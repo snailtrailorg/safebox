@@ -8,24 +8,22 @@ import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Patterns;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AutoCompleteTextView;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
 import java.security.KeyPair;
 import java.util.regex.Pattern;
 
-public class SignUpDialog extends AlertDialog implements View.OnClickListener, TextView.OnEditorActionListener,View.OnTouchListener {
+public class SignUpDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
     private Handler m_uiHandler;
     private View m_view;
+    private SignUpFormManager m_manager;
 
     SignUpDialog(Context context, Handler uiHandler) {
         super(context);
@@ -42,117 +40,143 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, T
 
         setCancelable(false);
 
-        new SignUpFormManager().manage();
+        m_manager = new SignUpFormManager(m_view);
+        m_manager.manage();
 
         m_view.findViewById(R.id.sign_up_progress_panel).setVisibility(View.GONE);
         m_view.findViewById(R.id.sign_up_form_panel).setVisibility(View.VISIBLE);
 
         m_view.findViewById(R.id.sign_up_switch_sign_in_button).setOnClickListener(this);
         m_view.findViewById(R.id.sign_up_button).setOnClickListener(this);
-        ((EditText)m_view.findViewById(R.id.sign_up_retype_password)).setOnEditorActionListener(this);
         m_view.setOnTouchListener(this);
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
     }
 
+    @Override
+    public void dismiss() {
+        m_view.setOnTouchListener(null);
+        m_view.findViewById(R.id.sign_up_button).setOnClickListener(null);
+        m_view.findViewById(R.id.sign_up_switch_sign_in_button).setOnClickListener(null);
+
+        m_manager.unmanage();
+
+        super.dismiss();
+    }
+
     private class SignUpFormManager {
-        boolean m_isEmailValid = false;
-        boolean m_isPasswordStrong = false;
-        boolean m_isPasswordConsistent = false;
+        private View m_rootView;
+        private EditText emailEditText;
+        private EditText passwordEditText;
+        private EditText retype_passwordEditText;
+        private boolean m_isEmailValid;
+        private boolean m_isPasswordStrong;
+        private boolean m_isPasswordConsistent;
+
+        SignUpFormManager(View view) {
+            m_rootView = view;
+            emailEditText = m_rootView.findViewById(R.id.sign_up_email);
+            passwordEditText = m_rootView.findViewById(R.id.sign_up_password);
+            retype_passwordEditText = m_rootView.findViewById(R.id.sign_up_retype_password);
+            m_isEmailValid = false;
+            m_isPasswordStrong = false;
+            m_isPasswordConsistent = false;
+        }
+
+        private TextWatcher m_emailTextWatcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (Patterns.EMAIL_ADDRESS.matcher(s).matches()) {
+                    m_isEmailValid = true;
+                } else {
+                    emailEditText.setError("Invalid email address");
+                    m_isEmailValid = false;
+                }
+                validate();
+            }
+        };
+
+        private TextWatcher m_passwordTextWatcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (Pattern.matches("^(?=.*?\\d)(?=.*?[A-Z]).{8,}$", s)) {
+                    m_isPasswordStrong = true;
+                } else {
+                    passwordEditText.setError("Password too weak");
+                    m_isPasswordStrong = false;
+                }
+
+                if (retype_passwordEditText.getText().toString().equals(passwordEditText.getText().toString())) {
+                    m_isPasswordConsistent = true;
+                } else {
+                    retype_passwordEditText.setError("Password inconsistent");
+                    m_isPasswordConsistent = false;
+                }
+                validate();
+            }
+        };
+
+        private TextWatcher m_retype_passwordTextWathcer = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (retype_passwordEditText.getText().toString().equals(passwordEditText.getText().toString())) {
+                    m_isPasswordConsistent = true;
+                } else {
+                    retype_passwordEditText.setError("Password inconsistent");
+                    m_isPasswordConsistent = false;
+                }
+                validate();
+            }
+        };
 
         void manage() {
-            final EditText emailEditText = m_view.findViewById(R.id.sign_up_email);
-            final EditText passwordEditText = m_view.findViewById(R.id.sign_up_password);
-            final EditText retypePasswordEditText = m_view.findViewById(R.id.sign_up_retype_password);
+            m_rootView.findViewById(R.id.sign_up_button).setEnabled(false);
 
-            m_view.findViewById(R.id.sign_up_button).setEnabled(false);
-            //retypePasswordEditText.setImeOptions(EditorInfo.IME_ACTION_NONE);
+            emailEditText.addTextChangedListener(m_emailTextWatcher);
+            passwordEditText.addTextChangedListener(m_passwordTextWatcher);
+            retype_passwordEditText.addTextChangedListener(m_retype_passwordTextWathcer);
+        }
 
-            emailEditText.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-                }
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {
-                    if (Patterns.EMAIL_ADDRESS.matcher(s).matches()) {
-                        m_isEmailValid = true;
-                        validate();
-                    } else {
-                        emailEditText.setError("Invalid email address");
-                        m_isEmailValid = false;
-                    }
-
-                }
-            });
-
-            passwordEditText.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-                }
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {
-                    if (Pattern.matches("^(?=.*?\\d)(?=.*?[A-Z]).{8,}$", s)) {
-                        m_isPasswordStrong = true;
-                        validate();
-                    } else {
-                        passwordEditText.setError("Password too weak");
-                        m_isPasswordStrong = false;
-                    }
-
-                    if (retypePasswordEditText.getText().toString().equals(passwordEditText.getText().toString())) {
-                        m_isPasswordConsistent = true;
-                        validate();
-                    } else {
-                        retypePasswordEditText.setError("Password inconsistent");
-                        m_isPasswordConsistent = false;
-                    }
-                }
-            });
-
-            retypePasswordEditText.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-                }
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {
-                    if ((retypePasswordEditText.getText().toString().equals(passwordEditText.getText().toString()))) {
-                        m_isPasswordConsistent = true;
-                        validate();
-                    } else {
-                        retypePasswordEditText.setError("Password inconsistent");
-                        m_isPasswordConsistent = false;
-                    }
-                }
-            });
+        void unmanage() {
+            emailEditText.removeTextChangedListener(m_emailTextWatcher);
+            passwordEditText.removeTextChangedListener(m_passwordTextWatcher);
+            retype_passwordEditText.removeTextChangedListener(m_retype_passwordTextWathcer);
         }
 
         private void validate() {
-            m_view.findViewById(R.id.sign_up_button).setEnabled(m_isEmailValid && m_isPasswordStrong && m_isPasswordConsistent);
-            //((EditText) m_view.findViewById(R.id.sign_up_retype_password)).setImeOptions((m_isEmailValid && m_isPasswordStrong && m_isPasswordConsistent) ? EditorInfo.IME_ACTION_DONE : EditorInfo.IME_ACTION_NONE);
+            m_rootView.findViewById(R.id.sign_up_button).setEnabled(m_isEmailValid && m_isPasswordStrong && m_isPasswordConsistent);
         }
-
     }
 
     @Override
@@ -170,18 +194,6 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, T
     }
 
     @Override
-    public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-        if (actionId != EditorInfo.IME_ACTION_DONE) {
-            return false;
-        } else if (v.getId() == R.id.sign_up_retype_password) {
-            onClickSignUp(v);
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
     public boolean onTouch(View v, MotionEvent event) {
         InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
@@ -190,15 +202,15 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, T
         return false;
     }
 
-    public void onClickSwitchSignIn(View view) {
+    private void onClickSwitchSignIn(View view) {
         m_uiHandler.sendEmptyMessage(R.integer.action_sign_in);
         dismiss();
     }
 
-    public void onClickSignUp(View view) {
+    private void onClickSignUp(View view) {
         AutoCompleteTextView emailView = findViewById(R.id.sign_up_email);
         EditText passwordView = findViewById(R.id.sign_up_password);
-        EditText retypePasswordView = findViewById(R.id.sign_up_retype_password);
+        EditText retype_passwordView = findViewById(R.id.sign_up_retype_password);
 
         String email = emailView.getText().toString();
         String password = passwordView.getText().toString();
