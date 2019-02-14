@@ -70,7 +70,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else {
             m_secureHandler.sendEmptyMessage(R.integer.action_sign_up);
         }
-
     }
 
     @Override
