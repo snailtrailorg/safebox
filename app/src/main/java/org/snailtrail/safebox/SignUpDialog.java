@@ -210,7 +210,6 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
     private void onClickSignUp(View view) {
         AutoCompleteTextView emailView = findViewById(R.id.sign_up_email);
         EditText passwordView = findViewById(R.id.sign_up_password);
-        EditText retype_passwordView = findViewById(R.id.sign_up_retype_password);
 
         String email = emailView.getText().toString();
         String password = passwordView.getText().toString();
@@ -256,6 +255,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
             // do something?
 
             publishProgress(PROGRESS_CHECK_EMAIL);
+
             sqliteOpenHelper = new SqliteOpenHelper(getContext());
             boolean conflict = sqliteOpenHelper.checkEmailConfliction(email);
             sqliteOpenHelper.close();
@@ -264,18 +264,21 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
             }
 
             publishProgress(PROGRESS_CALC_DIGEST);
+
             String shadow = Utilities.caculateDigist(email, password);
             if (shadow == null) {
                 return RESULT_ERROR_CALCULATE_DIGEST_FAILED;
             }
 
             publishProgress(PROGRESS_GEN_RSA_KEY);
+
             KeyPair keyPair = Utilities.generateRSAKey();
             if (keyPair == null) {
                 return RESULT_ERRIR_GEN_RSA_KEY_FAILED;
             }
 
             publishProgress(PROGRESS_CREATE_ACCOUNT);
+
             String public_key = Utilities.getEncodedPublicKey(keyPair);
             String private_key = Utilities.getEncodedPrivateKey(keyPair);
             String encrypted_public_key = Utilities.tripleDesEncrypt(public_key, password);

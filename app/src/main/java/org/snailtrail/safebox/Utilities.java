@@ -3,11 +3,7 @@ package org.snailtrail.safebox;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.org.apache.commons.codec.binary.Hex;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Base64;
-import android.util.Patterns;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import java.security.InvalidAlgorithmParameterException;
@@ -16,8 +12,9 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.util.regex.Pattern;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -213,5 +210,13 @@ class Utilities {
         byte[] digest = messageDigest.digest();
 
         return new SecretKeySpec(digest, 8, 24, symmetricEncryptAlgorithm);
+    }
+
+    public static PublicKey getPublicKey(String encryptedPublicKey) {
+        return null;
+    }
+
+    public static PrivateKey getPrivateKey(String encryptedPrivateKey) {
+        return null;
     }
 }

@@ -9,12 +9,12 @@ import android.database.sqlite.SQLiteOpenHelper;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SqliteOpenHelper extends SQLiteOpenHelper {
+class SqliteOpenHelper extends SQLiteOpenHelper {
 
     private static final String sqlite_db_name = "safebox.db";
     private static final int sqlite_db_version = 1;
 
-    public SqliteOpenHelper(Context context) {
+    SqliteOpenHelper(Context context) {
         super(context, sqlite_db_name, null, sqlite_db_version);
     }
 
@@ -33,56 +33,104 @@ public class SqliteOpenHelper extends SQLiteOpenHelper {
 
     }
 
-    public int getUserCount() {
+    int getUserCount() {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = db.query("user",new String[]{"email"},null, null,null,null,null);
 
         int result = cursor.getCount();
 
+        cursor.close();
         db.close();
 
         return result;
     }
 
-    public ArrayList<String> getUserEmailList() {
+    ArrayList<String> getUserEmailList() {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = db.query("user", new String[]{"email"},null, null, null, null, null);
 
-        ArrayList<String> result = new ArrayList<String>();
+        ArrayList<String> result = new ArrayList<>();
 
         while (cursor.moveToNext()) {
             result.add(cursor.getString(cursor.getColumnIndex("email")));
         }
 
+        cursor.close();
         db.close();
 
         return result;
     }
 
-    public boolean checkEmailConfliction(String email) {
+    boolean checkEmailConfliction(String email) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = db.query("user",new String[]{"email"},"email=?",new String[]{email},null,null,null);
 
         boolean result = cursor.moveToNext();
 
+        cursor.close();
         db.close();
 
         return result;
     }
 
-    public long insertUser(String email, String shadow, String rsapubkey, String rsaprivkey) {
+    class UserInfo {
+        int uid;
+        String email;
+        String shadow;
+        String public_key;
+        String private_key;
+
+        UserInfo() {
+        }
+
+        UserInfo(int uid, String email, String shadow, String public_key, String private_key) {
+            this.uid = uid;
+            this.email = email;
+            this.shadow = shadow;
+            this.public_key = public_key;
+            this.private_key = private_key;
+        }
+    }
+
+    long insertUser(UserInfo userInfo) {
+        return insertUser(userInfo.email, userInfo.shadow, userInfo.public_key, userInfo.private_key);
+    }
+
+    long insertUser(String email, String shadow, String public_key, String private_key) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
 
         values.put("email", email);
         values.put("shadow",shadow);
-        values.put("rsapubkey", rsapubkey);
-        values.put("rsaprivkey", rsaprivkey);
+        values.put("rsapubkey", public_key);
+        values.put("rsaprivkey", private_key);
 
         long result = db.insert("user", null, values);
 
         db.close();
 
         return result;
+    }
+
+    UserInfo getUserInfo(String email) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.rawQuery("select * from 'user' where 'email'=?", new String[]{email});
+
+        if (cursor.moveToFirst()) {
+            UserInfo userInfo = new UserInfo();
+            userInfo.uid = cursor.getInt(cursor.getColumnIndex("uid"));
+            userInfo.email = cursor.getString(cursor.getColumnIndex("email"));
+            userInfo.shadow = cursor.getString(cursor.getColumnIndex("shadow"));
+            userInfo.public_key = cursor.getString(cursor.getColumnIndex("rsapubkey"));
+            userInfo.private_key = cursor.getString(cursor.getColumnIndex("rsaprivkey"));
+
+            cursor.close();
+            db.close();
+            return userInfo;
+        } else {
+            cursor.close();
+            db.close();
+            return null;
+        }
     }
 }

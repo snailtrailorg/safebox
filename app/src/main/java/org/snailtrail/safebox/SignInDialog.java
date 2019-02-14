@@ -2,8 +2,10 @@ package org.snailtrail.safebox;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
@@ -11,7 +13,11 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
+import android.widget.TextView;
 
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.ArrayList;
 
 public class SignInDialog extends AlertDialog implements View.OnClickListener {
@@ -51,6 +57,14 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
     }
 
     @Override
+    public void dismiss() {
+        m_view.findViewById(R.id.sign_in_switch_sign_up_button).setOnClickListener(null);
+        m_view.findViewById(R.id.sign_in_button).setOnClickListener(null);
+
+        super.dismiss();
+    }
+
+    @Override
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.sign_in_switch_sign_up_button:
@@ -82,16 +96,17 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
         m_view.findViewById(R.id.sign_in_form_panel).setVisibility(View.GONE);
         m_view.findViewById(R.id.sign_in_progress_panel).setVisibility(View.VISIBLE);
 
-        //new SignInTask().execute(email, password);
+        new SignInTask().execute(email, password);
     }
-/*
+
     private class SignInTask extends AsyncTask<String, Integer, Integer> {
 
-        private static final int PROGRESS_START_SIGN_UP = 0;
-        private static final int PROGRESS_CHECK_EMAIL = 1;
-        private static final int PROGRESS_CHECK_PASSWORD = 2;
-        private static final int PROGRESS_LOAD_RSA_KEY = 3;
-        private static final int PROGRESS_FINISH_SIGN_IN = 4;
+        private static final int PROGRESS_START_SIGN_IN = 0;
+        private static final int PROGRESS_LOAD_USER_INFO = 1;
+        private static final int PROGRESS_CHECK_EMAIL = 2;
+        private static final int PROGRESS_CHECK_PASSWORD = 3;
+        private static final int PROGRESS_LOAD_RSA_KEY = 4;
+        private static final int PROGRESS_FINISH_SIGN_IN = 5;
 
         private static final int RESULT_SUCCESS = 0;
         private static final int RESULT_ERROR_EMAIL_DOES_NOT_EXIST = 1;
@@ -111,42 +126,41 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
             SqliteOpenHelper sqliteOpenHelper;
 
-            publishProgress(PROGRESS_START_SIGN_UP);
-            // do something?
+            publishProgress(PROGRESS_START_SIGN_IN);
+            //do something?
+
+            publishProgress(PROGRESS_LOAD_USER_INFO);
+
+            sqliteOpenHelper = new SqliteOpenHelper(getContext());
+            SqliteOpenHelper.UserInfo userInfo = sqliteOpenHelper.getUserInfo(email);
+            sqliteOpenHelper.close();
 
             publishProgress(PROGRESS_CHECK_EMAIL);
-            sqliteOpenHelper = new SqliteOpenHelper(getContext());
-            boolean conflict = sqliteOpenHelper.checkEmailConfliction(email);
-            sqliteOpenHelper.close();
-            if (conflict) {
-                return RESULT_ERROR_EMAIL_CONFLICTED;
+
+            if (userInfo = null) {
+                return RESULT_ERROR_EMAIL_DOES_NOT_EXIST;
             }
 
-            publishProgress(PROGRESS_CALC_DIGEST);
+            publishProgress(PROGRESS_CHECK_PASSWORD);
+
             String shadow = Utilities.caculateDigist(email, password);
-            if (shadow == null) {
-                return RESULT_ERROR_CALCULATE_DIGEST_FAILED;
+            if (userInfo.shadow != Utilities.caculateDigist(email, password)) {
+                return RESULT_ERROR_PASSWORD_INCORRECT;
             }
 
-            publishProgress(PROGRESS_GEN_RSA_KEY);
-            KeyPair keyPair = Utilities.generateRSAKey();
-            if (keyPair == null) {
-                return RESULT_ERRIR_GEN_RSA_KEY_FAILED;
+            publishProgress(PROGRESS_LOAD_RSA_KEY);
+
+            PublicKey public_key = Utilities.getPublicKey(userInfo.public_key);
+            PrivateKey privateKey = Utilities.getPrivateKey(userInfo.private_key);
+
+            if (public_key == null || privateKey == null) {
+                return RESULT_ERRIR_LOAD_RSA_KEY_FAILED;
             }
 
-            publishProgress(PROGRESS_CREATE_ACCOUNT);
-            String public_key = Utilities.getEncodedPublicKey(keyPair);
-            String private_key = Utilities.getEncodedPrivateKey(keyPair);
-            String encrypted_public_key = Utilities.tripleDesEncrypt(public_key, password);
-            String encrypted_private_key = Utilities.tripleDesEncrypt(private_key, password);
+            Message message = new Message();
+            m_uiHandler.sendMessage();
 
-            //Log.i("RSAKEY", keyPair.getPublic().getAlgorithm() + ":" + keyPair.getPublic().getFormat() + ":" + strPublicKey);
-            //Log.i("RSAKEY", keyPair.getPrivate().getAlgorithm() + ":" + keyPair.getPrivate().getFormat() + ":" + strPrivateKey);
-            sqliteOpenHelper = new SqliteOpenHelper(getContext());
-            sqliteOpenHelper.insertUser(email, shadow, encrypted_public_key, encrypted_private_key);
-            sqliteOpenHelper.close();
-
-            publishProgress(PROGRESS_FINISH_SIGN_UP);
+            publishProgress(PROGRESS_FINISH_SIGN_IN);
 
             return RESULT_SUCCESS;
         }
@@ -201,5 +215,5 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
                 m_view.findViewById(R.id.sign_in_form_panel).setVisibility(View.VISIBLE);
             }
         }
-    }*/
+    }
 }
