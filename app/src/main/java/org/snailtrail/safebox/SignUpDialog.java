@@ -128,6 +128,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
                 }
 
                 if (retype_passwordEditText.getText().toString().equals(passwordEditText.getText().toString())) {
+                    retype_passwordEditText.setError(null);
                     m_isPasswordConsistent = true;
                 } else {
                     retype_passwordEditText.setError("Password inconsistent");

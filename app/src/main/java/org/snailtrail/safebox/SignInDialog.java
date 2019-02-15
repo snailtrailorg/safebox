@@ -142,7 +142,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
             publishProgress(SIGN_IN_PROGRESS_CHECK_PASSWORD);
 
-            if (userInfo.m_shadow == null || userInfo.m_shadow.length() == 0 || password == null || password.length() == 0 || userInfo.m_shadow != Utilities.caculateDigist(email, password)) {
+            if (userInfo.m_shadow == null || userInfo.m_shadow.length() == 0 || password == null || password.length() == 0 || ! userInfo.m_shadow.equals(Utilities.caculateDigist(email, password))) {
                 return SIGN_IN_RESULT_ERROR_PASSWORD_INCORRECT;
             }
 
@@ -166,7 +166,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
         @Override
         protected void onProgressUpdate(Integer... progress) {
-            TextView progressMessageTextView = m_view.findViewById(R.id.sign_up_progress_message);
+            TextView progressMessageTextView = m_view.findViewById(R.id.sign_in_progress_message);
 
             switch (progress[0]) {
                 case SIGN_IN_PROGRESS_START:

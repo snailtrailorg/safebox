@@ -61,7 +61,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/prompt_sign_in_password"
-                    android:imeActionId="@integer/action_sign_in"
                     android:imeOptions="actionNext"
                     android:importantForAutofill="no"
                     android:inputType="textPassword"
@@ -148,7 +147,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_margin="@dimen/general_margin_small"
-                    android:text="@string/progress_dialog_title" />
+                    android:text="@string/progress_processing_message" />
 
             </LinearLayout>
 

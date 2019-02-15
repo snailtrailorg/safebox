@@ -113,7 +113,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
     UserInfo getUserInfo(String email) {
         SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery("select * from 'user' where 'email'=?", new String[]{email});
+        Cursor cursor = db.rawQuery("select * from user where email=?", new String[]{email});
 
         if (cursor.moveToFirst()) {
             UserInfo userInfo = new UserInfo();

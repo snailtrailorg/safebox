@@ -20,7 +20,7 @@
     <string name="sign_up_button">Sign up</string>
     <string name="switch_sign_in_button">Sign in an exist account</string>
     <string name="switch_sign_up_button">Sign up a new account</string>
-    <string name="progress_panel_title">Processing, please wait...</string>
+    <string name="progress_processing_message">Processing, please wait...</string>
 
     <string name="error_dialog_title">Error</string>
     <string name="error_dialog_button_ok">OK</string>
