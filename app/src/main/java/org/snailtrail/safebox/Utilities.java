@@ -44,7 +44,7 @@ class Utilities {
     }
 
     static void showMessageBox(Context context, int title, int message) {
-        new AlertDialog.Builder(context).setTitle(title).setMessage(message).setPositiveButton(R.string.dialog_button_ok, null).show();
+        new AlertDialog.Builder(context).setTitle(title).setMessage(message).setPositiveButton(R.string.error_dialog_button_ok, null).show();
     }
 
     static String caculateDigist(String email, String password) {
@@ -212,11 +212,27 @@ class Utilities {
         return new SecretKeySpec(digest, 8, 24, symmetricEncryptAlgorithm);
     }
 
-    public static PublicKey getPublicKey(String encryptedPublicKey) {
+    static PublicKey getPublicKey(String encryptedPublicKey) {
         return null;
     }
 
-    public static PrivateKey getPrivateKey(String encryptedPrivateKey) {
+    static PrivateKey getPrivateKey(String encryptedPrivateKey) {
         return null;
+    }
+
+    static class SignInMessageObject {
+        int m_uid;
+        String m_email;
+        PublicKey m_publicKey;
+        PrivateKey m_privateKey;
+
+        SignInMessageObject() {}
+
+        SignInMessageObject(int uid, String email, PublicKey publicKey, PrivateKey privateKey) {
+            m_uid = uid;
+            m_email = email;
+            m_publicKey = publicKey;
+            m_privateKey = privateKey;
+        }
     }
 }

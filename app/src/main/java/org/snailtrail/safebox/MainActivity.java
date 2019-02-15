@@ -9,7 +9,10 @@ import android.view.MenuItem;
 import com.google.android.material.navigation.NavigationView;
 
 import java.lang.ref.WeakReference;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -17,25 +20,38 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+    private boolean m_isUserSignedIn;
+    private int m_signInUserId;
+    private String m_email;
+    private PublicKey m_publicKey;
+    private PrivateKey m_privateKey;
 
     private static class SecureHandler extends Handler {
         private WeakReference<MainActivity> m_mainActivity;
 
         protected SecureHandler (MainActivity activity) {
-            m_mainActivity= new WeakReference<>(activity);
+            m_mainActivity = new WeakReference<>(activity);
         }
 
         @Override
         public void handleMessage(Message message) {
-            final MainActivity mainActivity = m_mainActivity.get();
+            MainActivity mainActivity = m_mainActivity.get();
 
             if (mainActivity != null) {
                 switch (message.what) {
-                    case R.integer.action_sign_in:
+                    case R.integer.MESSAGE_DO_SIGN_IN:
                         mainActivity.doSignIn();
                         break;
-                    case R.integer.action_sign_up:
+                    case R.integer.MESSAGE_DO_SIGN_UP:
                         mainActivity.doSignUp();
+                        break;
+                    case R.integer.MESSAGE_SET_USER_INFO:
+                        Utilities.SignInMessageObject obj = (Utilities.SignInMessageObject) message.obj;
+                        assert obj != null && obj.m_email != null && obj.m_publicKey != null && obj.m_privateKey != null;
+                        mainActivity.setUserInfo(obj.m_uid, obj.m_email, obj.m_publicKey, obj.m_privateKey);
+                        break;
+                    case R.integer.MESSAGE_LOAD_USER_DATA:
+                        mainActivity.loadUserData();
                         break;
                     default:
                         super.handleMessage(message);
@@ -46,7 +62,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    private SecureHandler m_secureHandler = new SecureHandler(this);
+    private SecureHandler m_secureHandler = new SecureHandler (this);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,11 +80,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
+        m_isUserSignedIn = false;
+
         int nUserCount = new SqliteOpenHelper(this).getUserCount();
         if (nUserCount > 0) {
-            m_secureHandler.sendEmptyMessage(R.integer.action_sign_in);
+            m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
         } else {
-            m_secureHandler.sendEmptyMessage(R.integer.action_sign_up);
+            m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_UP);
         }
     }
 
@@ -135,5 +153,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private  void doSignIn() {
         new SignInDialog(this, m_secureHandler).show();
+    }
+
+    private void setUserInfo(int uid, String email, PublicKey publicKey, PrivateKey privateKey) {
+        m_signInUserId = uid;
+        m_email = email;
+        m_publicKey = publicKey;
+        m_privateKey = privateKey;
+        m_isUserSignedIn = true;
+    }
+
+    private void loadUserData() {
+
     }
 }

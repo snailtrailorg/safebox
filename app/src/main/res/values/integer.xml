@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <integer name="action_sign_in">100</integer>
-    <integer name="action_sign_up">200</integer>
+    <integer name="MESSAGE_DO_SIGN_IN">100</integer>
+    <integer name="MESSAGE_DO_SIGN_UP">200</integer>
+    <integer name="MESSAGE_SET_USER_INFO">300</integer>
+    <integer name="MESSAGE_SET_USER_PUBLIC_KEY">500</integer>
+    <integer name="MESSAGE_SET_USER_PRIVATE_KEY">600</integer>
+    <integer name="MESSAGE_LOAD_USER_DATA">700</integer>
 </resources>

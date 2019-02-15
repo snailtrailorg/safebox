@@ -203,7 +203,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
     }
 
     private void onClickSwitchSignIn(View view) {
-        m_uiHandler.sendEmptyMessage(R.integer.action_sign_in);
+        m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
         dismiss();
     }
 
@@ -225,18 +225,18 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
 
     private class SignUpTask extends AsyncTask<String, Integer, Integer> {
 
-        private static final int PROGRESS_START_SIGN_UP = 0;
-        private static final int PROGRESS_CHECK_EMAIL = 1;
-        private static final int PROGRESS_CALC_DIGEST = 2;
-        private static final int PROGRESS_GEN_RSA_KEY = 3;
-        private static final int PROGRESS_CREATE_ACCOUNT = 4;
-        private static final int PROGRESS_FINISH_SIGN_UP = 5;
+        private static final int SIGN_UP_PROGRESS_START = 0;
+        private static final int SIGN_UP_PROGRESS_CHECK_EMAIL = 1;
+        private static final int SIGN_UP_PROGRESS_CALC_DIGEST = 2;
+        private static final int SIGN_UP_PROGRESS_GEN_RSA_KEY = 3;
+        private static final int SIGN_UP_PROGRESS_CREATE_ACCOUNT = 4;
+        private static final int SIGN_UP_PROGRESS_FINISHED = 5;
 
-        private static final int RESULT_SUCCESS = 0;
-        private static final int RESULT_ERROR_EMAIL_CONFLICTED = 1;
-        private static final int RESULT_ERROR_CALCULATE_DIGEST_FAILED = 2;
-        private static final int RESULT_ERRIR_GEN_RSA_KEY_FAILED = 3;
-        private static final int RESULT_ERROR_CREATE_ACCOUNT_FAILED = 4;
+        private static final int SIGN_UP_RESULT_SUCCESS = 0;
+        private static final int SIGN_UP_RESULT_ERROR_EMAIL_CONFLICTED = 1;
+        private static final int SIGN_UP_RESULT_ERROR_CALCULATE_DIGEST_FAILED = 2;
+        private static final int SIGN_UP_RESULT_ERRIR_GEN_RSA_KEY_FAILED = 3;
+        private static final int SIGN_UP_RESULT_ERROR_CREATE_ACCOUNT_FAILED = 4;
 
         @Override
         protected void onPreExecute() {
@@ -251,48 +251,48 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
 
             SqliteOpenHelper sqliteOpenHelper;
 
-            publishProgress(PROGRESS_START_SIGN_UP);
+            publishProgress(SIGN_UP_PROGRESS_START);
             // do something?
 
-            publishProgress(PROGRESS_CHECK_EMAIL);
+            publishProgress(SIGN_UP_PROGRESS_CHECK_EMAIL);
 
             sqliteOpenHelper = new SqliteOpenHelper(getContext());
             boolean conflict = sqliteOpenHelper.checkEmailConfliction(email);
             sqliteOpenHelper.close();
             if (conflict) {
-                return RESULT_ERROR_EMAIL_CONFLICTED;
+                return SIGN_UP_RESULT_ERROR_EMAIL_CONFLICTED;
             }
 
-            publishProgress(PROGRESS_CALC_DIGEST);
+            publishProgress(SIGN_UP_PROGRESS_CALC_DIGEST);
 
             String shadow = Utilities.caculateDigist(email, password);
             if (shadow == null) {
-                return RESULT_ERROR_CALCULATE_DIGEST_FAILED;
+                return SIGN_UP_RESULT_ERROR_CALCULATE_DIGEST_FAILED;
             }
 
-            publishProgress(PROGRESS_GEN_RSA_KEY);
+            publishProgress(SIGN_UP_PROGRESS_GEN_RSA_KEY);
 
             KeyPair keyPair = Utilities.generateRSAKey();
             if (keyPair == null) {
-                return RESULT_ERRIR_GEN_RSA_KEY_FAILED;
+                return SIGN_UP_RESULT_ERRIR_GEN_RSA_KEY_FAILED;
             }
 
-            publishProgress(PROGRESS_CREATE_ACCOUNT);
+            publishProgress(SIGN_UP_PROGRESS_CREATE_ACCOUNT);
 
             String public_key = Utilities.getEncodedPublicKey(keyPair);
             String private_key = Utilities.getEncodedPrivateKey(keyPair);
             String encrypted_public_key = Utilities.tripleDesEncrypt(public_key, password);
             String encrypted_private_key = Utilities.tripleDesEncrypt(private_key, password);
 
-            //Log.i("RSAKEY", keyPair.getPublic().getAlgorithm() + ":" + keyPair.getPublic().getFormat() + ":" + strPublicKey);
-            //Log.i("RSAKEY", keyPair.getPrivate().getAlgorithm() + ":" + keyPair.getPrivate().getFormat() + ":" + strPrivateKey);
             sqliteOpenHelper = new SqliteOpenHelper(getContext());
             sqliteOpenHelper.insertUser(email, shadow, encrypted_public_key, encrypted_private_key);
             sqliteOpenHelper.close();
 
-            publishProgress(PROGRESS_FINISH_SIGN_UP);
+            publishProgress(SIGN_UP_PROGRESS_FINISHED);
 
-            return RESULT_SUCCESS;
+            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
+
+            return SIGN_UP_RESULT_SUCCESS;
         }
 
         @Override
@@ -300,22 +300,22 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
             TextView progressMessageTextView = m_view.findViewById(R.id.sign_up_progress_message);
 
             switch (progress[0]) {
-                case PROGRESS_START_SIGN_UP:
+                case SIGN_UP_PROGRESS_START:
                     progressMessageTextView.setText(R.string.sign_up_progress_start);
                     break;
-                case PROGRESS_CHECK_EMAIL:
+                case SIGN_UP_PROGRESS_CHECK_EMAIL:
                     progressMessageTextView.setText(R.string.sign_up_progress_check_email);
                     break;
-                case PROGRESS_CALC_DIGEST:
+                case SIGN_UP_PROGRESS_CALC_DIGEST:
                     progressMessageTextView.setText(R.string.sign_up_progress_calculate_digest);
                     break;
-                case PROGRESS_GEN_RSA_KEY:
+                case SIGN_UP_PROGRESS_GEN_RSA_KEY:
                     progressMessageTextView.setText(R.string.sign_up_progress_generate_rsa_key);
                     break;
-                case PROGRESS_CREATE_ACCOUNT:
+                case SIGN_UP_PROGRESS_CREATE_ACCOUNT:
                     progressMessageTextView.setText(R.string.sign_up_progress_create_account);
                     break;
-                case PROGRESS_FINISH_SIGN_UP:
+                case SIGN_UP_PROGRESS_FINISHED:
                     progressMessageTextView.setText(R.string.sign_up_progress_finish);
                     break;
                 default:
@@ -324,26 +324,25 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
 
         @Override
         protected void onPostExecute(Integer result) {
-            if (result == RESULT_SUCCESS) {
-                dismiss();
-                Utilities.jam(getContext(), R.string.sign_up_progress_finish);
-            } else {
-                switch (result) {
-                    case RESULT_ERROR_EMAIL_CONFLICTED:
-                        Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.error_email_conflicted);
-                        break;
-                    case RESULT_ERROR_CALCULATE_DIGEST_FAILED:
-                        Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.error_calculate_digest_failed);
-                        break;
-                    case RESULT_ERRIR_GEN_RSA_KEY_FAILED:
-                        Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.error_generate_rsa_key_failed);
-                        break;
-                    default:
-                }
-
-                m_view.findViewById(R.id.sign_up_progress_panel).setVisibility(View.GONE);
-                m_view.findViewById(R.id.sign_up_form_panel).setVisibility(View.VISIBLE);
+            switch (result) {
+                case SIGN_UP_RESULT_ERROR_EMAIL_CONFLICTED:
+                    Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.sign_up_result_error_email_conflicted);
+                    break;
+                case SIGN_UP_RESULT_ERROR_CALCULATE_DIGEST_FAILED:
+                    Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.sign_up_result_error_calculate_digest_failed);
+                    break;
+                case SIGN_UP_RESULT_ERRIR_GEN_RSA_KEY_FAILED:
+                    Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.sign_up_result_error_generate_rsa_key_failed);
+                    break;
+                case SIGN_UP_RESULT_SUCCESS:
+                    Utilities.jam(getContext(), R.string.sign_up_result_success);
+                    dismiss();
+                    break;
+                default:
             }
+
+            m_view.findViewById(R.id.sign_up_progress_panel).setVisibility(View.GONE);
+            m_view.findViewById(R.id.sign_up_form_panel).setVisibility(View.VISIBLE);
         }
     }
 }

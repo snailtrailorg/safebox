@@ -79,7 +79,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
     }
 
     private void OnClickSwitchSignUp(View view) {
-        m_uiHandler.sendEmptyMessage(R.integer.action_sign_up);
+        m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_UP);
         dismiss();
     }
 
@@ -100,18 +100,17 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
     }
 
     private class SignInTask extends AsyncTask<String, Integer, Integer> {
+        private static final int SIGN_IN_PROGRESS_START = 0;
+        private static final int SIGN_IN_PROGRESS_LOAD_USER_INFO = 1;
+        private static final int SIGN_IN_PROGRESS_CHECK_EMAIL = 2;
+        private static final int SIGN_IN_PROGRESS_CHECK_PASSWORD = 3;
+        private static final int SIGN_IN_PROGRESS_LOAD_RSA_KEY = 4;
+        private static final int SIGN_IN_PROGRESS_FINISHED= 5;
 
-        private static final int PROGRESS_START_SIGN_IN = 0;
-        private static final int PROGRESS_LOAD_USER_INFO = 1;
-        private static final int PROGRESS_CHECK_EMAIL = 2;
-        private static final int PROGRESS_CHECK_PASSWORD = 3;
-        private static final int PROGRESS_LOAD_RSA_KEY = 4;
-        private static final int PROGRESS_FINISH_SIGN_IN = 5;
-
-        private static final int RESULT_SUCCESS = 0;
-        private static final int RESULT_ERROR_EMAIL_DOES_NOT_EXIST = 1;
-        private static final int RESULT_ERROR_PASSWORD_INCORRECT = 2;
-        private static final int RESULT_ERRIR_LOAD_RSA_KEY_FAILED = 3;
+        private static final int SIGN_IN_RESULT_SUCCESS = 0;
+        private static final int SIGN_IN_RESULT_ERROR_EMAIL_DOES_NOT_EXIST = 1;
+        private static final int SIGN_IN_RESULT_ERROR_PASSWORD_INCORRECT = 2;
+        private static final int SIGN_IN_RESULT_ERRIR_LOAD_RSA_KEY_FAILED = 3;
 
         @Override
         protected void onPreExecute() {
@@ -126,43 +125,43 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
             SqliteOpenHelper sqliteOpenHelper;
 
-            publishProgress(PROGRESS_START_SIGN_IN);
+            publishProgress(SIGN_IN_PROGRESS_START);
             //do something?
 
-            publishProgress(PROGRESS_LOAD_USER_INFO);
+            publishProgress(SIGN_IN_PROGRESS_LOAD_USER_INFO);
 
             sqliteOpenHelper = new SqliteOpenHelper(getContext());
             SqliteOpenHelper.UserInfo userInfo = sqliteOpenHelper.getUserInfo(email);
             sqliteOpenHelper.close();
 
-            publishProgress(PROGRESS_CHECK_EMAIL);
+            publishProgress(SIGN_IN_PROGRESS_CHECK_EMAIL);
 
-            if (userInfo = null) {
-                return RESULT_ERROR_EMAIL_DOES_NOT_EXIST;
+            if (userInfo == null || userInfo.m_email == null || userInfo.m_email.length() == 0) {
+                return SIGN_IN_RESULT_ERROR_EMAIL_DOES_NOT_EXIST;
             }
 
-            publishProgress(PROGRESS_CHECK_PASSWORD);
+            publishProgress(SIGN_IN_PROGRESS_CHECK_PASSWORD);
 
-            String shadow = Utilities.caculateDigist(email, password);
-            if (userInfo.shadow != Utilities.caculateDigist(email, password)) {
-                return RESULT_ERROR_PASSWORD_INCORRECT;
+            if (userInfo.m_shadow == null || userInfo.m_shadow.length() == 0 || password == null || password.length() == 0 || userInfo.m_shadow != Utilities.caculateDigist(email, password)) {
+                return SIGN_IN_RESULT_ERROR_PASSWORD_INCORRECT;
             }
 
-            publishProgress(PROGRESS_LOAD_RSA_KEY);
+            publishProgress(SIGN_IN_PROGRESS_LOAD_RSA_KEY);
 
-            PublicKey public_key = Utilities.getPublicKey(userInfo.public_key);
-            PrivateKey privateKey = Utilities.getPrivateKey(userInfo.private_key);
+            PublicKey publicKey = Utilities.getPublicKey(userInfo.m_public_key);
+            PrivateKey privateKey = Utilities.getPrivateKey(userInfo.m_private_key);
 
-            if (public_key == null || privateKey == null) {
-                return RESULT_ERRIR_LOAD_RSA_KEY_FAILED;
+            if (publicKey == null || privateKey == null) {
+                return SIGN_IN_RESULT_ERRIR_LOAD_RSA_KEY_FAILED;
             }
 
-            Message message = new Message();
-            m_uiHandler.sendMessage();
+            publishProgress(SIGN_IN_PROGRESS_FINISHED);
 
-            publishProgress(PROGRESS_FINISH_SIGN_IN);
+            m_uiHandler.obtainMessage(R.integer.MESSAGE_SET_USER_INFO, new Utilities.SignInMessageObject(userInfo.m_uid, userInfo.m_email, publicKey, privateKey)).sendToTarget();
 
-            return RESULT_SUCCESS;
+            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_DATA);
+
+            return SIGN_IN_RESULT_SUCCESS;
         }
 
         @Override
@@ -170,23 +169,23 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
             TextView progressMessageTextView = m_view.findViewById(R.id.sign_up_progress_message);
 
             switch (progress[0]) {
-                case PROGRESS_START_SIGN_UP:
-                    progressMessageTextView.setText(R.string.sign_up_progress_start);
+                case SIGN_IN_PROGRESS_START:
+                    progressMessageTextView.setText(R.string.sign_in_progress_start);
                     break;
-                case PROGRESS_CHECK_EMAIL:
-                    progressMessageTextView.setText(R.string.sign_up_progress_check_email);
+                case SIGN_IN_PROGRESS_LOAD_USER_INFO:
+                    progressMessageTextView.setText(R.string.sign_in_progress_load_user_info);
                     break;
-                case PROGRESS_CALC_DIGEST:
-                    progressMessageTextView.setText(R.string.sign_up_progress_calculate_digest);
+                case SIGN_IN_PROGRESS_CHECK_EMAIL:
+                    progressMessageTextView.setText(R.string.sign_in_progress_check_email);
                     break;
-                case PROGRESS_GEN_RSA_KEY:
-                    progressMessageTextView.setText(R.string.sign_up_progress_generate_rsa_key);
+                case SIGN_IN_PROGRESS_CHECK_PASSWORD:
+                    progressMessageTextView.setText(R.string.sign_in_progress_check_password);
                     break;
-                case PROGRESS_CREATE_ACCOUNT:
-                    progressMessageTextView.setText(R.string.sign_up_progress_create_account);
+                case SIGN_IN_PROGRESS_LOAD_RSA_KEY:
+                    progressMessageTextView.setText(R.string.sign_in_progress_load_rsa_key);
                     break;
-                case PROGRESS_FINISH_SIGN_UP:
-                    progressMessageTextView.setText(R.string.sign_up_progress_finish);
+                case SIGN_IN_PROGRESS_FINISHED:
+                    progressMessageTextView.setText(R.string.sign_in_progress_finish);
                     break;
                 default:
             }
@@ -194,26 +193,25 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
         @Override
         protected void onPostExecute(Integer result) {
-            if (result == RESULT_SUCCESS) {
-                dismiss();
-                Utilities.jam(getContext(), R.string.sign_up_progress_finish);
-            } else {
-                switch (result) {
-                    case RESULT_ERROR_EMAIL_CONFLICTED:
-                        Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.error_email_conflicted);
-                        break;
-                    case RESULT_ERROR_CALCULATE_DIGEST_FAILED:
-                        Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.error_calculate_digest_failed);
-                        break;
-                    case RESULT_ERRIR_GEN_RSA_KEY_FAILED:
-                        Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.error_generate_rsa_key_failed);
-                        break;
-                    default:
-                }
-
-                m_view.findViewById(R.id.sign_in_progress_panel).setVisibility(View.GONE);
-                m_view.findViewById(R.id.sign_in_form_panel).setVisibility(View.VISIBLE);
+            switch (result) {
+                case SIGN_IN_RESULT_ERROR_EMAIL_DOES_NOT_EXIST:
+                    Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.sign_in_result_error_email_does_not_exist);
+                    break;
+                case SIGN_IN_RESULT_ERROR_PASSWORD_INCORRECT:
+                    Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.sign_in_result_error_password_incorrect);
+                    break;
+                case SIGN_IN_RESULT_ERRIR_LOAD_RSA_KEY_FAILED:
+                    Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.sign_in_result_error_load_rsa_key_failed);
+                    break;
+                case SIGN_IN_RESULT_SUCCESS:
+                    Utilities.jam(getContext(), R.string.sign_in_result_success);
+                    dismiss();
+                    break;
+                default:
             }
+
+            m_view.findViewById(R.id.sign_in_progress_panel).setVisibility(View.GONE);
+            m_view.findViewById(R.id.sign_in_form_panel).setVisibility(View.VISIBLE);
         }
     }
 }

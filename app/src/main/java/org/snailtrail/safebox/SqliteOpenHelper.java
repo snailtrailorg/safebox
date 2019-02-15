@@ -73,27 +73,26 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         return result;
     }
 
-    class UserInfo {
-        int uid;
-        String email;
-        String shadow;
-        String public_key;
-        String private_key;
+    static class UserInfo {
+        int m_uid;
+        String m_email;
+        String m_shadow;
+        String m_public_key;
+        String m_private_key;
 
-        UserInfo() {
-        }
+        UserInfo() {}
 
         UserInfo(int uid, String email, String shadow, String public_key, String private_key) {
-            this.uid = uid;
-            this.email = email;
-            this.shadow = shadow;
-            this.public_key = public_key;
-            this.private_key = private_key;
+            m_uid = uid;
+            m_email = email;
+            m_shadow = shadow;
+            m_public_key = public_key;
+            m_private_key = private_key;
         }
     }
 
     long insertUser(UserInfo userInfo) {
-        return insertUser(userInfo.email, userInfo.shadow, userInfo.public_key, userInfo.private_key);
+        return insertUser(userInfo.m_email, userInfo.m_shadow, userInfo.m_public_key, userInfo.m_private_key);
     }
 
     long insertUser(String email, String shadow, String public_key, String private_key) {
@@ -118,11 +117,11 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
         if (cursor.moveToFirst()) {
             UserInfo userInfo = new UserInfo();
-            userInfo.uid = cursor.getInt(cursor.getColumnIndex("uid"));
-            userInfo.email = cursor.getString(cursor.getColumnIndex("email"));
-            userInfo.shadow = cursor.getString(cursor.getColumnIndex("shadow"));
-            userInfo.public_key = cursor.getString(cursor.getColumnIndex("rsapubkey"));
-            userInfo.private_key = cursor.getString(cursor.getColumnIndex("rsaprivkey"));
+            userInfo.m_uid = cursor.getInt(cursor.getColumnIndex("uid"));
+            userInfo.m_email = cursor.getString(cursor.getColumnIndex("email"));
+            userInfo.m_shadow = cursor.getString(cursor.getColumnIndex("shadow"));
+            userInfo.m_public_key = cursor.getString(cursor.getColumnIndex("rsapubkey"));
+            userInfo.m_private_key = cursor.getString(cursor.getColumnIndex("rsaprivkey"));
 
             cursor.close();
             db.close();

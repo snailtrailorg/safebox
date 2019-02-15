@@ -20,23 +20,41 @@
     <string name="sign_up_button">Sign up</string>
     <string name="switch_sign_in_button">Sign in an exist account</string>
     <string name="switch_sign_up_button">Sign up a new account</string>
-    <string name="pref_name_user_info">UserInfo</string>
-    <string name="pref_key_email">email</string>
+    <string name="progress_panel_title">Processing, please wait...</string>
+
     <string name="error_dialog_title">Error</string>
-    <string name="error_invalid_email">Invalid email address, please check and correct it.</string>
-    <string name="error_email_conflicted">The email address conflicted with an exist one, please use another and try again.</string>
-    <string name="error_password_too_weak">The password you\'ve input is too weak, we strongly recommend that you should make it as strong as possible.\nYou should know that all your secrets stored in the safebox app and safebox cloud is based on this password, that is, if this password was leaked, all your secrets were leaked.</string>
-    <string name="error_password_inconsistent">The passwords you\'ve entered are inconsistent, please make sure they are consistent.</string>
-    <string name="error_calculate_digest_failed">Calculate digest failed unpredictably, it would be very appreciated to report this bug to the author.</string>
-    <string name="error_generate_rsa_key_failed">Generate RSA key failed unpredictably, it would be very appreciated to report this bug to the author.</string>
-    <string name="error_email_does_not_exist">Email address does not exist in account database, please check and correct it.</string>
-    <string name="error_password_incorrect">Password incorrect, please check it and retry.</string>
-    <string name="dialog_button_ok">OK</string>
-    <string name="progress_dialog_title">Processing, please wait...</string>
-    <string name="sign_up_progress_start">Starting Sign up, please wait...</string>
+    <string name="error_dialog_button_ok">OK</string>
+
+    <string name="sign_up_result_error_invalid_email">Invalid email address, please check and correct it.</string>
+    <string name="sign_up_result_error_email_conflicted">The email address conflicted with an exist one, please use another and try again.</string>
+    <string name="sign_up_result_error_password_too_weak">The password you\'ve input is too weak, we strongly recommend that you should make it as strong as possible.\nYou should know that all your secrets stored in the safebox app and safebox cloud is based on this password, that is, if this password was leaked, all your secrets were leaked.</string>
+    <string name="sign_up_result_error_password_inconsistent">The passwords you\'ve entered are inconsistent, please make sure they are consistent.</string>
+    <string name="sign_up_result_error_calculate_digest_failed">Calculate digest failed unpredictably, it would be very appreciated to report this bug to the author.</string>
+    <string name="sign_up_result_error_generate_rsa_key_failed">Generate RSA key failed unpredictably, it would be very appreciated to report this bug to the author.</string>
+    <string name="sign_up_result_error_email_does_not_exist">Email address does not exist in account database, please check and correct it.</string>
+    <string name="sign_up_result_success">Sign up success.</string>
+
+    <string name="sign_in_result_error_email_does_not_exist">The email address does not exist.</string>
+    <string name="sign_in_result_error_password_incorrect">Password incorrect, please check it and retry.</string>
+    <string name="sign_in_result_error_load_rsa_key_failed">Load rsa key failed unpredictably.</string>
+    <string name="sign_in_result_success">Sign in success.</string>
+
+    <string name="sign_up_progress_start">Starting sign up, please wait...</string>
     <string name="sign_up_progress_check_email">Checking email usability...</string>
     <string name="sign_up_progress_calculate_digest">Calculating password digest...</string>
-    <string name="sign_up_progress_generate_rsa_key">Generating RSA key pair...</string>
+    <string name="sign_up_progress_generate_rsa_key">Generating rsa key pair...</string>
     <string name="sign_up_progress_create_account">Creating account...</string>
-    <string name="sign_up_progress_finish">Sign up finished successfully.</string>
+    <string name="sign_up_progress_finish">Sign up finished.</string>
+
+    <string name="sign_in_progress_start">Start sign in, please wait...</string>
+    <string name="sign_in_progress_load_user_info">Loading user information...</string>
+    <string name="sign_in_progress_check_email">Checking email address...</string>
+    <string name="sign_in_progress_check_password">Checking password...</string>
+    <string name="sign_in_progress_load_rsa_key">Loading rsa key pair...</string>
+    <string name="sign_in_progress_finish">Sign in finished.</string>
+
+
+
+
+
 </resources>
