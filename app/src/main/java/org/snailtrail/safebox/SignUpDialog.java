@@ -280,8 +280,8 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
 
             publishProgress(SIGN_UP_PROGRESS_CREATE_ACCOUNT);
 
-            String public_key = Utilities.getEncodedPublicKey(keyPair);
-            String private_key = Utilities.getEncodedPrivateKey(keyPair);
+            String public_key = Utilities.encodedPublicKey(keyPair.getPublic());
+            String private_key = Utilities.encodedPrivateKey(keyPair.getPrivate());
             String encrypted_public_key = Utilities.tripleDesEncrypt(public_key, password);
             String encrypted_private_key = Utilities.tripleDesEncrypt(private_key, password);
 

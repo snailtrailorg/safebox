@@ -8,6 +8,7 @@ import android.widget.Toast;
 
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
@@ -15,6 +16,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -88,12 +93,54 @@ class Utilities {
         return keyPairGenerator.generateKeyPair();
     }
 
-    static String getEncodedPublicKey(KeyPair keyPair) {
-        return Base64.encodeToString(keyPair.getPublic().getEncoded(), Base64.DEFAULT);
+    static String encodedPublicKey(PublicKey publicKey) {
+        return Base64.encodeToString(publicKey.getEncoded(), Base64.DEFAULT);
     }
 
-    static String getEncodedPrivateKey(KeyPair keyPair) {
-        return Base64.encodeToString(keyPair.getPrivate().getEncoded(), Base64.DEFAULT);
+    static String encodedPrivateKey(PrivateKey privateKey) {
+        return Base64.encodeToString(privateKey.getEncoded(), Base64.DEFAULT);
+    }
+
+    static PublicKey decodePublicKey(String public_key) {
+        byte[] base64DecodedPublicKey = Base64.decode(public_key, Base64.DEFAULT);
+        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(base64DecodedPublicKey);
+
+        KeyFactory keyFactory = null;
+        try {
+            keyFactory = KeyFactory.getInstance(asymmetricEncryptAlgorithm);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        PublicKey publicKey = null;
+        try {
+            publicKey = keyFactory.generatePublic(publicKeySpec);
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+
+        return publicKey;
+    }
+
+    static PrivateKey decodePrivateKey(String private_key) {
+        byte[] base64DecodedPrivateKey = Base64.decode(private_key, Base64.DEFAULT);
+        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(base64DecodedPrivateKey);
+
+        KeyFactory keyFactory = null;
+        try {
+            keyFactory = KeyFactory.getInstance(asymmetricEncryptAlgorithm);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+        PrivateKey privateKey = null;
+        try {
+            privateKey = keyFactory.generatePrivate(privateKeySpec);
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+
+        return privateKey;
     }
 
     static String tripleDesEncrypt(String message, String password) {
@@ -210,14 +257,6 @@ class Utilities {
         byte[] digest = messageDigest.digest();
 
         return new SecretKeySpec(digest, 8, 24, symmetricEncryptAlgorithm);
-    }
-
-    static PublicKey getPublicKey(String encryptedPublicKey) {
-        return null;
-    }
-
-    static PrivateKey getPrivateKey(String encryptedPrivateKey) {
-        return null;
     }
 
     static class SignInMessageObject {

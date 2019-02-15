@@ -148,8 +148,10 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
             publishProgress(SIGN_IN_PROGRESS_LOAD_RSA_KEY);
 
-            PublicKey publicKey = Utilities.getPublicKey(userInfo.m_public_key);
-            PrivateKey privateKey = Utilities.getPrivateKey(userInfo.m_private_key);
+            String decrypted_publick_key = Utilities.tripleDesDecrypt(userInfo.m_public_key, password);
+            String decrypted_private_key = Utilities.tripleDesDecrypt(userInfo.m_private_key, password);
+            PublicKey publicKey = Utilities.decodePublicKey(decrypted_publick_key);
+            PrivateKey privateKey = Utilities.decodePrivateKey(decrypted_private_key);
 
             if (publicKey == null || privateKey == null) {
                 return SIGN_IN_RESULT_ERRIR_LOAD_RSA_KEY_FAILED;
