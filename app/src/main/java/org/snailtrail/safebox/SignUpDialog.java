@@ -46,8 +46,8 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
         m_view.findViewById(R.id.sign_up_progress_panel).setVisibility(View.GONE);
         m_view.findViewById(R.id.sign_up_form_panel).setVisibility(View.VISIBLE);
 
-        m_view.findViewById(R.id.sign_up_switch_sign_in_button).setOnClickListener(this);
-        m_view.findViewById(R.id.sign_up_button).setOnClickListener(this);
+        m_view.findViewById(R.id.sign_up_switch_sign_in).setOnClickListener(this);
+        m_view.findViewById(R.id.sign_up_sign_up).setOnClickListener(this);
         m_view.setOnTouchListener(this);
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
@@ -57,8 +57,8 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
     @Override
     public void dismiss() {
         m_view.setOnTouchListener(null);
-        m_view.findViewById(R.id.sign_up_button).setOnClickListener(null);
-        m_view.findViewById(R.id.sign_up_switch_sign_in_button).setOnClickListener(null);
+        m_view.findViewById(R.id.sign_up_sign_up).setOnClickListener(null);
+        m_view.findViewById(R.id.sign_up_switch_sign_in).setOnClickListener(null);
 
         m_manager.unmanage();
 
@@ -162,7 +162,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
         };
 
         void manage() {
-            m_rootView.findViewById(R.id.sign_up_button).setEnabled(false);
+            m_rootView.findViewById(R.id.sign_up_sign_up).setEnabled(false);
 
             emailEditText.addTextChangedListener(m_emailTextWatcher);
             passwordEditText.addTextChangedListener(m_passwordTextWatcher);
@@ -176,17 +176,17 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
         }
 
         private void validate() {
-            m_rootView.findViewById(R.id.sign_up_button).setEnabled(m_isEmailValid && m_isPasswordStrong && m_isPasswordConsistent);
+            m_rootView.findViewById(R.id.sign_up_sign_up).setEnabled(m_isEmailValid && m_isPasswordStrong && m_isPasswordConsistent);
         }
     }
 
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.sign_up_switch_sign_in_button:
+            case R.id.sign_up_switch_sign_in:
                 onClickSwitchSignIn(view);
                 break;
-            case R.id.sign_up_button:
+            case R.id.sign_up_sign_up:
                 onClickSignUp(view);
                 break;
             default:

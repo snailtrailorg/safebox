@@ -7,44 +7,22 @@
     <string name="nav_header_subtitle">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Settings</string>
-    <string name="sign_in_form_title">Sign in an exist account</string>
-    <string name="sign_up_form_title">Sign up a new account</string>
-    <string name="sign_in_progress_title">Sign in processing...</string>
-    <string name="sign_up_progress_title">Sign up processing...</string>
-    <string name="prompt_sign_in_email">Email address:</string>
-    <string name="prompt_sign_in_password">Password:</string>
-    <string name="prompt_sign_up_email">Your frequently used email:</string>
-    <string name="prompt_sign_up_password">Set your password:</string>
-    <string name="prompt_sign_up_retype_password">Retype your password:</string>
-    <string name="sign_in_button">Sign in</string>
-    <string name="sign_up_button">Sign up</string>
-    <string name="switch_sign_in_button">Sign in an exist account</string>
-    <string name="switch_sign_up_button">Sign up a new account</string>
-    <string name="progress_processing_message">Processing, please wait...</string>
 
     <string name="error_dialog_title">Error</string>
     <string name="error_dialog_button_ok">OK</string>
 
-    <string name="sign_up_result_error_invalid_email">Invalid email address, please check and correct it.</string>
-    <string name="sign_up_result_error_email_conflicted">The email address conflicted with an exist one, please use another and try again.</string>
-    <string name="sign_up_result_error_password_too_weak">The password you\'ve input is too weak, we strongly recommend that you should make it as strong as possible.\nYou should know that all your secrets stored in the safebox app and safebox cloud is based on this password, that is, if this password was leaked, all your secrets were leaked.</string>
-    <string name="sign_up_result_error_password_inconsistent">The passwords you\'ve entered are inconsistent, please make sure they are consistent.</string>
-    <string name="sign_up_result_error_calculate_digest_failed">Calculate digest failed unpredictably, it would be very appreciated to report this bug to the author.</string>
-    <string name="sign_up_result_error_generate_rsa_key_failed">Generate RSA key failed unpredictably, it would be very appreciated to report this bug to the author.</string>
-    <string name="sign_up_result_error_email_does_not_exist">Email address does not exist in account database, please check and correct it.</string>
-    <string name="sign_up_result_success">Sign up success.</string>
+    <string name="sign_in_form_title">Sign in an exist account</string>
+    <string name="sign_in_prompt_email">Email address:</string>
+    <string name="sign_in_prompt_password">Password:</string>
+    <string name="sign_in_prompt_switch_sign_up">Sign up a new account</string>
+    <string name="sign_in_prompt_sign_in">Sign in</string>
+    <string name="sign_in_progress_title">Sign in processing...</string>
+    <string name="sign_in_progress_processing_message">Processing, please wait...</string>
 
     <string name="sign_in_result_error_email_does_not_exist">The email address does not exist.</string>
     <string name="sign_in_result_error_password_incorrect">Password incorrect, please check it and retry.</string>
     <string name="sign_in_result_error_load_rsa_key_failed">Load rsa key failed unpredictably.</string>
     <string name="sign_in_result_success">Sign in success.</string>
-
-    <string name="sign_up_progress_start">Starting sign up, please wait...</string>
-    <string name="sign_up_progress_check_email">Checking email usability...</string>
-    <string name="sign_up_progress_calculate_digest">Calculating password digest...</string>
-    <string name="sign_up_progress_generate_rsa_key">Generating rsa key pair...</string>
-    <string name="sign_up_progress_create_account">Creating account...</string>
-    <string name="sign_up_progress_finish">Sign up finished.</string>
 
     <string name="sign_in_progress_start">Start sign in, please wait...</string>
     <string name="sign_in_progress_load_user_info">Loading user information...</string>
@@ -53,8 +31,56 @@
     <string name="sign_in_progress_load_rsa_key">Loading rsa key pair...</string>
     <string name="sign_in_progress_finish">Sign in finished.</string>
 
+    <string name="sign_up_form_title">Sign up a new account</string>
+    <string name="sign_up_prompt_email">Your frequently used email:</string>
+    <string name="sign_up_prompt_password">Set your password:</string>
+    <string name="sign_up_prompt_retype_password">Retype your password:</string>
+    <string name="sign_up_prompt_switch_sign_in">Sign in an exist account</string>
+    <string name="sign_up_prompt_sign_up">Sign up</string>
+    <string name="sign_up_progress_title">Sign up processing...</string>
+    <string name="sign_up_progress_processing_message">Processing, please wait...</string>
 
+    <string name="sign_up_result_error_invalid_email">Invalid email address, please check and correct it.</string>
+    <string name="sign_up_result_error_email_conflicted">The email address conflicted with an exist one, please use another and try again.</string>
+    <string name="sign_up_result_error_password_too_weak">The password you\'ve input is too weak, we strongly recommend that you should make it as strong as possible.\nYou should know that all your items stored in the safebox app and safebox cloud is based on this password, that is, if this password was leaked, all your items were leaked.</string>
+    <string name="sign_up_result_error_password_inconsistent">The passwords you\'ve entered are inconsistent, please make sure they are consistent.</string>
+    <string name="sign_up_result_error_calculate_digest_failed">Calculate digest failed unpredictably, it would be very appreciated to report this bug to the author.</string>
+    <string name="sign_up_result_error_generate_rsa_key_failed">Generate RSA key failed unpredictably, it would be very appreciated to report this bug to the author.</string>
+    <string name="sign_up_result_error_email_does_not_exist">Email address does not exist in account database, please check and correct it.</string>
+    <string name="sign_up_result_success">Sign up success.</string>
 
+    <string name="sign_up_progress_start">Starting sign up, please wait...</string>
+    <string name="sign_up_progress_check_email">Checking email usability...</string>
+    <string name="sign_up_progress_calculate_digest">Calculating password digest...</string>
+    <string name="sign_up_progress_generate_rsa_key">Generating rsa key pair...</string>
+    <string name="sign_up_progress_create_account">Creating account...</string>
+    <string name="sign_up_progress_finish">Sign up finished.</string>
 
+    <string name="create_item_form_title">Create new item</string>
+    <string name="create_item_prompt_name">Name(plaintext):</string>
+    <string name="create_item_prompt_description">Description(plaintext):</string>
+    <string name="create_item_prompt_icon">Choose an icon:</string>
+    <string name="create_item_prompt_icon_app">Andriod app</string>
+    <string name="create_item_prompt_icon_web">Website</string>
+    <string name="create_item_prompt_icon_card">Bank card</string>
+    <string name="create_item_prompt_website">Website(optional):</string>
+    <string name="create_item_prompt_username">Username/Card No.:</string>
+    <string name="create_item_prompt_password">Password/PIN:</string>
+    <string name="create_item_prompt_remarks">Remarks:</string>
+    <string name="create_item_prompt_create">Create...</string>
+    <string name="create_item_prompt_cancel">Cancel</string>
+    <string name="create_item_progress_title">Creating new item...</string>
+    <string name="create_item_progress_processing_message">Processing, please wait...</string>
+
+    <string name="create_item_result_error_encrypt_data_failed">Encrypt item data failed.</string>
+    <string name="create_item_result_error_save_data_failed">Save item data failed.</string>
+    <string name="create_item_result_error_network_unavailable">Network unavailable.</string>
+    <string name="create_item_result_success">Create item success.</string>
+
+    <string name="create_item_progress_start">Start creation, please wait...</string>
+    <string name="create_item_progress_prepare_data">Preparing item data...</string>
+    <string name="create_item_progress_encrypt_data">Encrypting item data...</string>
+    <string name="create_item_progress_save_data">Saving item data...</string>
+    <string name="create_item_progress_finish">Create item finished.</string>
 
 </resources>

@@ -20,10 +20,10 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_normal"
-                android:layout_marginTop="@dimen/general_margin_large"
-                android:layout_marginRight="@dimen/general_margin_normal"
-                android:layout_marginBottom="@dimen/general_margin_small"
+                android:layout_marginTop="@dimen/general_margin_small"
+                android:layout_marginLeft="@dimen/general_margin_small"
+                android:layout_marginRight="@dimen/general_margin_small"
+                android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
                 android:text="@string/sign_in_form_title"
                 android:textSize="20sp"
@@ -32,15 +32,16 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/general_margin_tiny"
                 android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginTop="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_marginRight="@dimen/general_margin_small"
+                android:layout_marginBottom="@dimen/general_margin_tiny">
 
             <AutoCompleteTextView
                     android:id="@+id/sign_in_email"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/prompt_sign_in_email"
+                    android:hint="@string/sign_in_prompt_email"
                     android:imeOptions="actionNext"
                     android:inputType="textEmailAddress"
                     android:maxLength="50"
@@ -52,20 +53,21 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/general_margin_tiny"
                 android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginTop="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_marginRight="@dimen/general_margin_small"
+                android:layout_marginBottom="@dimen/general_margin_tiny">
 
                 <EditText
                     android:id="@+id/sign_in_password"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/prompt_sign_in_password"
+                    android:hint="@string/sign_in_prompt_password"
                     android:imeOptions="actionNext"
                     android:importantForAutofill="no"
                     android:inputType="textPassword"
                     android:maxLines="1"
-                    android:nextFocusForward="@id/sign_in_button"
+                    android:nextFocusForward="@id/sign_in_sign_in"
                     android:singleLine="true" />
 
             </com.google.android.material.textfield.TextInputLayout>
@@ -81,12 +83,15 @@
                     android:layout_gravity="start">
 
                     <Button
-                        android:id="@+id/sign_in_switch_sign_up_button"
+                        android:id="@+id/sign_in_switch_sign_up"
                         style="?android:textAppearanceSmall"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_margin="@dimen/general_margin_small"
-                        android:text="@string/switch_sign_up_button"
+                        android:layout_marginStart="@dimen/general_margin_small"
+                        android:layout_marginTop="@dimen/general_margin_tiny"
+                        android:layout_marginEnd="@dimen/general_margin_tiny"
+                        android:layout_marginBottom="@dimen/general_margin_small"
+                        android:text="@string/sign_in_prompt_switch_sign_up"
                         android:textAllCaps="false" />
 
                 </LinearLayout>
@@ -97,12 +102,15 @@
                     android:gravity="end">
 
                     <Button
-                        android:id="@+id/sign_in_button"
+                        android:id="@+id/sign_in_sign_in"
                         style="?android:textAppearanceSmall"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_margin="@dimen/general_margin_small"
-                        android:text="@string/sign_in_button"
+                        android:layout_marginStart="@dimen/general_margin_tiny"
+                        android:layout_marginTop="@dimen/general_margin_tiny"
+                        android:layout_marginEnd="@dimen/general_margin_small"
+                        android:layout_marginBottom="@dimen/general_margin_small"
+                        android:text="@string/sign_in_prompt_sign_in"
                         android:textAllCaps="false"
                         android:textStyle="bold" />
 
@@ -121,10 +129,10 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_normal"
-                android:layout_marginTop="@dimen/general_margin_large"
-                android:layout_marginRight="@dimen/general_margin_normal"
-                android:layout_marginBottom="@dimen/general_margin_small"
+                android:layout_marginTop="@dimen/general_margin_small"
+                android:layout_marginLeft="@dimen/general_margin_small"
+                android:layout_marginRight="@dimen/general_margin_small"
+                android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
                 android:text="@string/sign_in_progress_title"
                 android:textSize="20sp"
@@ -137,17 +145,22 @@
                 android:orientation="horizontal">
 
                 <ProgressBar
-                    android:id="@+id/sign_in_progress_bar"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_margin="@dimen/general_margin_small" />
+                    android:layout_marginStart="@dimen/general_margin_small"
+                    android:layout_marginTop="@dimen/general_margin_tiny"
+                    android:layout_marginEnd="@dimen/general_margin_tiny"
+                    android:layout_marginBottom="@dimen/general_margin_small" />
 
                 <TextView
                     android:id="@+id/sign_in_progress_message"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_margin="@dimen/general_margin_small"
-                    android:text="@string/progress_processing_message" />
+                    android:layout_marginStart="@dimen/general_margin_tiny"
+                    android:layout_marginTop="@dimen/general_margin_tiny"
+                    android:layout_marginEnd="@dimen/general_margin_small"
+                    android:layout_marginBottom="@dimen/general_margin_small"
+                    android:text="@string/sign_in_progress_processing_message" />
 
             </LinearLayout>
 

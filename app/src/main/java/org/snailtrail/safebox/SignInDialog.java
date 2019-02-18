@@ -42,8 +42,8 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
         m_view.findViewById(R.id.sign_in_progress_panel).setVisibility(View.GONE);
         m_view.findViewById(R.id.sign_in_form_panel).setVisibility(View.VISIBLE);
 
-        m_view.findViewById(R.id.sign_in_switch_sign_up_button).setOnClickListener(this);
-        m_view.findViewById(R.id.sign_in_button).setOnClickListener(this);
+        m_view.findViewById(R.id.sign_in_switch_sign_up).setOnClickListener(this);
+        m_view.findViewById(R.id.sign_in_sign_in).setOnClickListener(this);
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
@@ -58,8 +58,8 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
     @Override
     public void dismiss() {
-        m_view.findViewById(R.id.sign_in_switch_sign_up_button).setOnClickListener(null);
-        m_view.findViewById(R.id.sign_in_button).setOnClickListener(null);
+        m_view.findViewById(R.id.sign_in_switch_sign_up).setOnClickListener(null);
+        m_view.findViewById(R.id.sign_in_sign_in).setOnClickListener(null);
 
         super.dismiss();
     }
@@ -67,10 +67,10 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.sign_in_switch_sign_up_button:
+            case R.id.sign_in_switch_sign_up:
                 OnClickSwitchSignUp(view);
                 break;
-            case R.id.sign_in_button:
+            case R.id.sign_in_sign_in:
                 onClickSignIn(view);
                 break;
             default:
