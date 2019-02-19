@@ -59,10 +59,10 @@
     <string name="create_item_form_title">Create new item</string>
     <string name="create_item_prompt_name">Name(plaintext):</string>
     <string name="create_item_prompt_description">Description(plaintext):</string>
-    <string name="create_item_prompt_icon">Choose an icon:</string>
-    <string name="create_item_prompt_icon_app">Andriod app</string>
-    <string name="create_item_prompt_icon_web">Website</string>
-    <string name="create_item_prompt_icon_card">Bank card</string>
+    <string name="create_item_prompt_type_android_app">Andriod app</string>
+    <string name="create_item_prompt_type_general_account">General account</string>
+    <string name="create_item_prompt_type_local_file">Local file</string>
+    <string name="create_item_prompt_icon">Icon</string>
     <string name="create_item_prompt_website">Website(optional):</string>
     <string name="create_item_prompt_username">Username/Card No.:</string>
     <string name="create_item_prompt_password">Password/PIN:</string>
