@@ -83,4 +83,7 @@
     <string name="create_item_progress_save_data">Saving item data...</string>
     <string name="create_item_progress_finish">Create item finished.</string>
 
+    <string name="item_icon_content_description">Item Icon</string>
+    <string name="view_button_content_description">View button</string>
+
 </resources>

@@ -91,6 +91,30 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         }
     }
 
+    static class UserData {
+        int m_did;
+        int m_uid;
+        int m_type;
+        int m_icon;
+        String m_appName;
+        String m_name;
+        String m_description;
+        String m_data;
+
+        public UserData() {}
+
+        public UserData(int did, int uid, int type, int icon, String appName, String name, String description, String data) {
+            this.m_did = did;
+            this.m_uid = uid;
+            this.m_type = type;
+            this.m_icon = icon;
+            this.m_appName = appName;
+            this.m_name = name;
+            this.m_description = description;
+            this.m_data = data;
+        }
+    }
+
     long insertUser(UserInfo userInfo) {
         return insertUser(userInfo.m_email, userInfo.m_shadow, userInfo.m_public_key, userInfo.m_private_key);
     }

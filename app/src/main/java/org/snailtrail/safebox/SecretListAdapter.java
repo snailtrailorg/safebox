@@ -20,25 +20,6 @@ public class SecretListAdapter extends RecyclerView.Adapter<SecretListAdapter.Se
     Context m_context;
     List<AppInfo> m_appInfos;
 
-    public class Secret {
-        int m_did;
-        int m_type;
-        int m_icon;
-        String m_name;
-        String m_description;
-        String m_data;
-
-        public Secret() {}
-
-        public Secret(int m_did, int m_type, String m_name, String m_description, String m_data) {
-            this.m_did = m_did;
-            this.m_type = m_type;
-            this.m_name = m_name;
-            this.m_description = m_description;
-            this.m_data = m_data;
-        }
-    }
-
     public class AppInfo {
 
         String m_name;
