@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
@@ -20,7 +21,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
 
-public class SignInDialog extends AlertDialog implements View.OnClickListener {
+public class SignInDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
     private Handler m_uiHandler;
     private View m_view;
 
@@ -44,6 +45,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
         m_view.findViewById(R.id.sign_in_switch_sign_up).setOnClickListener(this);
         m_view.findViewById(R.id.sign_in_sign_in).setOnClickListener(this);
+        m_view.setOnTouchListener(this);
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
@@ -58,6 +60,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
 
     @Override
     public void dismiss() {
+        m_view.setOnTouchListener(null);
         m_view.findViewById(R.id.sign_in_switch_sign_up).setOnClickListener(null);
         m_view.findViewById(R.id.sign_in_sign_in).setOnClickListener(null);
 
@@ -97,6 +100,15 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener {
         m_view.findViewById(R.id.sign_in_progress_panel).setVisibility(View.VISIBLE);
 
         new SignInTask().execute(email, password);
+    }
+
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+
+        v.performClick();
+        return false;
     }
 
     private class SignInTask extends AsyncTask<String, Integer, Integer> {
