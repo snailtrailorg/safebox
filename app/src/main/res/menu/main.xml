@@ -2,20 +2,20 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/menu_item_create_item_android_app"
+        android:id="@+id/menu_item_add_android_app"
         android:orderInCategory="60"
-        android:title="@string/create_item_prompt_type_android_app"
+        android:title="@string/menu_item_add_android_app"
         android:icon="@drawable/android_app"
         app:showAsAction="always" />
 
-    <item android:id="@+id/menu_item_create_item_general_account"
-        android:title="@string/create_item_prompt_type_general_account"
+    <item android:id="@+id/menu_item_add_general_account"
+        android:title="@string/menu_item_add_general_account"
         android:orderInCategory="70"
         android:icon="@drawable/general_account"
         app:showAsAction="always" />
 
-    <item android:id="@+id/menu_item_create_local_file"
-        android:title="@string/create_item_prompt_type_local_file"
+    <item android:id="@+id/menu_item_add_local_file"
+        android:title="@string/menu_item_add_local_file"
         android:orderInCategory="80"
         android:icon="@drawable/local_file"
         app:showAsAction="always" />

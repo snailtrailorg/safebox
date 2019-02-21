@@ -25,6 +25,22 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
     private Handler m_uiHandler;
     private View m_view;
 
+    public static class SignInMessageObject {
+        int m_uid;
+        String m_email;
+        PublicKey m_publicKey;
+        PrivateKey m_privateKey;
+
+        SignInMessageObject() {}
+
+        SignInMessageObject(int uid, String email, PublicKey publicKey, PrivateKey privateKey) {
+            m_uid = uid;
+            m_email = email;
+            m_publicKey = publicKey;
+            m_privateKey = privateKey;
+        }
+    }
+
     SignInDialog(Context context, Handler uiHandler) {
         super(context);
         m_uiHandler = uiHandler;
@@ -171,7 +187,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
 
             publishProgress(SIGN_IN_PROGRESS_FINISHED);
 
-            m_uiHandler.obtainMessage(R.integer.MESSAGE_SET_USER_INFO, new Utilities.SignInMessageObject(userInfo.m_uid, userInfo.m_email, publicKey, privateKey)).sendToTarget();
+            m_uiHandler.obtainMessage(R.integer.MESSAGE_SET_USER_INFO, new SignInMessageObject(userInfo.m_uid, userInfo.m_email, publicKey, privateKey)).sendToTarget();
 
             m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_DATA);
 

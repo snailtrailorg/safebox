@@ -6,7 +6,10 @@
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_subtitle">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
-    <string name="action_settings">Settings</string>
+
+    <string name="menu_item_add_android_app">Andriod app</string>
+    <string name="menu_item_add_general_account">General account</string>
+    <string name="menu_item_add_local_file">Local file</string>
 
     <string name="error_dialog_title">Error</string>
     <string name="error_dialog_button_ok">OK</string>
@@ -56,34 +59,35 @@
     <string name="sign_up_progress_create_account">Creating account...</string>
     <string name="sign_up_progress_finish">Sign up finished.</string>
 
-    <string name="create_item_form_title">Create new item</string>
-    <string name="create_item_prompt_name">Name(plaintext):</string>
-    <string name="create_item_prompt_description">Description(plaintext):</string>
-    <string name="create_item_prompt_type_android_app">Andriod app</string>
-    <string name="create_item_prompt_type_general_account">General account</string>
-    <string name="create_item_prompt_type_local_file">Local file</string>
-    <string name="create_item_prompt_icon">Icon</string>
-    <string name="create_item_prompt_website">Website(optional):</string>
-    <string name="create_item_prompt_username">Username/Card No.:</string>
-    <string name="create_item_prompt_password">Password/PIN:</string>
-    <string name="create_item_prompt_remarks">Remarks:</string>
-    <string name="create_item_prompt_create">Create...</string>
-    <string name="create_item_prompt_cancel">Cancel</string>
-    <string name="create_item_progress_title">Creating new item...</string>
-    <string name="create_item_progress_processing_message">Processing, please wait...</string>
+    <string name="add_android_app_form_title">Add an android app</string>
+    <string name="add_general_account_form_title">Add an account</string>
+    <string name="add_local_file_form_title">Add a file</string>
+    <string name="add_item_prompt_icon">Icon</string>
+    <string name="add_item_prompt_name">Name(plaintext):</string>
+    <string name="add_item_prompt_description">Description(plaintext):</string>
+    <string name="add_item_prompt_website">Website(optional):</string>
+    <string name="add_item_prompt_username">Username/Card No.:</string>
+    <string name="add_item_prompt_password">Password/PIN:</string>
+    <string name="add_item_prompt_remarks">Remarks/Hint:</string>
+    <string name="add_item_prompt_add">Add...</string>
+    <string name="add_item_prompt_cancel">Cancel</string>
+    <string name="add_item_progress_title">Creating new item...</string>
+    <string name="add_item_progress_processing_message">Processing, please wait...</string>
 
-    <string name="create_item_result_error_encrypt_data_failed">Encrypt item data failed.</string>
-    <string name="create_item_result_error_save_data_failed">Save item data failed.</string>
-    <string name="create_item_result_error_network_unavailable">Network unavailable.</string>
-    <string name="create_item_result_success">Create item success.</string>
+    <string name="add_item_result_error_encrypt_data_failed">Encrypt item data failed.</string>
+    <string name="add_item_result_error_save_item_failed">Save item failed.</string>
+    <string name="add_item_result_error_upload_item_failed">Upload item failed.</string>
+    <string name="add_item_result_success">Add item success.</string>
 
-    <string name="create_item_progress_start">Start creation, please wait...</string>
-    <string name="create_item_progress_prepare_data">Preparing item data...</string>
-    <string name="create_item_progress_encrypt_data">Encrypting item data...</string>
-    <string name="create_item_progress_save_data">Saving item data...</string>
-    <string name="create_item_progress_finish">Create item finished.</string>
+    <string name="add_item_progress_start">Start creation, please wait...</string>
+    <string name="add_item_progress_encrypt_data">Encrypting item data...</string>
+    <string name="add_item_progress_save_item">Saving item ...</string>
+    <string name="add_item_progress_upload_item">Uploading item...</string>
+    <string name="add_item_progress_finish">Add item finished.</string>
 
-    <string name="item_icon_content_description">Item Icon</string>
-    <string name="view_button_content_description">View button</string>
+    <string name="safe_list_item_icon_content_description">Icon</string>
+    <string name="safe_list_item_view_button_content_description">View</string>
+    <string name="safe_list_item_name">Name...</string>
+    <string name="safe_list_item_description">Description...</string>
 
 </resources>

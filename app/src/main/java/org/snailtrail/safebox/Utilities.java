@@ -114,7 +114,7 @@ class Utilities {
 
         PublicKey publicKey = null;
         try {
-            publicKey = keyFactory.generatePublic(publicKeySpec);
+            publicKey = (keyFactory != null) ? keyFactory.generatePublic(publicKeySpec) : null;
         } catch (InvalidKeySpecException e) {
             e.printStackTrace();
         }
@@ -135,7 +135,7 @@ class Utilities {
 
         PrivateKey privateKey = null;
         try {
-            privateKey = keyFactory.generatePrivate(privateKeySpec);
+            privateKey = (keyFactory != null) ? keyFactory.generatePrivate(privateKeySpec) : null;
         } catch (InvalidKeySpecException e) {
             e.printStackTrace();
         }
@@ -152,7 +152,8 @@ class Utilities {
         secureRandom.setSeed(uptimeMillis());
 
         byte[] padding_data = new byte[paddingLength];
-        for (int i=0; i<paddingLength; i++) padding_data[i] = (byte)(Math.abs(secureRandom.nextInt()) % 95 + 32);
+        for (int i = 0; i < paddingLength; i++)
+            padding_data[i] = (byte) (Math.abs(secureRandom.nextInt()) % 95 + 32);
 
         String padding = new String(padding_data);
         String input = String.format("%s%s", padding, message);
@@ -200,7 +201,7 @@ class Utilities {
         SecretKeySpec secretKey = generateSecretKey(password);
         IvParameterSpec ivParameterSpec = new IvParameterSpec(initialVector);
 
-        byte[] input = Base64.decode(message,Base64.DEFAULT);
+        byte[] input = Base64.decode(message, Base64.DEFAULT);
         byte[] result = null;
         Cipher cipher = null;
 
@@ -259,19 +260,64 @@ class Utilities {
         return new SecretKeySpec(digest, 8, 24, symmetricEncryptAlgorithm);
     }
 
-    static class SignInMessageObject {
-        int m_uid;
-        String m_email;
-        PublicKey m_publicKey;
-        PrivateKey m_privateKey;
+    static String rsaEncrypt(PublicKey publicKey, String itemData) {
+        Cipher cipher = null;
 
-        SignInMessageObject() {}
-
-        SignInMessageObject(int uid, String email, PublicKey publicKey, PrivateKey privateKey) {
-            m_uid = uid;
-            m_email = email;
-            m_publicKey = publicKey;
-            m_privateKey = privateKey;
+        try {
+            cipher = Cipher.getInstance(asymmetricEncryptAlgorithm);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
         }
+
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+
+        byte[] encryptedData = new byte[0];
+        try {
+            encryptedData = cipher.doFinal(itemData.getBytes());
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+
+        return Base64.encodeToString(encryptedData, Base64.DEFAULT);
+    }
+
+    static String rsaDecrypt(PrivateKey privateKey, String itemData) {
+        byte[] decodedData = Base64.decode(itemData, Base64.DEFAULT);
+
+        Cipher cipher = null;
+
+        try {
+            cipher = Cipher.getInstance(asymmetricEncryptAlgorithm);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        }
+
+        byte[] decryptedData = new byte[0];
+
+        try {
+            decryptedData = cipher.doFinal(decodedData);
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+
+        return new String(decryptedData);
     }
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<org.snailtrail.safebox.SecretListItem xmlns:android="http://schemas.android.com/apk/res/android"
+<org.snailtrail.safebox.SafeListItem xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -7,16 +7,16 @@
     android:orientation="horizontal">
 
     <ImageView
-        android:id="@+id/secret_list_item_icon"
+        android:id="@+id/safe_list_item_icon"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/general_margin_tiny"
-        android:contentDescription="@string/item_icon_content_description"
+        android:layout_weight="0"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/safe_list_item_icon_content_description"
         android:maxWidth="64dp"
         android:maxHeight="64dp"
-        android:layout_weight="0"
-        app:srcCompat="@android:drawable/sym_def_app_icon"
-        android:adjustViewBounds="true"/>
+        app:srcCompat="@android:drawable/sym_def_app_icon" />
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -26,31 +26,31 @@
         android:layout_weight="10">
 
         <TextView
-            android:id="@+id/secret_list_item_name"
+            android:id="@+id/safe_list_item_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/general_margin_micro"
             android:layout_weight="10"
-            android:text="Name" />
+            android:text="@string/safe_list_item_name" />
 
         <TextView
-            android:id="@+id/secret_list_item_description"
+            android:id="@+id/safe_list_item_description"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/general_margin_micro"
             android:layout_weight="10"
-            android:text="Description..." />
+            android:text="@string/safe_list_item_description" />
     </LinearLayout>
 
     <ImageView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/general_margin_tiny"
+        android:layout_weight="0"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/safe_list_item_view_button_content_description"
         android:maxWidth="@dimen/app_button_size"
         android:maxHeight="@dimen/app_button_size"
-        android:contentDescription="@string/view_button_content_description"
-        android:src="@drawable/ic_menu_view"
-        android:layout_weight="0"
-        android:adjustViewBounds="true" />
+        android:src="@drawable/ic_menu_view" />
 
-</org.snailtrail.safebox.SecretListItem>
+</org.snailtrail.safebox.SafeListItem>

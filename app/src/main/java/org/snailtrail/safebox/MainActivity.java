@@ -1,5 +1,6 @@
 package org.snailtrail.safebox;
 
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -47,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         mainActivity.doSignUp();
                         break;
                     case R.integer.MESSAGE_SET_USER_INFO:
-                        Utilities.SignInMessageObject obj = (Utilities.SignInMessageObject) message.obj;
+                        SignInDialog.SignInMessageObject obj = (SignInDialog.SignInMessageObject) message.obj;
                         assert obj != null && obj.m_email != null && obj.m_publicKey != null && obj.m_privateKey != null;
                         mainActivity.setUserInfo(obj.m_uid, obj.m_email, obj.m_publicKey, obj.m_privateKey);
                         break;
@@ -82,7 +83,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         RecyclerView recyclerView = findViewById(R.id.secret_list_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(new SecretListAdapter(this));
+        recyclerView.setAdapter(new SafeListAdapter(this));
 
         m_isUserSignedIn = false;
 
@@ -120,13 +121,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         //noinspection SimplifiableIfStatement
         switch (menuItemId) {
-            case R.id.menu_item_create_item_android_app:
-            case R.id.menu_item_create_item_general_account:
-            case R.id.menu_item_create_local_file:
+            case R.id.menu_item_add_android_app:
                 if (m_isUserSignedIn) {
-                    new SecretDialog(this, m_secureHandler, menuItemId, m_publicKey, m_privateKey).show();
+                    new AddAndroidAppDialog(this, m_secureHandler, m_publicKey).show();
                 }
+                return true;
 
+            case R.id.menu_item_add_general_account:
+                return true;
+
+            case R.id.menu_item_add_local_file:
                 return true;
 
             default:

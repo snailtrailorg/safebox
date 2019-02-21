@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,9 +23,9 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
     public void onCreate(SQLiteDatabase db) {
         String sql_create_user_table = "create table user (uid integer primary key autoincrement, email varchar(64), shadow varchar(256), rsapubkey varchar(4096), rsaprivkey varchar(8192))";
         db.execSQL(sql_create_user_table);
-        String sql_create_data_table = "create table secret (did integer primary key autoincrement, uid int, type int, name varchar(64), description varchar(128), timestamp varchar(32), data varchar(8192))";
-        db.execSQL(sql_create_data_table);
-        String sql_create_log_table = "create table log (lid integer primary key autoincrement, timestamp varchar(32), content varchar(256));";
+        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid int, type int, icon int, appname varchar(256), name varchar(64), description varchar(128), data varchar(4096), time timestamp)";
+        db.execSQL(sql_create_item_table);
+        String sql_create_log_table = "create table log (lid integer primary key autoincrement, content varchar(256), time timestamp);";
         db.execSQL(sql_create_log_table);
     }
 
@@ -91,30 +92,6 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         }
     }
 
-    static class UserData {
-        int m_did;
-        int m_uid;
-        int m_type;
-        int m_icon;
-        String m_appName;
-        String m_name;
-        String m_description;
-        String m_data;
-
-        public UserData() {}
-
-        public UserData(int did, int uid, int type, int icon, String appName, String name, String description, String data) {
-            this.m_did = did;
-            this.m_uid = uid;
-            this.m_type = type;
-            this.m_icon = icon;
-            this.m_appName = appName;
-            this.m_name = name;
-            this.m_description = description;
-            this.m_data = data;
-        }
-    }
-
     long insertUser(UserInfo userInfo) {
         return insertUser(userInfo.m_email, userInfo.m_shadow, userInfo.m_public_key, userInfo.m_private_key);
     }
@@ -156,4 +133,77 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
             return null;
         }
     }
+
+    static class ItemInfo {
+        int m_did;
+        int m_uid;
+        int m_type;
+        int m_icon;
+        String m_appName;
+        String m_name;
+        String m_description;
+        String m_data;
+
+        public ItemInfo() {}
+
+        public ItemInfo(int did, int uid, int type, int icon, String appName, String name, String description, String data) {
+            this.m_did = did;
+            this.m_uid = uid;
+            this.m_type = type;
+            this.m_icon = icon;
+            this.m_appName = appName;
+            this.m_name = name;
+            this.m_description = description;
+            this.m_data = data;
+        }
+    }
+
+    long insertItem(ItemInfo itemInfo) {
+        return insertItem(itemInfo.m_uid, itemInfo.m_type, itemInfo.m_icon, itemInfo.m_appName, itemInfo.m_name, itemInfo.m_description, itemInfo.m_data);
+    }
+
+    long insertItem(int uid, int type, int icon, String appName, String name, String description, String data) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues values = new ContentValues();
+
+        values.put("uid", uid);
+        values.put("type",type);
+        values.put("icon", icon);
+        values.put("appname", appName);
+        values.put("name", name);
+        values.put("description", description);
+        values.put("data", data);
+
+        long result = db.insert("item", null, values);
+
+        db.close();
+
+        return result;
+    }
+
+    ItemInfo getItemInfo(int did) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.rawQuery("select * from item where did=?", new String[]{new Integer(did).toString()});
+
+        if (cursor.moveToFirst()) {
+            ItemInfo itemInfo = new ItemInfo();
+            itemInfo.m_did = cursor.getInt(cursor.getColumnIndex("did"));
+            itemInfo.m_uid = cursor.getInt(cursor.getColumnIndex("uid"));
+            itemInfo.m_type = cursor.getInt(cursor.getColumnIndex("type"));
+            itemInfo.m_icon = cursor.getInt(cursor.getColumnIndex("icon"));
+            itemInfo.m_appName = cursor.getString(cursor.getColumnIndex("appname"));
+            itemInfo.m_name = cursor.getString(cursor.getColumnIndex("name"));
+            itemInfo.m_description = cursor.getString(cursor.getColumnIndex("description"));
+            itemInfo.m_data = cursor.getString(cursor.getColumnIndex("data"));
+
+            cursor.close();
+            db.close();
+            return itemInfo;
+        } else {
+            cursor.close();
+            db.close();
+            return null;
+        }
+    }
+
 }

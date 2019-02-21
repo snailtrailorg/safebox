@@ -5,9 +5,6 @@ import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -20,38 +17,38 @@ import android.widget.TextView;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.util.regex.Pattern;
 
-public class SecretDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
-    private Handler m_uiHandler;
-    private View m_view;
-    int m_type;
-    PublicKey m_publicKey;
-    PrivateKey m_privateKey;
+public abstract class ViewItemDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
+    public Handler m_uiHandler;
+    public int m_resource;
+    public View m_view;
+    public PublicKey m_publicKey;
+    public PrivateKey m_privateKey;
+    public SqliteOpenHelper.ItemInfo m_itemInfo;
 
-    SecretDialog(Context context, Handler uiHandler, int type, PublicKey publicKey, PrivateKey privateKey) {
+
+    public ViewItemDialog(Context context, int resource, Handler uiHandler, PrivateKey privateKey) {
         super(context);
+        m_resource = resource;
         m_uiHandler = uiHandler;
-        m_type = type;
-        m_publicKey = publicKey;
         m_privateKey = privateKey;
+        m_itemInfo = null;
     }
+
+    public abstract void composeUserData();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         LayoutInflater inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        m_view = inflater.inflate(R.layout.secret_dialog, null);
+        m_view = inflater.inflate(m_resource, null);
         setContentView(m_view);
 
         setCancelable(false);
 
-        m_view.findViewById(R.id.create_item_progress_panel).setVisibility(View.GONE);
-        m_view.findViewById(R.id.create_item_form_panel).setVisibility(View.VISIBLE);
-
-        m_view.findViewById(R.id.create_item_cancel_button).setOnClickListener(this);
-        m_view.findViewById(R.id.create_item_create_button).setOnClickListener(this);
+        //m_view.findViewById(R.id.view_item_cancel_button).setOnClickListener(this);
+        //m_view.findViewById(R.id.view_item_create_button).setOnClickListener(this);
         m_view.setOnTouchListener(this);
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
@@ -61,8 +58,8 @@ public class SecretDialog extends AlertDialog implements View.OnClickListener, V
     @Override
     public void dismiss() {
         m_view.setOnTouchListener(null);
-        m_view.findViewById(R.id.create_item_create_button).setOnClickListener(null);
-        m_view.findViewById(R.id.create_item_cancel_button).setOnClickListener(null);
+        //m_view.findViewById(R.id.view_item_create_button).setOnClickListener(null);
+        //m_view.findViewById(R.id.view_item_cancel_button).setOnClickListener(null);
 
         super.dismiss();
     }

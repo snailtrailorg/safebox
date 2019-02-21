@@ -16,7 +16,7 @@ import java.util.List;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-public class SecretListAdapter extends RecyclerView.Adapter<SecretListAdapter.SecretViewHolder> {
+public class SafeListAdapter extends RecyclerView.Adapter<SafeListAdapter.SafeViewHolder> {
     Context m_context;
     List<AppInfo> m_appInfos;
 
@@ -40,18 +40,18 @@ public class SecretListAdapter extends RecyclerView.Adapter<SecretListAdapter.Se
         }
     }
 
-    public static class SecretViewHolder extends RecyclerView.ViewHolder {
-        public SecretListItem m_secretListItem;
+    public static class SafeViewHolder extends RecyclerView.ViewHolder {
+        public SafeListItem m_SafeListItem;
 
-        public SecretViewHolder(SecretListItem secretListItem) {
-            super(secretListItem);
-            m_secretListItem = secretListItem;
+        public SafeViewHolder(SafeListItem SafeListItem) {
+            super(SafeListItem);
+            m_SafeListItem = SafeListItem;
         }
     }
 
-    SecretListAdapter() {}
+    SafeListAdapter() {}
 
-    SecretListAdapter(Context context) {
+    SafeListAdapter(Context context) {
         m_context = context;
 
         PackageManager packageManager = context.getPackageManager();
@@ -78,19 +78,19 @@ public class SecretListAdapter extends RecyclerView.Adapter<SecretListAdapter.Se
     public void setAppInfos(List<AppInfo> appInfos) { m_appInfos = appInfos; }
 
     @Override
-    public void onBindViewHolder(SecretViewHolder secretViewHolder, int position) {
-        ((ImageView)secretViewHolder.m_secretListItem.findViewById(R.id.secret_list_item_icon)).setImageDrawable(m_appInfos.get(position).m_icon);
-        ((TextView)secretViewHolder.m_secretListItem.findViewById(R.id.secret_list_item_name)).setText(m_appInfos.get(position).m_name);
-        ((TextView)secretViewHolder.m_secretListItem.findViewById(R.id.secret_list_item_description)).setText(m_appInfos.get(position).m_description);
+    public void onBindViewHolder(SafeViewHolder SafeViewHolder, int position) {
+        ((ImageView)SafeViewHolder.m_SafeListItem.findViewById(R.id.safe_list_item_icon)).setImageDrawable(m_appInfos.get(position).m_icon);
+        ((TextView)SafeViewHolder.m_SafeListItem.findViewById(R.id.safe_list_item_name)).setText(m_appInfos.get(position).m_name);
+        ((TextView)SafeViewHolder.m_SafeListItem.findViewById(R.id.safe_list_item_description)).setText(m_appInfos.get(position).m_description);
     }
 
     @NonNull
     @Override
-    public SecretViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        SecretListItem secretListItem = (SecretListItem) LayoutInflater.from(parent.getContext()).inflate(R.layout.secret_list_item, parent, false);
+    public SafeViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        SafeListItem SafeListItem = (SafeListItem) LayoutInflater.from(parent.getContext()).inflate(R.layout.safe_list_item, parent, false);
 
-        SecretViewHolder secretViewHolder = new SecretViewHolder(secretListItem);
-        return secretViewHolder;
+        SafeViewHolder SafeViewHolder = new SafeViewHolder(SafeListItem);
+        return SafeViewHolder;
     }
 
     @Override
