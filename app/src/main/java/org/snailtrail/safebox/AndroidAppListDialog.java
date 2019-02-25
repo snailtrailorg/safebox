@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -23,6 +24,7 @@ public class AndroidAppListDialog extends AlertDialog {
     public Context m_context;
     public GridView m_view;
     public ArrayList<AndroidAppInfo> m_androidAppInfos;
+    public Rect m_rect;
 
     class AndroidAppInfo {
         public String m_appName;
@@ -64,7 +66,6 @@ public class AndroidAppListDialog extends AlertDialog {
                 String appName = packgeInfo.applicationInfo.loadLabel(packageManager).toString();
                 String packageName = packgeInfo.packageName;
                 Drawable drawable = packgeInfo.applicationInfo.loadIcon(packageManager);
-                drawable.setBounds(0, 0, drawable.getMinimumWidth(), drawable.getMinimumHeight());
                 AndroidAppInfo androidAppInfo = new AndroidAppInfo(appName, packageName, drawable);
                 m_androidAppInfos.add(androidAppInfo);
             }
@@ -104,8 +105,12 @@ public class AndroidAppListDialog extends AlertDialog {
                 View view = LayoutInflater.from(getContext()).inflate(R.layout.icon_list_item, parent, false);
                 TextView textView = view.findViewById(R.id.icon_list_item_name);
                 if (textView != null) {
+                    Rect rect = textView.getCompoundDrawables()[1].getBounds();
                     textView.setText(androidAppInfo.m_appName);
+                    androidAppInfo.m_icom.setBounds(rect);
                     textView.setCompoundDrawables(null, androidAppInfo.m_icom, null, null);
+                    textView.setMaxWidth(rect.right);
+                    textView.setSingleLine(true);
                 }
 
                 return view;
