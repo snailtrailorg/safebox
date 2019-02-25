@@ -67,10 +67,10 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.create_item_create_button:
+            case R.id.save_item_save_button:
                 onClickCreate(view);
                 break;
-            case R.id.create_item_cancel_button:
+            case R.id.save_item_cancel_button:
                 onClickCancel(view);
                 break;
             default:
@@ -101,8 +101,8 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
         InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
 
-        m_view.findViewById(R.id.create_item_form_panel).setVisibility(View.GONE);
-        m_view.findViewById(R.id.create_item_progress_panel).setVisibility(View.VISIBLE);
+        m_view.findViewById(R.id.save_item_form_panel).setVisibility(View.GONE);
+        m_view.findViewById(R.id.save_item_progress_panel).setVisibility(View.VISIBLE);
 
         new CreateItemTask().execute(email, password);
     }

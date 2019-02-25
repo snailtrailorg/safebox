@@ -27,6 +27,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private String m_email;
     private PublicKey m_publicKey;
     private PrivateKey m_privateKey;
+    SafeRecycleAdapter m_safeRecycleAdapter;
 
     private static class SecureHandler extends Handler {
         private WeakReference<MainActivity> m_mainActivity;
@@ -52,8 +53,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         assert obj != null && obj.m_email != null && obj.m_publicKey != null && obj.m_privateKey != null;
                         mainActivity.setUserInfo(obj.m_uid, obj.m_email, obj.m_publicKey, obj.m_privateKey);
                         break;
-                    case R.integer.MESSAGE_LOAD_USER_DATA:
-                        mainActivity.loadUserData();
+                    case R.integer.MESSAGE_LOAD_USER_ITEMS:
+                        mainActivity.loadUserItems();
                         break;
                     default:
                         super.handleMessage(message);
@@ -81,9 +82,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        RecyclerView recyclerView = findViewById(R.id.secret_list_view);
+        RecyclerView recyclerView = findViewById(R.id.safe_recycle_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(new SafeListAdapter(this));
+        m_safeRecycleAdapter = new SafeRecycleAdapter(this);
+        recyclerView.setAdapter(m_safeRecycleAdapter);
 
         m_isUserSignedIn = false;
 
@@ -123,7 +125,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         switch (menuItemId) {
             case R.id.menu_item_add_android_app:
                 if (m_isUserSignedIn) {
-                    new AddAndroidAppDialog(this, m_secureHandler, m_publicKey).show();
+                    SqliteOpenHelper.ItemInfo itemInfo = new SqliteOpenHelper.ItemInfo();
+                    itemInfo.m_uid = m_signInUserId;
+                    itemInfo.m_did = 0;
+                    itemInfo.m_type = R.id.menu_item_add_android_app;
+                    itemInfo.m_icon = 0;
+                    itemInfo.m_appName = "";
+                    new SaveAndroidAppDialog(this, R.layout.save_android_app_dialog, m_secureHandler, m_publicKey, itemInfo).show();
                 }
                 return true;
 
@@ -177,9 +185,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         m_publicKey = publicKey;
         m_privateKey = privateKey;
         m_isUserSignedIn = true;
+        m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
     }
 
-    private void loadUserData() {
-
+    private void loadUserItems() {
+        m_safeRecycleAdapter.loadItemInfos(m_signInUserId);
     }
 }

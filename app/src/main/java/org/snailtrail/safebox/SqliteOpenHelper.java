@@ -3,12 +3,20 @@ package org.snailtrail.safebox;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 import java.security.PublicKey;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 class SqliteOpenHelper extends SQLiteOpenHelper {
 
@@ -112,6 +120,12 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         return result;
     }
 
+    long removeUser(int uid) {
+        SQLiteDatabase db = getWritableDatabase();
+
+        return db.delete("user", "uid=?", new String[]{new Integer(uid).toString()});
+    }
+
     UserInfo getUserInfo(String email) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = db.rawQuery("select * from user where email=?", new String[]{email});
@@ -158,11 +172,11 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         }
     }
 
-    long insertItem(ItemInfo itemInfo) {
-        return insertItem(itemInfo.m_uid, itemInfo.m_type, itemInfo.m_icon, itemInfo.m_appName, itemInfo.m_name, itemInfo.m_description, itemInfo.m_data);
+    long saveItem(ItemInfo itemInfo) {
+        return saveItem(itemInfo.m_did, itemInfo.m_uid, itemInfo.m_type, itemInfo.m_icon, itemInfo.m_appName, itemInfo.m_name, itemInfo.m_description, itemInfo.m_data);
     }
 
-    long insertItem(int uid, int type, int icon, String appName, String name, String description, String data) {
+    long saveItem(int did, int uid, int type, int icon, String appName, String name, String description, String data) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
 
@@ -174,7 +188,24 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         values.put("description", description);
         values.put("data", data);
 
-        long result = db.insert("item", null, values);
+        long result = -1;
+
+        if (did == 0) {
+            //result = db.insert("item", null, values);
+            try
+            {
+                result = db.insertOrThrow("item", null, values);
+            }
+            catch(SQLException e)
+            {
+                // Sep 12, 2013 6:50:17 AM
+                Log.e("Exception","SQLException"+String.valueOf(e.getMessage()));
+                e.printStackTrace();
+            }
+
+        } else {
+            result = db.update("item", values, "did=?", new String[]{new Integer(did).toString()});
+        }
 
         db.close();
 
@@ -206,4 +237,38 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         }
     }
 
+    List<ItemInfo> getUserItemList(int uid) {
+        ArrayList<ItemInfo> itemInfos = new ArrayList<>();
+
+
+        SQLiteDatabase db = getWritableDatabase();
+
+        Cursor cursor = db.rawQuery("select * from item where uid=?", new String[]{new Integer(uid).toString()});
+
+        while (cursor.moveToNext()) {
+            ItemInfo itemInfo = new ItemInfo();
+
+            itemInfo.m_did = cursor.getInt(cursor.getColumnIndex("did"));
+            itemInfo.m_uid = cursor.getInt(cursor.getColumnIndex("uid"));
+            itemInfo.m_type = cursor.getInt(cursor.getColumnIndex("type"));
+            itemInfo.m_icon = cursor.getInt(cursor.getColumnIndex("icon"));
+            itemInfo.m_appName = cursor.getString(cursor.getColumnIndex("appname"));
+            itemInfo.m_name = cursor.getString(cursor.getColumnIndex("name"));
+            itemInfo.m_description = cursor.getString(cursor.getColumnIndex("description"));
+            itemInfo.m_data = cursor.getString(cursor.getColumnIndex("data"));
+
+            itemInfos.add(itemInfo);
+        }
+
+        cursor.close();
+        db.close();
+
+        return itemInfos;
+    }
+
+    long removeItem(int did) {
+        SQLiteDatabase db = getWritableDatabase();
+
+        return db.delete("item", "did=?", new String[]{new Integer(did).toString()});
+    }
 }

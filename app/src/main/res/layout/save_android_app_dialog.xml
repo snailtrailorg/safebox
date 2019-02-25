@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/sign_up_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
@@ -12,7 +11,7 @@
         android:orientation="vertical">
 
         <LinearLayout
-            android:id="@+id/add_item_form_panel"
+            android:id="@+id/save_item_form_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
@@ -25,7 +24,7 @@
                 android:layout_marginRight="@dimen/general_margin_small"
                 android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
-                android:text="@string/add_android_app_form_title"
+                android:text="@string/android_app_form_title"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -35,11 +34,13 @@
                 android:gravity="center_horizontal|center_vertical">
 
                 <ImageView
+                    android:id="@+id/save_item_icon"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/general_margin_tiny"
                     android:layout_marginEnd="@dimen/general_margin_small"
-                    android:contentDescription="@string/add_item_prompt_icon"
+                    android:clickable="true"
+                    android:contentDescription="@string/save_item_prompt_icon"
                     android:src="@mipmap/ic_launcher" />
 
             </LinearLayout>
@@ -50,15 +51,16 @@
                 android:layout_marginLeft="@dimen/general_margin_small"
                 android:layout_marginRight="@dimen/general_margin_small">
 
-                <AutoCompleteTextView
-                    android:id="@+id/add_item_name"
+                <EditText
+                    android:id="@+id/save_item_name"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/add_item_prompt_name"
+                    android:hint="@string/save_item_prompt_name"
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:singleLine="true"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -68,15 +70,16 @@
                 android:layout_marginLeft="@dimen/general_margin_small"
                 android:layout_marginRight="@dimen/general_margin_small">
 
-                <AutoCompleteTextView
-                    android:id="@+id/add_item_description"
+                <EditText
+                    android:id="@+id/save_item_description"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/add_item_prompt_description"
+                    android:hint="@string/save_item_prompt_description"
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:singleLine="true"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -86,15 +89,16 @@
                 android:layout_marginLeft="@dimen/general_margin_small"
                 android:layout_marginRight="@dimen/general_margin_small">
 
-                <AutoCompleteTextView
-                    android:id="@+id/add_item_username"
+                <EditText
+                    android:id="@+id/save_android_app_username"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/add_item_prompt_username"
+                    android:hint="@string/android_app_prompt_username"
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:singleLine="true"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -104,15 +108,16 @@
                 android:layout_marginLeft="@dimen/general_margin_small"
                 android:layout_marginRight="@dimen/general_margin_small">
 
-                <AutoCompleteTextView
-                    android:id="@+id/add_item_password"
+                <EditText
+                    android:id="@+id/save_android_app_password"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/add_item_prompt_password"
+                    android:hint="@string/android_app_prompt_password"
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:singleLine="true"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -122,15 +127,16 @@
                 android:layout_marginLeft="@dimen/general_margin_small"
                 android:layout_marginRight="@dimen/general_margin_small">
 
-                <AutoCompleteTextView
-                    android:id="@+id/add_item_remarks"
+                <EditText
+                    android:id="@+id/save_android_app_remarks"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/add_item_prompt_remarks"
+                    android:hint="@string/android_app_prompt_remarks"
                     android:imeOptions="actionNext"
                     android:maxLength="2048"
-                    android:nextFocusForward="@id/add_item_add_button"
-                    android:singleLine="false" />
+                    android:nextFocusForward="@id/save_item_save_button"
+                    android:singleLine="false"
+                    android:inputType="text" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -145,14 +151,14 @@
                     android:layout_gravity="start">
 
                     <Button
-                        android:id="@+id/add_item_cancel_button"
+                        android:id="@+id/save_item_cancel_button"
                         style="?android:textAppearanceSmall"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/general_margin_small"
                         android:layout_marginEnd="@dimen/general_margin_tiny"
                         android:layout_marginBottom="@dimen/general_margin_small"
-                        android:text="@string/add_item_prompt_cancel"
+                        android:text="@string/save_item_prompt_cancel"
                         android:textAllCaps="false" />
 
                 </LinearLayout>
@@ -163,14 +169,14 @@
                     android:gravity="end">
 
                     <Button
-                        android:id="@+id/add_item_add_button"
+                        android:id="@+id/save_item_save_button"
                         style="?android:textAppearanceSmall"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/general_margin_tiny"
                         android:layout_marginEnd="@dimen/general_margin_small"
                         android:layout_marginBottom="@dimen/general_margin_small"
-                        android:text="@string/add_item_prompt_add"
+                        android:text="@string/save_item_prompt_save"
                         android:textAllCaps="false"
                         android:textStyle="bold" />
 
@@ -181,7 +187,7 @@
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/add_item_progress_panel"
+            android:id="@+id/save_item_progress_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
@@ -194,7 +200,7 @@
                 android:layout_marginRight="@dimen/general_margin_small"
                 android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
-                android:text="@string/add_item_progress_title"
+                android:text="@string/save_item_progress_title"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -213,14 +219,14 @@
                     android:layout_marginBottom="@dimen/general_margin_small" />
 
                 <TextView
-                    android:id="@+id/add_item_progress_message"
+                    android:id="@+id/save_item_progress_message"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/general_margin_tiny"
                     android:layout_marginTop="@dimen/general_margin_tiny"
                     android:layout_marginEnd="@dimen/general_margin_small"
                     android:layout_marginBottom="@dimen/general_margin_small"
-                    android:text="@string/add_item_progress_processing_message" />
+                    android:text="@string/save_item_progress_processing_message" />
 
             </LinearLayout>
 

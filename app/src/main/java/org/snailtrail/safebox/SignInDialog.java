@@ -189,7 +189,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
 
             m_uiHandler.obtainMessage(R.integer.MESSAGE_SET_USER_INFO, new SignInMessageObject(userInfo.m_uid, userInfo.m_email, publicKey, privateKey)).sendToTarget();
 
-            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_DATA);
+            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
 
             return SIGN_IN_RESULT_SUCCESS;
         }

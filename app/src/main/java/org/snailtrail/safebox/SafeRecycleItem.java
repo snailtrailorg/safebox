@@ -8,18 +8,18 @@ import android.widget.LinearLayout;
 
 import androidx.annotation.Nullable;
 
-public class SafeListItem extends LinearLayout implements GestureDetector.OnGestureListener {
-    public SafeListItem(Context context) {
+public class SafeRecycleItem extends LinearLayout implements GestureDetector.OnGestureListener {
+    public SafeRecycleItem(Context context) {
         super(context);
     }
 
-    public SafeListItem(Context context, @Nullable AttributeSet attrs) {
+    public SafeRecycleItem(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public SafeListItem(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); }
+    public SafeRecycleItem(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); }
 
-    public SafeListItem(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) { super(context, attrs, defStyleAttr, defStyleRes); }
+    public SafeRecycleItem(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) { super(context, attrs, defStyleAttr, defStyleRes); }
 
     @Override
     public boolean onDown(MotionEvent e) {

@@ -260,7 +260,11 @@ class Utilities {
         return new SecretKeySpec(digest, 8, 24, symmetricEncryptAlgorithm);
     }
 
-    static String rsaEncrypt(PublicKey publicKey, String itemData) {
+    static String rsaEncrypt(PublicKey publicKey, String message) {
+        if (message == null) {
+            return null;
+        }
+
         Cipher cipher = null;
 
         try {
@@ -279,7 +283,7 @@ class Utilities {
 
         byte[] encryptedData = new byte[0];
         try {
-            encryptedData = cipher.doFinal(itemData.getBytes());
+            encryptedData = cipher.doFinal(message.getBytes());
         } catch (BadPaddingException e) {
             e.printStackTrace();
         } catch (IllegalBlockSizeException e) {
@@ -289,8 +293,12 @@ class Utilities {
         return Base64.encodeToString(encryptedData, Base64.DEFAULT);
     }
 
-    static String rsaDecrypt(PrivateKey privateKey, String itemData) {
-        byte[] decodedData = Base64.decode(itemData, Base64.DEFAULT);
+    static String rsaDecrypt(PrivateKey privateKey, String message) {
+        if (message == null) {
+            return null;
+        }
+
+        byte[] decodedData = Base64.decode(message, Base64.DEFAULT);
 
         Cipher cipher = null;
 

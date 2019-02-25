@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/sign_up_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
@@ -23,14 +22,11 @@
             android:layout_marginLeft="@dimen/general_margin_small"
             android:layout_marginRight="@dimen/general_margin_small">
 
-            <AutoCompleteTextView
-                android:id="@+id/add_item_name"
+            <EditText
+                android:id="@+id/view_android_app_username"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/add_item_prompt_name"
-                android:imeOptions="actionNext"
-                android:maxLength="50"
-                android:maxLines="1"
+                android:hint="@string/android_app_prompt_username"
                 android:singleLine="true" />
 
         </com.google.android.material.textfield.TextInputLayout>
@@ -41,14 +37,11 @@
             android:layout_marginLeft="@dimen/general_margin_small"
             android:layout_marginRight="@dimen/general_margin_small">
 
-            <AutoCompleteTextView
-                android:id="@+id/add_item_description"
+            <EditText
+                android:id="@+id/view_android_app_password"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/add_item_prompt_description"
-                android:imeOptions="actionNext"
-                android:maxLength="50"
-                android:maxLines="1"
+                android:hint="@string/android_app_prompt_password"
                 android:singleLine="true" />
 
         </com.google.android.material.textfield.TextInputLayout>
@@ -59,50 +52,11 @@
             android:layout_marginLeft="@dimen/general_margin_small"
             android:layout_marginRight="@dimen/general_margin_small">
 
-            <AutoCompleteTextView
-                android:id="@+id/add_item_username"
+            <EditText
+                android:id="@+id/view_android_app_remarks"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/add_item_prompt_username"
-                android:imeOptions="actionNext"
-                android:maxLength="50"
-                android:maxLines="1"
-                android:singleLine="true" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="@dimen/general_margin_small"
-            android:layout_marginRight="@dimen/general_margin_small">
-
-            <AutoCompleteTextView
-                android:id="@+id/add_item_password"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/add_item_prompt_password"
-                android:imeOptions="actionNext"
-                android:maxLength="50"
-                android:maxLines="1"
-                android:singleLine="true" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="@dimen/general_margin_small"
-            android:layout_marginRight="@dimen/general_margin_small">
-
-            <AutoCompleteTextView
-                android:id="@+id/add_item_remarks"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="@string/add_item_prompt_remarks"
-                android:imeOptions="actionNext"
-                android:maxLength="2048"
-                android:nextFocusForward="@id/add_item_add_button"
+                android:hint="@string/android_app_prompt_remarks"
                 android:singleLine="false" />
 
         </com.google.android.material.textfield.TextInputLayout>
@@ -118,14 +72,14 @@
                 android:layout_gravity="start">
 
                 <Button
-                    android:id="@+id/add_item_cancel_button"
+                    android:id="@+id/view_item_modify_button"
                     style="?android:textAppearanceSmall"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/general_margin_small"
                     android:layout_marginEnd="@dimen/general_margin_tiny"
                     android:layout_marginBottom="@dimen/general_margin_small"
-                    android:text="@string/add_item_prompt_cancel"
+                    android:text="@string/view_item_prompt_modify"
                     android:textAllCaps="false" />
 
             </LinearLayout>
@@ -136,14 +90,14 @@
                 android:gravity="end">
 
                 <Button
-                    android:id="@+id/add_item_add_button"
+                    android:id="@+id/view_item_ok_button"
                     style="?android:textAppearanceSmall"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/general_margin_tiny"
                     android:layout_marginEnd="@dimen/general_margin_small"
                     android:layout_marginBottom="@dimen/general_margin_small"
-                    android:text="@string/add_item_prompt_add"
+                    android:text="@string/view_item_prompt_ok"
                     android:textAllCaps="false"
                     android:textStyle="bold" />
 

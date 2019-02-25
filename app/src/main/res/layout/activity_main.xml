@@ -41,7 +41,7 @@
             tools:context=".MainActivity">
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/secret_list_view"
+                android:id="@+id/safe_recycle_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
