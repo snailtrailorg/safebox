@@ -8,13 +8,15 @@ import android.content.pm.PackageManager;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.GridView;
-import android.widget.ListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -22,37 +24,26 @@ import java.util.List;
 
 public class AndroidAppListDialog extends AlertDialog {
     public Context m_context;
-    public GridView m_view;
+    public View m_view;
     public ArrayList<AndroidAppInfo> m_androidAppInfos;
-    public Rect m_rect;
+    public Handler m_handler;
 
     class AndroidAppInfo {
         public String m_appName;
         public String m_packageName;
-        public Drawable m_icom;
+        public Drawable m_icon;
 
-        public AndroidAppInfo(String m_appName, String m_packageName, Drawable m_icom) {
+        public AndroidAppInfo(String m_appName, String m_packageName, Drawable m_icon) {
             this.m_appName = m_appName;
             this.m_packageName = m_packageName;
-            this.m_icom = m_icom;
+            this.m_icon = m_icon;
         }
     }
 
-    protected AndroidAppListDialog(Context context) {
+    protected AndroidAppListDialog(Context context, Handler handler) {
         super(context);
         m_context = context;
-        loadAndoirAppInfos();
-    }
-
-    protected AndroidAppListDialog(Context context, boolean cancelable, OnCancelListener cancelListener) {
-        super(context, cancelable, cancelListener);
-        m_context = context;
-        loadAndoirAppInfos();
-    }
-
-    protected AndroidAppListDialog(Context context, int themeResId) {
-        super(context, themeResId);
-        m_context = context;
+        m_handler = handler;
         loadAndoirAppInfos();
     }
 
@@ -77,12 +68,14 @@ public class AndroidAppListDialog extends AlertDialog {
         super.onCreate(savedInstanceState);
 
         LayoutInflater inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        m_view = (GridView) inflater.inflate(R.layout.android_app_icon_dialog, null);
+        m_view = inflater.inflate(R.layout.android_app_list_dialog, null);
         setContentView(m_view);
 
         setCancelable(false);
 
-        m_view.setAdapter(new BaseAdapter() {
+        GridView gridView = m_view.findViewById(R.id.android_app_list_dialog_grid);
+
+        gridView.setAdapter(new BaseAdapter() {
             @Override
             public int getCount() {
                 return (m_androidAppInfos == null) ? 0 : m_androidAppInfos.size();
@@ -102,14 +95,13 @@ public class AndroidAppListDialog extends AlertDialog {
             public View getView(int position, View convertView, ViewGroup parent) {
                 AndroidAppInfo androidAppInfo = m_androidAppInfos.get(position);
 
-                View view = LayoutInflater.from(getContext()).inflate(R.layout.icon_list_item, parent, false);
-                TextView textView = view.findViewById(R.id.icon_list_item_name);
+                View view = LayoutInflater.from(getContext()).inflate(R.layout.android_app_list_item, parent, false);
+                TextView textView = view.findViewById(R.id.android_app_list_item_name);
                 if (textView != null) {
                     Rect rect = textView.getCompoundDrawables()[1].getBounds();
                     textView.setText(androidAppInfo.m_appName);
-                    androidAppInfo.m_icom.setBounds(rect);
-                    textView.setCompoundDrawables(null, androidAppInfo.m_icom, null, null);
-                    textView.setMaxWidth(rect.right);
+                    androidAppInfo.m_icon.setBounds(rect);
+                    textView.setCompoundDrawables(null, androidAppInfo.m_icon, null, null);
                     textView.setSingleLine(true);
                 }
 
@@ -117,8 +109,32 @@ public class AndroidAppListDialog extends AlertDialog {
             }
         });
 
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-    }
+        gridView.setOnItemClickListener(new GridView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                AndroidAppInfo androidAppInfo = m_androidAppInfos.get(position);
+                SaveItemDialog.IconInfo iconInfo = new SaveItemDialog.IconInfo();
+                iconInfo.m_iconDrawable = androidAppInfo.m_icon;
+                iconInfo.m_iconIndex = 0;
+                iconInfo.m_iconName = androidAppInfo.m_appName;
+                iconInfo.m_iconDescription = androidAppInfo.m_packageName;
 
+                Message message = new Message();
+                message.what = R.id.save_item_icon;
+                message.obj = iconInfo;
+                m_handler.sendMessage(message);
+
+                dismiss();
+            }
+        });
+
+        Button button = m_view.findViewById(R.id.android_app_list_dialog_button_cancel);
+
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dismiss();
+            }
+        });
+    }
 }

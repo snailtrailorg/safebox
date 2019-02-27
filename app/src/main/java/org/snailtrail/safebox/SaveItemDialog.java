@@ -2,18 +2,23 @@ package org.snailtrail.safebox;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.ref.WeakReference;
 import java.security.PublicKey;
 
 public abstract class SaveItemDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
@@ -31,7 +36,26 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         m_itemInfo = itemInfo;
     }
 
-    public abstract void selectItemIcon();
+    static class IconInfo {
+        Drawable m_iconDrawable;
+        int m_iconIndex;
+        String m_iconName;
+        String m_iconDescription;
+    }
+
+    private Handler m_handler = new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what == R.id.save_item_icon) {
+                setItemIconInfo((IconInfo) msg.obj);
+            } else {
+                super.handleMessage(msg);
+            }
+        }
+    };
+
+    public abstract void selectItemIcon(Handler handler);
+    public abstract void setItemIconInfo(IconInfo iconInfo);
     public abstract void composeItemInfo();
     public abstract void extractItemInfo();
 
@@ -73,7 +97,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.save_item_icon:
-                selectItemIcon();
+                selectItemIcon(m_handler);
                 break;
             case R.id.save_item_cancel_button:
                 onClickCancel(view);

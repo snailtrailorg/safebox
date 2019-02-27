@@ -11,4 +11,7 @@
     <dimen name="general_margin_normal">24dp</dimen>
     <dimen name="general_margin_large">32dp</dimen>
     <dimen name="app_button_size">48dip</dimen>
+    <dimen name="app_icon_size_small">48dp</dimen>
+    <dimen name="app_icon_size_medium">64dp</dimen>
+    <dimen name="app_icon_size_large">72dp</dimen>
 </resources>

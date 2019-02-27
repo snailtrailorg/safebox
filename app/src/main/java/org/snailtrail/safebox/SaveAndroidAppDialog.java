@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.view.View;
 import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
+import android.widget.ImageView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -20,8 +21,18 @@ public class SaveAndroidAppDialog extends SaveItemDialog {
     }
 
     @Override
-    public void selectItemIcon() {
-        new AndroidAppListDialog(getContext()).show();
+    public void selectItemIcon(Handler handler) {
+        new AndroidAppListDialog(getContext(), handler).show();
+    }
+
+    @Override
+    public void setItemIconInfo(IconInfo iconInfo) {
+        ((ImageView)m_view.findViewById(R.id.save_item_icon)).setImageDrawable(iconInfo.m_iconDrawable);
+        ((EditText)m_view.findViewById(R.id.save_item_name)).setText(iconInfo.m_iconName);
+        ((EditText)m_view.findViewById(R.id.save_item_description)).setText(iconInfo.m_iconDescription);
+
+        m_itemInfo.m_icon = 0;
+        m_itemInfo.m_appName = iconInfo.m_iconDescription;
     }
 
     @Override

@@ -101,4 +101,7 @@
     <string name="save_item_result_error_upload_item_failed">Upload item failed.</string>
     <string name="save_item_result_success">Save item success.</string>
 
+    <string name="android_app_list_dialog_title">Choose an app</string>
+    <string name="android_app_list_dialog_button_cancel">Cancel</string>
+
 </resources>

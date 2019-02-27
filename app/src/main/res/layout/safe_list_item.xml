@@ -14,8 +14,8 @@
         android:layout_weight="0"
         android:adjustViewBounds="true"
         android:contentDescription="@string/safe_list_item_icon_content_description"
-        android:maxWidth="64dp"
-        android:maxHeight="64dp"
+        android:maxWidth="@dimen/app_icon_size_medium"
+        android:maxHeight="@dimen/app_icon_size_medium"
         app:srcCompat="@android:drawable/sym_def_app_icon" />
 
     <LinearLayout
