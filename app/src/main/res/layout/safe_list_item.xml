@@ -1,36 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<org.snailtrail.safebox.SafeRecycleItem xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:clickable="true"
     android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:background="@drawable/safe_list_item_ripple"
+    android:layout_margin="@dimen/special_margin_small">
 
     <ImageView
         android:id="@+id/safe_list_item_icon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="@dimen/app_icon_size_medium"
+        android:layout_height="@dimen/app_icon_size_medium"
         android:layout_margin="@dimen/general_margin_tiny"
         android:layout_weight="0"
         android:adjustViewBounds="true"
         android:contentDescription="@string/safe_list_item_icon_content_description"
-        android:maxWidth="@dimen/app_icon_size_medium"
-        android:maxHeight="@dimen/app_icon_size_medium"
         app:srcCompat="@android:drawable/sym_def_app_icon" />
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:layout_weight="10"
         android:gravity="center_vertical"
-        android:layout_weight="10">
+        android:orientation="vertical">
 
         <TextView
             android:id="@+id/safe_list_item_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/general_margin_micro"
-            android:layout_weight="10"
             android:text="@string/safe_list_item_name" />
 
         <TextView
@@ -38,19 +39,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/general_margin_micro"
-            android:layout_weight="10"
             android:text="@string/safe_list_item_description" />
     </LinearLayout>
 
     <ImageView
+        android:id="@+id/safe_list_item_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/general_margin_tiny"
         android:layout_weight="0"
         android:adjustViewBounds="true"
+        android:alpha="0.5"
+        android:clickable="false"
         android:contentDescription="@string/safe_list_item_view_button_content_description"
-        android:maxWidth="@dimen/app_button_size"
-        android:maxHeight="@dimen/app_button_size"
-        android:src="@drawable/ic_menu_view" />
+        android:maxWidth="@dimen/app_button_size_small"
+        android:maxHeight="@dimen/app_button_size_small"
+        android:src="@drawable/more" />
 
-</org.snailtrail.safebox.SafeRecycleItem>
+</LinearLayout>

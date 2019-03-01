@@ -5,13 +5,21 @@
     <dimen name="nav_header_vertical_spacing">8dp</dimen>
     <dimen name="nav_header_height">176dp</dimen>
     <dimen name="fab_margin">16dp</dimen>
+    <dimen name="general_margin_micro_micro">1dp</dimen>
+    <dimen name="general_margin_tiny_micro">2dp</dimen>
     <dimen name="general_margin_micro">4dp</dimen>
     <dimen name="general_margin_tiny">8dp</dimen>
     <dimen name="general_margin_small">16dp</dimen>
     <dimen name="general_margin_normal">24dp</dimen>
     <dimen name="general_margin_large">32dp</dimen>
+    <dimen name="app_button_size_small">40dip</dimen>
     <dimen name="app_button_size">48dip</dimen>
     <dimen name="app_icon_size_small">48dp</dimen>
     <dimen name="app_icon_size_medium">64dp</dimen>
     <dimen name="app_icon_size_large">72dp</dimen>
+    <dimen name="special_margin_micro">1px</dimen>
+    <dimen name="special_margin_tiny">2px</dimen>
+    <dimen name="special_margin_small">4px</dimen>
+    <dimen name="special_margin_medium">8px</dimen>
+    <dimen name="special_margin_large">16px</dimen>
 </resources>
