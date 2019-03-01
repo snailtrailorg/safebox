@@ -125,6 +125,7 @@ public class SafeRecycleAdapter extends RecyclerView.Adapter<SafeRecycleAdapter.
             }
         });
 
+        /*
         safeViewHolder.m_itemView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -161,6 +162,7 @@ public class SafeRecycleAdapter extends RecyclerView.Adapter<SafeRecycleAdapter.
                 }).onTouchEvent(event);
             }
         });
+        */
     }
 
     @NonNull
