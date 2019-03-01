@@ -7,35 +7,50 @@ import android.content.pm.PackageManager;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.drawable.Drawable;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
 public class SafeRecycleAdapter extends RecyclerView.Adapter<SafeRecycleAdapter.SafeViewHolder> {
-    int m_signInUserId;
+
+    RecyclerView m_recyclerView;
     Context m_context;
     List<SqliteOpenHelper.ItemInfo> m_itemInfos;
 
-    public static class SafeViewHolder extends RecyclerView.ViewHolder {
-        public SafeRecycleItem m_safeRecycleItem;
-
-        public SafeViewHolder(SafeRecycleItem safeRecycleItem) {
-            super(safeRecycleItem);
-            m_safeRecycleItem = safeRecycleItem;
-        }
-    }
-
-    SafeRecycleAdapter() {}
-
-    SafeRecycleAdapter(Context context) {
+    SafeRecycleAdapter(Context context, RecyclerView recyclerView) {
         m_context = context;
+        m_recyclerView = recyclerView;
+
+        new ItemTouchHelper(new ItemTouchHelper.Callback(){
+
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                 return makeMovementFlags(0, ItemTouchHelper.START | ItemTouchHelper.END);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                Utilities.jam(getContext(),"swipe");
+            }
+        }).attachToRecyclerView(recyclerView);
     }
 
     public Context getContext() { return m_context; }
@@ -48,9 +63,20 @@ public class SafeRecycleAdapter extends RecyclerView.Adapter<SafeRecycleAdapter.
         notifyDataSetChanged();
     }
 
-    public List<SqliteOpenHelper.ItemInfo> getItemInfos() { return m_itemInfos; }
+    public static class SafeViewHolder extends RecyclerView.ViewHolder {
+        public View m_itemView;
+        public ImageView m_icon;
+        public TextView m_name;
+        public TextView m_description;
 
-    public void setItemInfos(List<SqliteOpenHelper.ItemInfo> itemInfos) { m_itemInfos = itemInfos; }
+        public SafeViewHolder(@NonNull View itemView) {
+            super(itemView);
+            m_itemView = itemView;
+            m_icon = itemView.findViewById(R.id.safe_list_item_icon);
+            m_name = itemView.findViewById(R.id.safe_list_item_name);
+            m_description = itemView.findViewById(R.id.safe_list_item_description);
+        }
+    }
 
     @Override
     public void onBindViewHolder(SafeViewHolder safeViewHolder, int position) {
@@ -88,18 +114,59 @@ public class SafeRecycleAdapter extends RecyclerView.Adapter<SafeRecycleAdapter.
                 break;
         }
 
-        if (drawable != null) ((ImageView)safeViewHolder.m_safeRecycleItem.findViewById(R.id.safe_list_item_icon)).setImageDrawable(drawable);
-        ((TextView)safeViewHolder.m_safeRecycleItem.findViewById(R.id.safe_list_item_name)).setText(m_itemInfos.get(position).m_name);
-        ((TextView)safeViewHolder.m_safeRecycleItem.findViewById(R.id.safe_list_item_description)).setText(m_itemInfos.get(position).m_description);
+        if (drawable != null) { safeViewHolder.m_icon.setImageDrawable(drawable); }
+        safeViewHolder.m_name.setText(m_itemInfos.get(position).m_name);
+        safeViewHolder.m_description.setText(m_itemInfos.get(position).m_description);
+
+        safeViewHolder.m_itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            }
+        });
+
+        safeViewHolder.m_itemView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                return new GestureDetector(new GestureDetector.OnGestureListener() {
+                    @Override
+                    public boolean onDown(MotionEvent e) {
+                        return false;
+                    }
+
+                    @Override
+                    public void onShowPress(MotionEvent e) {
+
+                    }
+
+                    @Override
+                    public boolean onSingleTapUp(MotionEvent e) {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+                        return false;
+                    }
+
+                    @Override
+                    public void onLongPress(MotionEvent e) {
+                        Utilities.jam(getContext(), "long press");
+                    }
+
+                    @Override
+                    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                        return false;
+                    }
+                }).onTouchEvent(event);
+            }
+        });
     }
 
     @NonNull
     @Override
     public SafeViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        SafeRecycleItem SafeListItem = (SafeRecycleItem) LayoutInflater.from(parent.getContext()).inflate(R.layout.safe_list_item, parent, false);
-
-        SafeViewHolder SafeViewHolder = new SafeViewHolder(SafeListItem);
-        return SafeViewHolder;
+        return new SafeViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.safe_list_item, parent, false));
     }
 
     @Override
