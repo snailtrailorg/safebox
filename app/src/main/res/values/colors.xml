@@ -3,6 +3,10 @@
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#C800A3B4</color>
     <color name="colorAccent">#D81B60</color>
-    <color name="colorRipple">#C7C7C0</color>
-    <color name="colorShape">#D7D7D0</color>
+    <color name="colorSafeListItemBodyRipple">#C7C7C0</color>
+    <color name="colorSafeListItemBodyShape">#D7D7D0</color>
+    <color name="colorSafeListItemDeleteRipple">#E09090</color>
+    <color name="colorSafeListItemDeleteShape">#F0A0A0</color>
+    <color name="colorSafeListItemModifyRipple">#90C0C0</color>
+    <color name="colorSafeListItemModifyShape">#A0D0D0</color>
 </resources>

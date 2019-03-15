@@ -15,7 +15,9 @@
     <string name="error_dialog_button_ok">OK</string>
 
     <string name="safe_list_item_icon_content_description">Icon</string>
-    <string name="safe_list_item_view_button_content_description">View</string>
+    <string name="safe_list_item_more_content_description">More</string>
+    <string name="safe_list_item_modify_content_description">Modify</string>
+    <string name="safe_list_item_delete_content_description">Delete</string>
     <string name="safe_list_item_name">Name...</string>
     <string name="safe_list_item_description">Description...</string>
 

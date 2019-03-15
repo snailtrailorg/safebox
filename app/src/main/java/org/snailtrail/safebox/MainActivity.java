@@ -26,9 +26,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private String m_email;
     private PublicKey m_publicKey;
     private PrivateKey m_privateKey;
-    SafeRecycleAdapter m_safeRecycleAdapter;
+    SafeRecyclerAdapter m_safeRecycleAdapter;
 
-    private static class SecureHandler extends Handler {
+    public static class SecureHandler extends Handler {
         private WeakReference<MainActivity> m_mainActivity;
 
         protected SecureHandler (MainActivity activity) {
@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         RecyclerView recyclerView = findViewById(R.id.safe_recycle_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        m_safeRecycleAdapter = new SafeRecycleAdapter(this, recyclerView);
+        m_safeRecycleAdapter = new SafeRecyclerAdapter(this, m_secureHandler, recyclerView);
         recyclerView.setAdapter(m_safeRecycleAdapter);
 
         m_isUserSignedIn = false;
