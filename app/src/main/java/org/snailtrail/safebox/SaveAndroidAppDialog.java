@@ -1,6 +1,9 @@
 package org.snailtrail.safebox;
 
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
@@ -12,37 +15,36 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.security.PrivateKey;
 import java.security.PublicKey;
 
 public class SaveAndroidAppDialog extends SaveItemDialog {
 
-    public SaveAndroidAppDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, SqliteOpenHelper.ItemInfo itemInfo) {
-        super(context, resource, uiHandler, publicKey, itemInfo);
+    public SaveAndroidAppDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
+        super(context, resource, uiHandler, publicKey, privateKey, itemInfo);
     }
 
     @Override
     public void selectItemIcon(Handler handler) {
-        new AndroidAppListDialog(getContext(), handler).show();
+        new AndroidAppIconListDialog(getContext(), R.layout.icon_list_dialog, handler).show();
     }
 
     @Override
-    public void setItemIconInfo(IconInfo iconInfo) {
-        ((ImageView)m_view.findViewById(R.id.save_item_icon)).setImageDrawable(iconInfo.m_iconDrawable);
-        ((EditText)m_view.findViewById(R.id.save_item_name)).setText(iconInfo.m_iconName);
-        ((EditText)m_view.findViewById(R.id.save_item_description)).setText(iconInfo.m_iconDescription);
+    public void setItemIconInfo(IconListDialog.IconInfo iconInfo) {
+        ((ImageView)m_view.findViewById(R.id.save_item_icon)).setImageDrawable(iconInfo.m_drawable);
+        ((EditText)m_view.findViewById(R.id.save_item_name)).setText(iconInfo.m_name);
+        ((EditText)m_view.findViewById(R.id.save_item_description)).setText(iconInfo.m_identifier);
 
-        m_itemInfo.m_icon = 0;
-        m_itemInfo.m_appName = iconInfo.m_iconDescription;
+        m_itemInfo.m_icon = iconInfo.m_identifier;
     }
 
     @Override
-    public void composeItemInfo() {
-        EditText name = m_view.findViewById(R.id.save_item_name);
-        EditText description = m_view.findViewById(R.id.save_item_description);
+    public Drawable getIconInfoByIdentifier(Context context, String identifier) {
+        return Utilities.getAndroidAppIcon(context, identifier);
+    }
 
-        m_itemInfo.m_name = (name == null) ? null : name.getText().toString();
-        m_itemInfo.m_description = (description == null) ? null : description.getText().toString();
-
+    @Override
+    public void composeItemData() {
         EditText username = m_view.findViewById(R.id.save_android_app_username);
         EditText password = m_view.findViewById(R.id.save_android_app_password);
         EditText remarks = m_view.findViewById(R.id.save_android_app_remarks);
@@ -60,7 +62,27 @@ public class SaveAndroidAppDialog extends SaveItemDialog {
     }
 
     @Override
-    public void extractItemInfo() {
+    public void extractItemData() {
+        EditText username = m_view.findViewById(R.id.save_android_app_username);
+        EditText password = m_view.findViewById(R.id.save_android_app_password);
+        EditText remarks = m_view.findViewById(R.id.save_android_app_remarks);
 
+        String decryptedData = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(decryptedData);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        if (jsonObject != null) {
+            try {
+                username.setText(jsonObject.getString("username"));
+                password.setText(jsonObject.getString("password"));
+                remarks.setText(jsonObject.getString("remarks"));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

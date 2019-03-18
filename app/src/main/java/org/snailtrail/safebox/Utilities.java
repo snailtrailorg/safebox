@@ -2,10 +2,14 @@ package org.snailtrail.safebox;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.org.apache.commons.codec.binary.Hex;
 import android.util.Base64;
 import android.widget.Toast;
 
+import java.lang.reflect.Field;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -27,6 +31,8 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+
+import androidx.core.content.ContextCompat;
 
 import static android.os.SystemClock.uptimeMillis;
 
@@ -327,5 +333,31 @@ class Utilities {
         }
 
         return new String(decryptedData);
+    }
+
+    static Drawable getAndroidAppIcon(Context context, String packageName) {
+        PackageManager packageManager = context.getPackageManager();
+        PackageInfo packageInfo = null;
+
+        try {
+            packageInfo = packageManager.getPackageInfo(packageName, 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        if (packageInfo != null) {
+            return packageInfo.applicationInfo.loadIcon(packageManager);
+        } else {
+            return context.getDrawable(R.drawable.android_app);
+        }
+    }
+
+    static Drawable getResourceIcon(Context context, String filename) {
+        int id = context.getResources().getIdentifier(filename, "drawable", context.getPackageName());
+        if (id != 0) {
+            return ContextCompat.getDrawable(context,id);
+        } else {
+            return null;
+        }
     }
 }

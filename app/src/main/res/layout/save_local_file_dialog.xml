@@ -24,7 +24,7 @@
                 android:layout_marginRight="@dimen/general_margin_small"
                 android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
-                android:text="@string/android_app_form_title"
+                android:text="@string/local_file_form_title"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -40,11 +40,10 @@
                     android:layout_marginStart="@dimen/general_margin_tiny"
                     android:layout_marginEnd="@dimen/general_margin_small"
                     android:adjustViewBounds="true"
-                    android:clickable="true"
                     android:contentDescription="@string/save_item_prompt_icon"
                     android:maxWidth="@dimen/app_icon_size_medium"
-                    android:maxHeight="@dimen/app_icon_size_medium"
-                    android:src="@mipmap/ic_launcher" />
+                    android:minHeight="@dimen/app_icon_size_medium"
+                    android:src="@drawable/local_file" />
 
             </LinearLayout>
 
@@ -62,8 +61,7 @@
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true"
-                    android:inputType="text" />
+                    android:singleLine="true" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -81,8 +79,7 @@
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true"
-                    android:inputType="text" />
+                    android:singleLine="true" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -93,15 +90,14 @@
                 android:layout_marginRight="@dimen/general_margin_small">
 
                 <EditText
-                    android:id="@+id/save_android_app_username"
+                    android:id="@+id/save_item_username"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/android_app_prompt_username"
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true"
-                    android:inputType="text" />
+                    android:singleLine="true" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -112,15 +108,14 @@
                 android:layout_marginRight="@dimen/general_margin_small">
 
                 <EditText
-                    android:id="@+id/save_android_app_password"
+                    android:id="@+id/save_item_password"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/android_app_prompt_password"
                     android:imeOptions="actionNext"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true"
-                    android:inputType="text" />
+                    android:singleLine="true" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -131,15 +126,14 @@
                 android:layout_marginRight="@dimen/general_margin_small">
 
                 <EditText
-                    android:id="@+id/save_android_app_remarks"
+                    android:id="@+id/save_item_remarks"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="@string/android_app_prompt_remarks"
                     android:imeOptions="actionNext"
                     android:maxLength="2048"
                     android:nextFocusForward="@id/save_item_save_button"
-                    android:singleLine="false"
-                    android:inputType="text" />
+                    android:singleLine="false" />
 
             </com.google.android.material.textfield.TextInputLayout>
 

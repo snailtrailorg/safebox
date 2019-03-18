@@ -1,5 +1,6 @@
 package org.snailtrail.safebox;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -21,15 +22,16 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
-    private boolean m_isUserSignedIn;
-    private int m_signInUserId;
-    private String m_email;
-    private PublicKey m_publicKey;
-    private PrivateKey m_privateKey;
+    private static boolean m_isUserSignedIn;
+    private static int m_signInUserId;
+    private static String m_email;
+    private static PublicKey m_publicKey;
+    private static PrivateKey m_privateKey;
     SafeRecyclerAdapter m_safeRecycleAdapter;
 
-    public static class SecureHandler extends Handler {
+    public class SecureHandler extends Handler {
         private WeakReference<MainActivity> m_mainActivity;
+        private WeakReference<Context> m_context;
 
         protected SecureHandler (MainActivity activity) {
             m_mainActivity = new WeakReference<>(activity);
@@ -54,6 +56,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         break;
                     case R.integer.MESSAGE_LOAD_USER_ITEMS:
                         mainActivity.loadUserItems();
+                        break;
+                    case R.integer.MESSAGE_MODIFY_ANDROID_APP_ITEM:
+                        new SaveAndroidAppDialog(mainActivity, R.layout.save_android_app_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        break;
+                    case R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM:
+                        new SaveLocalFileDialog(mainActivity, R.layout.save_local_file_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        break;
+                    case R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
+                        new SaveGeneralAccountDialog(mainActivity, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     default:
                         super.handleMessage(message);
@@ -120,29 +131,37 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         // as you specify a parent activity in AndroidManifest.xml.
         int menuItemId = item.getItemId();
 
-        //noinspection SimplifiableIfStatement
-        switch (menuItemId) {
-            case R.id.menu_item_add_android_app:
-                if (m_isUserSignedIn) {
-                    SqliteOpenHelper.ItemInfo itemInfo = new SqliteOpenHelper.ItemInfo();
-                    itemInfo.m_uid = m_signInUserId;
-                    itemInfo.m_did = 0;
+        if (m_isUserSignedIn) {
+            SqliteOpenHelper.ItemInfo itemInfo = new SqliteOpenHelper.ItemInfo();
+            itemInfo.m_uid = m_signInUserId;
+            itemInfo.m_did = 0;
+            itemInfo.m_icon = "";
+            itemInfo.m_description = "";
+            itemInfo.m_data = "";
+
+            //noinspection SimplifiableIfStatement
+            switch (menuItemId) {
+                case R.id.menu_item_add_android_app:
                     itemInfo.m_type = R.id.menu_item_add_android_app;
-                    itemInfo.m_icon = 0;
-                    itemInfo.m_appName = "";
-                    new SaveAndroidAppDialog(this, R.layout.save_android_app_dialog, m_secureHandler, m_publicKey, itemInfo).show();
-                }
-                return true;
+                    new SaveAndroidAppDialog(this, R.layout.save_android_app_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
+                    return true;
 
-            case R.id.menu_item_add_general_account:
-                return true;
+                case R.id.menu_item_add_general_account:
+                    itemInfo.m_type = R.id.menu_item_add_general_account;
+                    new SaveGeneralAccountDialog(this, R.layout.save_general_account_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
+                    return true;
 
-            case R.id.menu_item_add_local_file:
-                return true;
+                case R.id.menu_item_add_local_file:
+                    itemInfo.m_type = R.id.menu_item_add_local_file;
+                    new SaveLocalFileDialog(this, R.layout.save_local_file_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
+                    return true;
 
-            default:
-                return super.onOptionsItemSelected(item);
+                default:
+                    return super.onOptionsItemSelected(item);
+            }
         }
+
+        return false;
     }
 
     @SuppressWarnings("StatementWithEmptyBody")

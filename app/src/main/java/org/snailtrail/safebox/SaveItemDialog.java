@@ -13,12 +13,14 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.WeakReference;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 
 public abstract class SaveItemDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
@@ -26,28 +28,23 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
     public Handler m_uiHandler;
     public View m_view;
     public PublicKey m_publicKey;
+    public PrivateKey m_privateKey;
     public SqliteOpenHelper.ItemInfo m_itemInfo;
 
-    public SaveItemDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, SqliteOpenHelper.ItemInfo itemInfo) {
+    public SaveItemDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
         super(context);
         m_resource = resource;
         m_uiHandler = uiHandler;
         m_publicKey = publicKey;
+        m_privateKey = privateKey;
         m_itemInfo = itemInfo;
-    }
-
-    static class IconInfo {
-        Drawable m_iconDrawable;
-        int m_iconIndex;
-        String m_iconName;
-        String m_iconDescription;
     }
 
     private Handler m_handler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
             if (msg.what == R.id.save_item_icon) {
-                setItemIconInfo((IconInfo) msg.obj);
+                setItemIconInfo((IconListDialog.IconInfo) msg.obj);
             } else {
                 super.handleMessage(msg);
             }
@@ -55,9 +52,10 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
     };
 
     public abstract void selectItemIcon(Handler handler);
-    public abstract void setItemIconInfo(IconInfo iconInfo);
-    public abstract void composeItemInfo();
-    public abstract void extractItemInfo();
+    public abstract void setItemIconInfo(IconListDialog.IconInfo iconInfo);
+    public abstract Drawable getIconInfoByIdentifier(Context context, String identifier);
+    public abstract void composeItemData();
+    public abstract void extractItemData();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,7 +75,17 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         m_view.findViewById(R.id.save_item_save_button).setOnClickListener(this);
         m_view.setOnTouchListener(this);
 
-        extractItemInfo();
+        ImageView icon = m_view.findViewById(R.id.save_item_icon);
+        Drawable drawable = getIconInfoByIdentifier(getContext(), m_itemInfo.m_icon);
+        if (drawable != null) { icon.setImageDrawable(drawable);}
+
+        EditText name = m_view.findViewById(R.id.save_item_name);
+        EditText description = m_view.findViewById(R.id.save_item_description);
+
+        name.setText(m_itemInfo.m_name);
+        description.setText(m_itemInfo.m_description);
+
+        extractItemData();
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
@@ -106,16 +114,19 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
                 onClickSave(view);
                 break;
             default:
-                //do nothing
+                InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
     }
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+        /*
         InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
 
         v.performClick();
+        */
         return false;
     }
 
@@ -127,7 +138,13 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
 
-        composeItemInfo();
+        EditText name = m_view.findViewById(R.id.save_item_name);
+        EditText description = m_view.findViewById(R.id.save_item_description);
+
+        m_itemInfo.m_name = (name == null) ? null : name.getText().toString();
+        m_itemInfo.m_description = (description == null) ? null : description.getText().toString();
+
+        composeItemData();
 
         m_view.findViewById(R.id.save_item_form_panel).setVisibility(View.GONE);
         m_view.findViewById(R.id.save_item_progress_panel).setVisibility(View.VISIBLE);

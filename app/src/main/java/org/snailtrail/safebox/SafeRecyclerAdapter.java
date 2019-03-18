@@ -1,9 +1,13 @@
 package org.snailtrail.safebox;
 
+import android.animation.ObjectAnimator;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
+import android.os.Message;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -17,6 +21,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +34,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
     RecyclerView m_recyclerView;
     MainActivity.SecureHandler m_uiHandler;
     Context m_context;
+    PublicKey m_publicKey;
     List<SqliteOpenHelper.ItemInfo> m_itemInfos;
 
     SafeRecyclerAdapter(Context context, MainActivity.SecureHandler uiHandler, RecyclerView recyclerView) {
@@ -58,6 +64,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         public View m_body;
         public View m_delete;
         public View m_modify;
+        public SqliteOpenHelper.ItemInfo m_itemInfo;
 
         public SafeViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -71,16 +78,41 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         }
     }
 
-    public void animateTranslation(SafeViewHolder safeViewHolder, float start, float end, float velocity) {
+    public void animateTranslation(final SafeViewHolder safeViewHolder, float start, float stop, float velocity) {
         final View body = safeViewHolder.m_body;
-        final TranslateAnimation translateAnimation = new TranslateAnimation(start, end, 0.0f, 0.0f);
-        long duration = Math.abs((long)((end - start) / ((velocity == 0) ? 100 : velocity) * 1000));
+        final float begin = start;
+        final float end = stop;
+        long duration = Math.abs((long)((end - begin) / ((velocity == 0) ? 100 : velocity) * 1000));
+
+        /*
+        final ObjectAnimator objectAnimator = ObjectAnimator.ofFloat(body, "translationX", start, stop);
+        objectAnimator.setDuration(duration);
+        ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
+            @Override
+            public void run() {
+                objectAnimator.start();
+                Log.i("SafeBox", "animateTranslation callback, use ObjectAnimator, begin:" + begin + ", end:" + end);
+            }
+        });
+        */
+        /*
+        final TranslateAnimation translateAnimation = new TranslateAnimation(start, stop, 0.0f, 0.0f);
         translateAnimation.setDuration(duration);
         translateAnimation.setFillAfter(true);
-        ViewCompat.postOnAnimation(body, new Runnable() {
+        ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
             @Override
             public void run() {
                 body.startAnimation(translateAnimation);
+                Log.i("SafeBox", "animateTranslation callback, use TranslateAnimation, begin:" + begin + ", end:" + end);
+            }
+        });
+        */
+
+        ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
+            @Override
+            public void run() {
+                body.setTranslationX(end);
+                Log.i("SafeBox", "animateTranslation, direct use setTranslationX, begin:" + begin + ", end:" + end);
             }
         });
     }
@@ -124,13 +156,11 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                     m_velocityTracker.clear();
                     m_velocityTracker.addMovement(e);
 
-                    Log.i("SafeBox", " onInterceptTouchEvent ACTION_DOWN, m_initialTouchX:" + m_initialTouchX + ", m_selectedViewHolder:" + ((m_selectedViewHolder == null) ? null : m_selectedViewHolder.getLayoutPosition()));
-
-                    return true;
-                } else {
-                    Log.i("SafeBox", " onInterceptTouchEvent ACTION_DOWN, m_initialTouchX:" + m_initialTouchX + ", m_selectedViewHolder:" + ((m_selectedViewHolder == null) ? null : m_selectedViewHolder.getLayoutPosition()));
-                    return false;
                 }
+
+                Log.i("SafeBox", " onInterceptTouchEvent ACTION_DOWN, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
+
+                return false;
 
             case MotionEvent.ACTION_MOVE:
                 if (m_selectedViewHolder != null) {
@@ -139,21 +169,22 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                     float velocity = m_velocityTracker.getXVelocity();
                     float translateX = m_initialTranslateX + e.getX() - m_initialTouchX;
                     if (translateX < 0.0f) {
-                        float alpha = (translateX > m_thresholdTranslationX) ? (translateX / m_thresholdTranslationX) : 1.0f;
+                        float alpha = (m_thresholdTranslationX == 0.0f) ? 0.0f : (translateX / m_thresholdTranslationX);
+                        alpha = (alpha < 0.0f) ? 0.0f : ((alpha > 1.0f) ? 1.0f : alpha);
                         m_selectedViewHolder.m_delete.setAlpha(alpha);
                         m_selectedViewHolder.m_modify.setAlpha(alpha);
                     }
                     animateTranslation(m_selectedViewHolder, m_lastTranslateX, translateX, velocity);
                     m_lastTranslateX = translateX;
                     //m_selectedViewHolder.m_body.setTranslationX(m_initialTranslationX + e.getX() - m_initialTouchX);
-                    Log.i("SafeBox", " onInterceptTouchEvent ACTION_MOVE, velocity:" + velocity);
+                    Log.i("SafeBox", " onInterceptTouchEvent ACTION_MOVE, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
                 }
 
                 return false;
 
             case MotionEvent.ACTION_UP:
                 if (m_selectedViewHolder != null) {
-                    if (m_lastTranslateX < m_thresholdTranslationX) {
+                    if (m_lastTranslateX <= m_thresholdTranslationX) {
                         animateTranslation(m_selectedViewHolder, m_lastTranslateX, m_thresholdTranslationX, 3000.0f);
                         m_lastTranslateX = m_thresholdTranslationX;
                     } else {
@@ -162,11 +193,11 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                     }
                 }
 
-                Log.i("SafeBox", " onInterceptTouchEvent ACTION_UP");
+                Log.i("SafeBox", " onInterceptTouchEvent ACTION_UP, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
                 return false;
 
             case MotionEvent.ACTION_CANCEL:
-                Log.i("SafeBox", " onInterceptTouchEvent ACTION_CANCEL");
+                Log.i("SafeBox", " onInterceptTouchEvent ACTION_CANCEL, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
                 return false;
 
             default:
@@ -206,30 +237,19 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         SqliteOpenHelper.ItemInfo itemInfo = m_itemInfos.get(position);
         Drawable drawable;
 
+        safeViewHolder.m_itemInfo = itemInfo;
+
         switch (itemInfo.m_type) {
             case R.id.menu_item_add_android_app:
-                PackageManager packageManager = getContext().getPackageManager();
-                PackageInfo packageInfo = null;
-
-                try {
-                    packageInfo = packageManager.getPackageInfo(itemInfo.m_appName, 0);
-                } catch (PackageManager.NameNotFoundException e) {
-                    e.printStackTrace();
-                }
-
-                if (packageInfo != null) {
-                    drawable = packageInfo.applicationInfo.loadIcon(packageManager);
-                } else {
-                    drawable = getContext().getDrawable(R.drawable.android_app);
-                }
+                drawable = Utilities.getAndroidAppIcon(getContext(), itemInfo.m_icon);
                 break;
 
             case R.id.menu_item_add_general_account:
-                drawable = getContext().getDrawable(R.drawable.general_account);
+                drawable = Utilities.getResourceIcon(getContext(), itemInfo.m_icon);
                 break;
 
             case R.id.menu_item_add_local_file:
-                drawable = getContext().getDrawable(R.drawable.local_file);
+                drawable = Utilities.getResourceIcon(getContext(), itemInfo.m_icon);
                 break;
 
             default:
@@ -240,6 +260,61 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         if (drawable != null) { safeViewHolder.m_icon.setImageDrawable(drawable); }
         safeViewHolder.m_name.setText(m_itemInfos.get(position).m_name);
         safeViewHolder.m_description.setText(m_itemInfos.get(position).m_description);
+
+        safeViewHolder.m_delete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_recyclerView.findContainingViewHolder(v);
+                if (holder != null) {
+                    new AlertDialog.Builder(getContext())
+                            .setTitle(R.string.delete_item_confirm_dialog_title)
+                            .setMessage(holder.m_itemInfo.m_name + "\n" + holder.m_itemInfo.m_description)
+                            .setCancelable(false)
+                            .setPositiveButton(R.string.delete_item_confirm_dialog_button_ok, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(getContext());
+                                    sqliteOpenHelper.removeItem(holder.m_itemInfo.m_did);
+                                    m_selectedViewHolder = null;
+                                    m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
+                                }
+                            })
+                            .setNegativeButton(R.string.delete_item_confirm_dialog_button_cancel, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+
+                                }
+                            })
+                            .create()
+                            .show();
+                } else {
+                    Utilities.jam(getContext(), R.string.delete_item_failed_cannot_fimd_item);
+                }
+            }
+        });
+
+        safeViewHolder.m_modify.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_recyclerView.findContainingViewHolder(v);
+                if (holder != null) {
+                    switch (holder.m_itemInfo.m_type) {
+                        case R.id.menu_item_add_android_app:
+                            m_uiHandler.obtainMessage(R.integer.MESSAGE_MODIFY_ANDROID_APP_ITEM, holder.m_itemInfo).sendToTarget();
+                            break;
+                        case R.id.menu_item_add_local_file:
+                            m_uiHandler.obtainMessage(R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM, holder.m_itemInfo).sendToTarget();
+                            break;
+                        case R.id.menu_item_add_general_account:
+                            m_uiHandler.obtainMessage(R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM, holder.m_itemInfo).sendToTarget();
+                            break;
+                        default:
+                    }
+                } else {
+                    Utilities.jam(getContext(), R.string.modify_item_failed_cannot_fimd_item);
+                }
+            }
+        });
     }
 
     @NonNull

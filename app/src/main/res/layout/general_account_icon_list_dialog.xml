@@ -12,12 +12,12 @@
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/general_margin_small"
         android:gravity="center_horizontal"
-        android:text="@string/android_app_list_dialog_title"
+        android:text="@string/icon_list_dialog_title"
         android:textSize="20sp"
         android:textStyle="bold" />
 
     <GridView
-        android:id="@+id/android_app_list_dialog_grid"
+        android:id="@+id/icon_list_dialog_grid"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="10"
@@ -31,12 +31,12 @@
     </GridView>
 
     <Button
-        android:id="@+id/android_app_list_dialog_button_cancel"
+        android:id="@+id/icon_list_dialog_button_cancel"
         style="?android:textAppearanceSmall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/general_margin_small"
-        android:text="@string/android_app_list_dialog_button_cancel"
+        android:text="@string/icon_list_dialog_button_cancel"
         android:textAllCaps="false"
         android:textStyle="bold" />
 
