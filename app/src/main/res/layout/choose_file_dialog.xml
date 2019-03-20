@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/choose_file_dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/general_margin_small"
+        android:layout_marginTop="@dimen/general_margin_small"
+        android:layout_marginEnd="@dimen/general_margin_small"
+        android:layout_marginBottom="@dimen/general_margin_tiny"
+        android:gravity="center_horizontal"
+        android:text="@string/choose_file_dialog_open_title"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/choose_file_dialog_folder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/general_margin_small"
+        android:layout_marginTop="@dimen/general_margin_tiny"
+        android:layout_marginEnd="@dimen/general_margin_small"
+        android:layout_marginBottom="@dimen/general_margin_tiny"
+        android:text="@string/choose_file_dialog_initial_folder" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/choose_file_dialog_cancel_button"
+            style="?android:textAppearanceSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/general_margin_small"
+            android:layout_marginTop="@dimen/general_margin_tiny"
+            android:layout_marginEnd="@dimen/general_margin_tiny"
+            android:layout_marginBottom="@dimen/general_margin_tiny"
+            android:text="@string/choose_file_dialog_cancel_button"
+            android:textAllCaps="false" />
+
+        <EditText
+            android:id="@+id/choose_file_dialog_filename"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="10"
+            android:layout_margin="@dimen/general_margin_tiny"
+            android:hint="@string/choose_file_dialog_filename_prompt"/>
+
+        <Button
+            android:id="@+id/choose_file_dialog_ok_button"
+            style="?android:textAppearanceSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/general_margin_tiny"
+            android:layout_marginTop="@dimen/general_margin_tiny"
+            android:layout_marginEnd="@dimen/general_margin_small"
+            android:layout_marginBottom="@dimen/general_margin_tiny"
+            android:text="@string/choose_file_dialog_open_button"
+            android:textAllCaps="false"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <GridView
+        android:id="@+id/choose_file_dialog_grid_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="10"
+        android:layout_marginStart="@dimen/general_margin_small"
+        android:layout_marginTop="@dimen/general_margin_tiny"
+        android:layout_marginEnd="@dimen/general_margin_small"
+        android:layout_marginBottom="@dimen/general_margin_tiny"
+        android:numColumns="auto_fit"
+        android:columnWidth="@dimen/app_icon_size_large"
+        android:horizontalSpacing="@dimen/general_margin_tiny"
+        android:verticalSpacing="@dimen/general_margin_tiny"
+        android:paddingHorizontal="@dimen/general_margin_tiny"
+        android:paddingVertical="@dimen/general_margin_tiny">
+    </GridView>
+
+</LinearLayout>

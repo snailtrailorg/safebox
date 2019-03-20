@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
@@ -59,6 +60,7 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/save_item_prompt_name"
                     android:imeOptions="actionNext"
+                    android:inputType="text"
                     android:maxLength="50"
                     android:maxLines="1"
                     android:singleLine="true" />
@@ -77,65 +79,53 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/save_item_prompt_description"
                     android:imeOptions="actionNext"
+                    android:inputType="text"
                     android:maxLength="50"
                     android:maxLines="1"
                     android:singleLine="true" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <EditText
-                    android:id="@+id/save_item_username"
-                    android:layout_width="match_parent"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:hint="@string/android_app_prompt_username"
-                    android:imeOptions="actionNext"
-                    android:maxLength="50"
-                    android:maxLines="1"
-                    android:singleLine="true" />
+                    android:layout_weight="10"
+                    android:layout_marginLeft="@dimen/general_margin_small"
+                    android:layout_marginRight="@dimen/general_margin_small">
 
-            </com.google.android.material.textfield.TextInputLayout>
+                    <EditText
+                        android:id="@+id/save_item_remarks"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:enabled="false"
+                        android:hint="@string/local_file_prompt_pathname"
+                        android:imeOptions="actionNext"
+                        android:inputType="text"
+                        android:nextFocusForward="@id/save_item_save_button"
+                        android:singleLine="false" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <EditText
-                    android:id="@+id/save_item_password"
-                    android:layout_width="match_parent"
+                <Button
+                    android:id="@+id/save_local_file_browse_button"
+                    style="?android:textAppearanceSmall"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:hint="@string/android_app_prompt_password"
-                    android:imeOptions="actionNext"
-                    android:maxLength="50"
-                    android:maxLines="1"
-                    android:singleLine="true" />
+                    android:layout_marginStart="@dimen/general_margin_tiny"
+                    android:layout_marginTop="@dimen/general_margin_tiny"
+                    android:layout_marginEnd="@dimen/general_margin_small"
+                    android:layout_marginBottom="@dimen/general_margin_tiny"
+                    android:text="@string/local_file_prompt_browse"
+                    android:textAllCaps="false" />
 
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
-
-                <EditText
-                    android:id="@+id/save_item_remarks"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/android_app_prompt_remarks"
-                    android:imeOptions="actionNext"
-                    android:maxLength="2048"
-                    android:nextFocusForward="@id/save_item_save_button"
-                    android:singleLine="false" />
-
-            </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

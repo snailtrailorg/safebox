@@ -73,7 +73,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         m_view.findViewById(R.id.save_item_icon).setOnClickListener(this);
         m_view.findViewById(R.id.save_item_cancel_button).setOnClickListener(this);
         m_view.findViewById(R.id.save_item_save_button).setOnClickListener(this);
-        m_view.setOnTouchListener(this);
+        m_view.findViewById(R.id.save_item_form_panel).setOnClickListener(this);
 
         ImageView icon = m_view.findViewById(R.id.save_item_icon);
         Drawable drawable = getIconInfoByIdentifier(getContext(), m_itemInfo.m_icon);
@@ -93,7 +93,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
 
     @Override
     public void dismiss() {
-        m_view.setOnTouchListener(null);
+        m_view.findViewById(R.id.save_item_form_panel).setOnClickListener(null);
         m_view.findViewById(R.id.save_item_save_button).setOnClickListener(null);
         m_view.findViewById(R.id.save_item_cancel_button).setOnClickListener(null);
         m_view.findViewById(R.id.save_item_icon).setOnClickListener(null);

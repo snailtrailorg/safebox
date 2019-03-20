@@ -61,7 +61,7 @@ public abstract  class IconListDialog extends AlertDialog {
 
         setCancelable(false);
 
-        GridView gridView = m_view.findViewById(R.id.icon_list_dialog_grid);
+        GridView gridView = m_view.findViewById(R.id.icon_list_dialog_grid_view);
 
         gridView.setAdapter(new BaseAdapter() {
             @Override

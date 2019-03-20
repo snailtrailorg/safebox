@@ -8,12 +8,17 @@
     <string name="nav_header_subtitle">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
 
-    <string name="menu_item_android_app">Andriod app</string>
+    <string name="menu_item_android_app">Android app</string>
     <string name="menu_item_general_account">General account</string>
     <string name="menu_item_local_file">Local file</string>
 
     <string name="error_dialog_title">Error</string>
     <string name="error_dialog_button_ok">OK</string>
+
+    <string name="permission_dialog_title">Permission Required</string>
+    <string name="permission_dialog_message">We need permissions to do stuff.\n Please allow.</string>
+    <string name="permission_dialog_cancel_button">Cancel</string>
+    <string name="permission_dialog_setting_button">Setting</string>
 
     <string name="safe_list_item_icon_content_description">Icon</string>
     <string name="safe_list_item_more_content_description">More</string>
@@ -32,7 +37,7 @@
 
     <string name="sign_in_progress_start">Start sign in, please wait...</string>
     <string name="sign_in_progress_load_user_info">Loading user information...</string>
-    <string name="sign_in_progress_check_email">Checking email saveress...</string>
+    <string name="sign_in_progress_check_email">Checking email usability...</string>
     <string name="sign_in_progress_check_password">Checking password...</string>
     <string name="sign_in_progress_load_rsa_key">Loading rsa key pair...</string>
     <string name="sign_in_progress_finish">Sign in finished.</string>
@@ -84,6 +89,9 @@
     <string name="general_account_prompt_password">Password/PIN:</string>
     <string name="general_account_prompt_remarks">Remarks/Hint:</string>
 
+    <string name="local_file_prompt_pathname">Choose a File...</string>
+    <string name="local_file_prompt_browse">Browse...</string>
+
     <string name="save_item_prompt_save">Save...</string>
     <string name="save_item_prompt_cancel">Cancel</string>
 
@@ -95,7 +103,7 @@
 
     <string name="save_item_progress_start">Starting process, please wait...</string>
     <string name="save_item_progress_encrypt_data">Encrypting item data...</string>
-    <string name="save_item_progress_save_item">Saving item ...</string>
+    <string name="save_item_progress_save_item">Saving item...</string>
     <string name="save_item_progress_upload_item">Uploading item...</string>
     <string name="save_item_progress_finish">Save item finished.</string>
 
@@ -112,6 +120,20 @@
     <string name="delete_item_confirm_dialog_title">Delete this item?</string>
     <string name="delete_item_confirm_dialog_button_ok">OK</string>
     <string name="delete_item_confirm_dialog_button_cancel">Cancel</string>
+
+    <string name="choose_file_dialog_open_title">Open File</string>
+    <string name="choose_file_dialog_save_title">Save File</string>
+    <string name="choose_file_dialog_cancel_button">Cancel</string>
+    <string name="choose_file_dialog_open_button">Open</string>
+    <string name="choose_file_dialog_save_button">Save</string>
+    <string name="choose_file_dialog_initial_folder">\/sdcard</string>
+    <string name="choose_file_dialog_filename_prompt">File Name...</string>
+
+    <string name="choose_open_file_error">File doesn\'t exist, or is directory, or can\'t read.</string>
+    <string name="choose_save_file_error_folder_cannot_write">Folder can not write.</string>
+    <string name="choose_save_file_error_empty_filename">File name is empty.</string>
+    <string name="choose_save_file_error_file_exist">File exist.</string>
+    <string name="choose_save_file_error_create_file">Create file error.</string>
 
 </resources>
 

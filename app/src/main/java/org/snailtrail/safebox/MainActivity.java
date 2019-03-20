@@ -1,21 +1,30 @@
 package org.snailtrail.safebox;
 
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.Settings;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.snackbar.Snackbar;
 
 import java.lang.ref.WeakReference;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
 import androidx.appcompat.app.ActionBarDrawerToggle;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -154,6 +163,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 case R.id.menu_item_add_local_file:
                     itemInfo.m_type = R.id.menu_item_add_local_file;
                     new SaveLocalFileDialog(this, R.layout.save_local_file_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
+                    requestStoragePermission();
                     return true;
 
                 default:
@@ -208,5 +218,39 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void loadUserItems() {
         m_safeRecycleAdapter.loadItemInfos(m_signInUserId);
+    }
+
+    private void requestStoragePermission() {
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, android.Manifest.permission.READ_EXTERNAL_STORAGE)) {
+
+                new AlertDialog.Builder(this)
+                    .setTitle(R.string.permission_dialog_title)
+                    .setMessage(R.string.permission_dialog_message)
+                    .setIcon(R.mipmap.ic_launcher)
+                    .setCancelable(false)
+                    .setNegativeButton(R.string.permission_dialog_cancel_button, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) { dialog.dismiss(); }
+                    })
+                    .setPositiveButton(R.string.permission_dialog_setting_button, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            final Intent intent = new Intent();
+                            intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                            intent.addCategory(Intent.CATEGORY_DEFAULT);
+                            intent.setData(Uri.parse("package:" + getPackageName()));
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                            startActivity(intent);
+                            dialog.dismiss();
+                        }
+                    }).create().show();
+
+            }
+
+        }
+
     }
 }
