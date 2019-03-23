@@ -245,11 +245,11 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                 break;
 
             case R.id.menu_item_add_general_account:
-                drawable = Utilities.getResourceIcon(getContext(), itemInfo.m_icon);
+                drawable = Utilities.getGeneralAccountIcon(getContext(), itemInfo.m_icon);
                 break;
 
             case R.id.menu_item_add_local_file:
-                drawable = Utilities.getResourceIcon(getContext(), itemInfo.m_icon);
+                drawable = Utilities.getLocalFileIcon(getContext(), itemInfo.m_icon);
                 break;
 
             default:
@@ -287,8 +287,10 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                             })
                             .create()
                             .show();
+                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
+                    m_lastTranslateX = 0.0f;
                 } else {
-                    Utilities.jam(getContext(), R.string.delete_item_failed_cannot_fimd_item);
+                    Utilities.jam(getContext(), R.string.delete_item_failed_cannot_find_item);
                 }
             }
         });
@@ -310,8 +312,10 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                             break;
                         default:
                     }
+                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
+                    m_lastTranslateX = 0.0f;
                 } else {
-                    Utilities.jam(getContext(), R.string.modify_item_failed_cannot_fimd_item);
+                    Utilities.jam(getContext(), R.string.modify_item_failed_cannot_find_item);
                 }
             }
         });

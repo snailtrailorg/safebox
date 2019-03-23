@@ -33,7 +33,7 @@ public class SaveGeneralAccountDialog extends SaveItemDialog {
 
     @Override
     public Drawable getIconInfoByIdentifier(Context context, String identifier) {
-        Drawable drawable =  Utilities.getResourceIcon(context, identifier);
+        Drawable drawable =  Utilities.getGeneralAccountIcon(context, identifier);
 
         if (drawable != null) {
             return drawable;
@@ -65,9 +65,9 @@ public class SaveGeneralAccountDialog extends SaveItemDialog {
     @Override
     public void extractItemData() {
         EditText website = m_view.findViewById(R.id.save_general_account_website);
-        EditText username = m_view.findViewById(R.id.save_android_app_username);
-        EditText password = m_view.findViewById(R.id.save_android_app_password);
-        EditText remarks = m_view.findViewById(R.id.save_android_app_remarks);
+        EditText username = m_view.findViewById(R.id.save_general_account_username);
+        EditText password = m_view.findViewById(R.id.save_general_account_password);
+        EditText remarks = m_view.findViewById(R.id.save_general_account_remarks);
 
         String decryptedData = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
         JSONObject jsonObject = null;

@@ -17,6 +17,7 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -83,18 +84,16 @@ public abstract  class IconListDialog extends AlertDialog {
             public View getView(int position, View convertView, ViewGroup parent) {
                 IconInfo iconInfo = m_iconInfos.get(position);
 
-                if (convertView == null) {
+                if (convertView == null || convertView.getTag() != iconInfo) {
 
                     convertView = LayoutInflater.from(getContext()).inflate(R.layout.icon_list_item, parent, false);
 
+                    ImageView imageView = convertView.findViewById(R.id.icon_list_item_icon);
                     TextView textView = convertView.findViewById(R.id.icon_list_item_name);
-                    if (textView != null) {
-                        Rect rect = textView.getCompoundDrawables()[1].getBounds();
-                        textView.setText(iconInfo.m_name);
-                        iconInfo.m_drawable.setBounds(rect);
-                        textView.setCompoundDrawables(null, iconInfo.m_drawable, null, null);
-                        textView.setSingleLine(true);
-                    }
+                    if (imageView != null) { imageView.setImageDrawable(iconInfo.m_drawable); }
+                    if (textView != null) { textView.setText(iconInfo.m_name); }
+
+                    convertView.setTag(iconInfo);
                 }
 
                 return convertView;

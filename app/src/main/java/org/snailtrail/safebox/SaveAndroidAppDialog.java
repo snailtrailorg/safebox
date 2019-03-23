@@ -63,25 +63,26 @@ public class SaveAndroidAppDialog extends SaveItemDialog {
 
     @Override
     public void extractItemData() {
-        EditText username = m_view.findViewById(R.id.save_android_app_username);
-        EditText password = m_view.findViewById(R.id.save_android_app_password);
-        EditText remarks = m_view.findViewById(R.id.save_android_app_remarks);
+        if (m_itemInfo.m_data != null && m_itemInfo.m_data.length() > 0) {
+            EditText username = m_view.findViewById(R.id.save_android_app_username);
+            EditText password = m_view.findViewById(R.id.save_android_app_password);
+            EditText remarks = m_view.findViewById(R.id.save_android_app_remarks);
 
-        String decryptedData = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
-        JSONObject jsonObject = null;
-        try {
-            jsonObject = new JSONObject(decryptedData);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        if (jsonObject != null) {
+            JSONObject jsonObject = null;
             try {
-                username.setText(jsonObject.getString("username"));
-                password.setText(jsonObject.getString("password"));
-                remarks.setText(jsonObject.getString("remarks"));
+                jsonObject = new JSONObject(m_itemInfo.m_data);
             } catch (JSONException e) {
                 e.printStackTrace();
+            }
+
+            if (jsonObject != null) {
+                try {
+                    username.setText(jsonObject.getString("username"));
+                    password.setText(jsonObject.getString("password"));
+                    remarks.setText(jsonObject.getString("remarks"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

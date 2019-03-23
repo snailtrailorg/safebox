@@ -9,6 +9,7 @@ import android.org.apache.commons.codec.binary.Hex;
 import android.util.Base64;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -44,6 +45,8 @@ class Utilities {
     private final static String symmetricEncryptAlgorithm = "DESede/CBC/PKCS5Padding";
     private final static String asymmetricEncryptAlgorithm = "RSA";
     private final static int rsaKeyLength = 4096;
+    private final static int rsaMaxEncryptLength = 501;
+    private final static int rsaMaxDecryptLength = 512;
     private final static int paddingLength = 8;
 
     static void jam(Context context, String message) {
@@ -267,7 +270,7 @@ class Utilities {
     }
 
     static String rsaEncrypt(PublicKey publicKey, String message) {
-        if (message == null) {
+        if (publicKey == null || message == null) {
             return null;
         }
 
@@ -287,24 +290,42 @@ class Utilities {
             e.printStackTrace();
         }
 
-        byte[] encryptedData = new byte[0];
-        try {
-            encryptedData = cipher.doFinal(message.getBytes());
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
+        byte[] messageData = message.getBytes();
+        ByteArrayOutputStream encryptedData = new ByteArrayOutputStream();
+        int length = messageData.length;
+        int offset = 0;
+        byte[] encryptedSection = new byte[0];
+
+        while (length - offset > 0) {
+            if ( length - offset > rsaMaxEncryptLength) {
+                try {
+                    encryptedSection = cipher.doFinal(messageData, offset, rsaMaxEncryptLength);
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    encryptedSection = cipher.doFinal(messageData, offset, length - offset);
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            encryptedData.write(encryptedSection, 0, encryptedSection.length);
+            offset += rsaMaxEncryptLength;
         }
 
-        return Base64.encodeToString(encryptedData, Base64.DEFAULT);
+        return Base64.encodeToString(encryptedData.toByteArray(), Base64.DEFAULT);
     }
 
     static String rsaDecrypt(PrivateKey privateKey, String message) {
-        if (message == null) {
+        if (privateKey == null || message == null) {
             return null;
         }
-
-        byte[] decodedData = Base64.decode(message, Base64.DEFAULT);
 
         Cipher cipher = null;
 
@@ -322,18 +343,38 @@ class Utilities {
             e.printStackTrace();
         }
 
-        byte[] decryptedData = new byte[0];
+        byte[] decodedData = Base64.decode(message, Base64.DEFAULT);
+        ByteArrayOutputStream decryptedData = new ByteArrayOutputStream();
+        int length = decodedData.length;
+        int offset = 0;
+        byte[] decryptedSection = new byte[0];
 
-        try {
-            decryptedData = cipher.doFinal(decodedData);
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
+        while (length - offset > 0) {
+            if (length - offset > rsaMaxDecryptLength) {
+                try {
+                    decryptedSection = cipher.doFinal(decodedData, offset, rsaMaxDecryptLength);
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    decryptedSection = cipher.doFinal(decodedData, offset, length - offset);
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            decryptedData.write(decryptedSection, 0, decryptedSection.length);
+            offset += rsaMaxDecryptLength;
         }
 
-        return new String(decryptedData);
+        return new String(decryptedData.toByteArray());
     }
+
 
     static Drawable getAndroidAppIcon(Context context, String packageName) {
         PackageManager packageManager = context.getPackageManager();
@@ -352,12 +393,21 @@ class Utilities {
         }
     }
 
-    static Drawable getResourceIcon(Context context, String filename) {
-        int id = context.getResources().getIdentifier(filename, "drawable", context.getPackageName());
+    static Drawable getGeneralAccountIcon(Context context, String filename) {
+        int id = context.getResources().getIdentifier("general_account_" + filename, "drawable", context.getPackageName());
         if (id != 0) {
             return ContextCompat.getDrawable(context,id);
         } else {
-            return null;
+            return context.getDrawable(R.drawable.general_account);
+        }
+    }
+
+    static Drawable getLocalFileIcon(Context context, String filename) {
+        int id = context.getResources().getIdentifier("local_file_" + filename, "drawable", context.getPackageName());
+        if (id != 0) {
+            return ContextCompat.getDrawable(context,id);
+        } else {
+            return context.getDrawable(R.drawable.local_file_default);
         }
     }
 }

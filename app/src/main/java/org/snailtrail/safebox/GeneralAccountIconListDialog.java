@@ -19,7 +19,7 @@ public class GeneralAccountIconListDialog extends IconListDialog {
 
         if (icons != null) {
             for (String icon : icons) {
-                Drawable drawable = Utilities.getResourceIcon(m_context, icon);
+                Drawable drawable = Utilities.getGeneralAccountIcon(m_context, icon);
                 if (drawable != null) {
                     iconInfos.add(new IconInfo(drawable, icon, icon));
                 }

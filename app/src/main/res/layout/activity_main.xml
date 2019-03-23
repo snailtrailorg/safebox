@@ -44,7 +44,7 @@
                 android:id="@+id/safe_recycle_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="@dimen/special_margin_small" />
+                android:padding="@dimen/special_margin_micro" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 

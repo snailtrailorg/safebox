@@ -1,44 +1,33 @@
 package org.snailtrail.safebox;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.database.DataSetObservable;
 import android.database.DataSetObserver;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridView;
-import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.TextView;
-
-import com.google.android.material.snackbar.Snackbar;
-
-import org.snailtrail.safebox.R;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.zip.Inflater;
 
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import static android.os.Environment.getDataDirectory;
 
 public class ChooseFileDialog extends AlertDialog implements ListAdapter, AdapterView.OnItemClickListener, View.OnClickListener {
     private final DataSetObservable mDataSetObservable = new DataSetObservable();
@@ -94,14 +83,10 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
 
             convertView = LayoutInflater.from(getContext()).inflate(R.layout.icon_list_item, parent, false);
 
+            ImageView imageView = convertView.findViewById(R.id.icon_list_item_icon);
             TextView textView = convertView.findViewById(R.id.icon_list_item_name);
-            if (textView != null) {
-                Rect rect = textView.getCompoundDrawables()[1].getBounds();
-                textView.setText(fileInfo.m_filename);
-                fileInfo.m_icon.setBounds(rect);
-                textView.setCompoundDrawables(null, fileInfo.m_icon, null, null);
-                textView.setSingleLine(true);
-            }
+            if (imageView != null) { imageView.setImageDrawable(fileInfo.m_icon); }
+            if (textView != null) { textView.setText(fileInfo.m_filename); }
 
             convertView.setTag(fileInfo);
         }
@@ -114,10 +99,10 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         switch (v.getId()) {
             case R.id.choose_file_dialog_ok_button:
                 if (m_type == CHOOSE_OPEN_FILE) {
-                    String pathname = m_folder + "/" + m_filename;
-                    File file = new File(pathname);
+                    FileInfo fileInfo = m_fileInfos.get(m_selected);
+                    File file = new File(fileInfo.m_pathname);
                     if (file.exists() && file.isFile() && file.canRead()) {
-                        m_handler.obtainMessage(CHOOSE_OPEN_FILE, pathname).sendToTarget();
+                        m_handler.obtainMessage(CHOOSE_OPEN_FILE, m_fileInfos.get(m_selected)).sendToTarget();
                         setDefaultFolder(m_folder);
                         dismiss();
                     } else {
@@ -160,7 +145,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         FileInfo fileInfo = m_fileInfos.get(position);
 
-        if (fileInfo.m_directory) {
+        if (fileInfo.m_dir) {
 
             String folder;
 
@@ -181,26 +166,32 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
             }
 
         } else {
-            m_filenameEdit.setText(fileInfo.m_filename);
+            m_filename = fileInfo.m_filename;
+            m_filenameEdit.setText(m_filename);
+            m_selected = position;
         }
     }
 
     public class FileInfo {
+        String m_pathname;
         String m_filename;
+        String m_type;
         Drawable m_icon;
-        boolean m_directory;
+        boolean m_dir;
 
-        public FileInfo(String filename, Drawable icon, boolean directory) {
+        public FileInfo(String pathname, String filename, String type, Drawable icon, boolean dir) {
+            m_pathname = pathname;
             m_filename = filename;
+            m_type = type;
             m_icon = icon;
-            m_directory = directory;
+            m_dir = dir;
         }
     }
 
     private final String DEFAULT_FOLDER_KEY = "DefaultFolder";
     public static final int CHOOSE_OPEN_FILE = 1;
     public static final int CHOOSE_SAVE_FILE = 2;
-    private int m_type = CHOOSE_OPEN_FILE;
+    private int m_type;
     private String m_folder="";
     private String m_filename="";
     private Context m_context;
@@ -212,8 +203,10 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     private TextView m_folderView;
     private EditText m_filenameEdit;
     private Handler m_handler;
-    ArrayList<FileInfo> m_fileInfos;
-    HashMap<String, Drawable> m_iconMap;
+    private ArrayList<FileInfo> m_fileInfos;
+    private Drawable m_folderIcon;
+    private HashMap<String, Drawable> m_iconMap;
+    private int m_selected;
 
     protected ChooseFileDialog(Context context, Handler handler, int type) {
         super(context);
@@ -223,12 +216,17 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
 
         m_fileInfos = new ArrayList<>();
 
-        m_iconMap = new HashMap<>();
-        m_iconMap.put("folder", Utilities.getResourceIcon(m_context, "folder"));
+        m_folderIcon = ContextCompat.getDrawable(m_context, R.drawable.folder);
 
-        String[] exts = m_context.getResources().getStringArray(R.array.local_file_icon_list);
-        for (String ext : exts) {
-            m_iconMap.put(ext, Utilities.getResourceIcon(m_context, ext));
+        m_iconMap = new HashMap<>();
+        m_iconMap.put("folder", Utilities.getLocalFileIcon(m_context, "folder"));
+
+        String[] filetypes = m_context.getResources().getStringArray(R.array.local_file_icon_list);
+
+        if (filetypes != null && filetypes.length > 0) {
+            for (String filetype : filetypes) {
+                m_iconMap.put(filetype, Utilities.getLocalFileIcon(m_context, filetype));
+            }
         }
     }
 
@@ -286,7 +284,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         m_folderView.setText(m_folder);
         m_fileInfos.clear();
 
-        if (!m_folder.equals("/")) { m_fileInfos.add(new FileInfo("..", Utilities.getResourceIcon(m_context, "folder"), true)); }
+        if (!m_folder.equals("/")) { m_fileInfos.add(new FileInfo(null, "..", null, m_folderIcon, true)); }
 
         File dir = new File(m_folder);
         File[] files = dir.listFiles();
@@ -299,7 +297,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
 
                 if (file.isDirectory() && file.canRead()) {
 
-                    m_fileInfos.add(new FileInfo(filename, m_iconMap.get("folder"), true));
+                    m_fileInfos.add(new FileInfo(null, filename, null, m_folderIcon, true));
 
                 } else if (file.isFile()) {
 
@@ -307,10 +305,10 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                     Drawable drawable = m_iconMap.get(ext);
 
                     if (drawable == null) {
-                        drawable = m_iconMap.get("other");
+                        drawable = m_iconMap.get("default");
                     }
 
-                    m_fileInfos.add(new FileInfo(filename, drawable, false));
+                    m_fileInfos.add(new FileInfo(file.getAbsolutePath(), filename, ext, drawable, false));
                 }
             }
         }

@@ -12,17 +12,21 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true"
-        android:layout_margin="@dimen/special_margin_small"
+        android:layout_margin="@dimen/special_margin_micro"
         android:background="@drawable/safe_list_item_modify_ripple"
         android:clickable="true">
 
         <ImageView
-            android:layout_width="@dimen/app_icon_size_medium"
-            android:layout_height="@dimen/app_icon_size_medium"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal|center_vertical"
-            android:layout_margin="@dimen/special_margin_small"
+            android:layout_margin="@dimen/special_margin_mini"
+            android:padding="@dimen/general_margin_mini"
+            android:adjustViewBounds="true"
             android:contentDescription="@string/safe_list_item_modify_content_description"
-            android:src="@drawable/ic_menu_edit" />
+            android:maxWidth="@dimen/app_icon_size_small"
+            android:maxHeight="@dimen/app_icon_size_small"
+            android:src="@drawable/modify_file" />
 
     </LinearLayout>
 
@@ -32,17 +36,21 @@
         android:layout_height="wrap_content"
         android:layout_alignParentStart="false"
         android:layout_centerVertical="true"
-        android:layout_margin="@dimen/special_margin_small"
+        android:layout_margin="@dimen/special_margin_micro"
         android:layout_toStartOf="@id/safe_list_item_modify"
         android:background="@drawable/safe_list_item_delete_ripple"
         android:clickable="true">
 
         <ImageView
-            android:layout_width="@dimen/app_icon_size_medium"
-            android:layout_height="@dimen/app_icon_size_medium"
-            android:layout_margin="@dimen/special_margin_small"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/special_margin_mini"
+            android:padding="@dimen/general_margin_mini"
+            android:adjustViewBounds="true"
             android:contentDescription="@string/safe_list_item_delete_content_description"
-            android:src="@drawable/ic_menu_delete" />
+            android:maxWidth="@dimen/app_icon_size_small"
+            android:maxHeight="@dimen/app_icon_size_small"
+            android:src="@drawable/delete_file" />
 
     </LinearLayout>
 
@@ -50,21 +58,30 @@
         android:id="@+id/safe_list_item_body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/special_margin_small"
+        android:layout_margin="@dimen/special_margin_micro"
         android:background="@drawable/safe_list_item_body_ripple"
         android:clickable="true"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <ImageView
-            android:id="@+id/safe_list_item_icon"
-            android:layout_width="@dimen/app_icon_size_medium"
-            android:layout_height="@dimen/app_icon_size_medium"
-            android:layout_margin="@dimen/special_margin_small"
-            android:layout_weight="0"
-            android:adjustViewBounds="true"
-            android:contentDescription="@string/safe_list_item_icon_content_description"
-            app:srcCompat="@android:drawable/sym_def_app_icon" />
+        <LinearLayout
+            android:layout_width="@dimen/app_icon_size_small"
+            android:layout_height="@dimen/app_icon_size_small"
+            android:layout_margin="@dimen/special_margin_mini"
+            android:gravity="center_horizontal|center_vertical">
+
+            <ImageView
+                android:id="@+id/safe_list_item_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="0"
+                android:adjustViewBounds="true"
+                android:contentDescription="@string/safe_list_item_icon_content_description"
+                android:maxWidth="@dimen/app_icon_size_small"
+                android:maxHeight="@dimen/app_icon_size_small"
+                app:srcCompat="@android:drawable/sym_def_app_icon" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -77,14 +94,12 @@
                 android:id="@+id/safe_list_item_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="@dimen/general_margin_micro"
                 android:text="@string/safe_list_item_name" />
 
             <TextView
                 android:id="@+id/safe_list_item_description"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="@dimen/general_margin_micro"
                 android:text="@string/safe_list_item_description" />
         </LinearLayout>
 
@@ -92,7 +107,7 @@
             android:id="@+id/safe_list_item_view"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_margin="@dimen/special_margin_small"
+            android:layout_margin="@dimen/special_margin_mini"
             android:layout_weight="0"
             android:adjustViewBounds="true"
             android:alpha="0.5"

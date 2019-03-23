@@ -4,8 +4,8 @@
     <string name="app_name">SafeBox</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
-    <string name="nav_header_title">Android Studio</string>
-    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_title">SafeBox Account Manager</string>
+    <string name="nav_header_subtitle">Powered by SnailTrail.ORG, 1984</string>
     <string name="nav_header_desc">Navigation header</string>
 
     <string name="menu_item_android_app">Android app</string>
@@ -27,7 +27,7 @@
     <string name="safe_list_item_name">Name...</string>
     <string name="safe_list_item_description">Description...</string>
 
-    <string name="sign_in_form_title">Sign in an exist account</string>
+    <string name="sign_in_form_title">Sign in</string>
     <string name="sign_in_prompt_email">Email saveress:</string>
     <string name="sign_in_prompt_password">Password:</string>
     <string name="sign_in_prompt_switch_sign_up">Sign up a new account</string>
@@ -47,7 +47,7 @@
     <string name="sign_in_result_error_load_rsa_key_failed">Load rsa key failed unpredictably.</string>
     <string name="sign_in_result_success">Sign in success.</string>
 
-    <string name="sign_up_form_title">Sign up a new account</string>
+    <string name="sign_up_form_title">Sign up</string>
     <string name="sign_up_prompt_email">Your frequently used email:</string>
     <string name="sign_up_prompt_password">Set your password:</string>
     <string name="sign_up_prompt_retype_password">Retype your password:</string>
@@ -115,8 +115,8 @@
     <string name="icon_list_dialog_title">Choose an icon</string>
     <string name="icon_list_dialog_button_cancel">Cancel</string>
 
-    <string name="modify_item_failed_cannot_fimd_item">Cannot find item, modification failed.</string>
-    <string name="delete_item_failed_cannot_fimd_item">Cannot find item, deletion failed.</string>
+    <string name="modify_item_failed_cannot_find_item">Cannot find item, modification failed.</string>
+    <string name="delete_item_failed_cannot_find_item">Cannot find item, deletion failed.</string>
     <string name="delete_item_confirm_dialog_title">Delete this item?</string>
     <string name="delete_item_confirm_dialog_button_ok">OK</string>
     <string name="delete_item_confirm_dialog_button_cancel">Cancel</string>
@@ -134,6 +134,8 @@
     <string name="choose_save_file_error_empty_filename">File name is empty.</string>
     <string name="choose_save_file_error_file_exist">File exist.</string>
     <string name="choose_save_file_error_create_file">Create file error.</string>
+
+    <string name="icon_list_item_icon_content_description">Icon</string>
 
 </resources>
 

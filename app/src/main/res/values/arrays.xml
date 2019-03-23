@@ -1,43 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="general_account_icon_list">
-        <item>vesa</item>
-        <item>mastercard</item>
-        <item>key</item>
-        <item>browser</item>
-        <item>safebox</item>
-        <item>house</item>
+        <item>dictionary</item>
         <item>car</item>
-        <item>router</item>
-        <item>redhat</item>
-        <item>football</item>
-        <item>game</item>
-        <item>linux</item>
         <item>clock</item>
         <item>compass</item>
-        <item>strawberry</item>
-        <item>panda</item>
+        <item>contact</item>
+        <item>credit</item>
+        <item>football</item>
+        <item>game</item>
+        <item>house</item>
+        <item>key</item>
+        <item>linux</item>
+        <item>radiation</item>
+        <item>redhat</item>
+        <item>router</item>
+        <item>safebox</item>
+        <item>stocks</item>
+        <item>website</item>
+        <item>xstrawberry</item>
     </string-array>
 
     <string-array name="local_file_icon_list">
-        <item>doc</item>
-        <item>xls</item>
-        <item>ppt</item>
-        <item>pdf</item>
-        <item>jpg</item>
-        <item>png</item>
         <item>avi</item>
-        <item>mp3</item>
-        <item>mp4</item>
-        <item>txt</item>
-        <item>zip</item>
-        <item>rtf</item>
         <item>csv</item>
-        <item>svg</item>
-        <item>xml</item>
+        <item>default</item>
+        <item>doc</item>
+        <item>docx</item>
         <item>html</item>
+        <item>htm</item>
+        <item>jpeg</item>
+        <item>jpg</item>
         <item>json</item>
         <item>js</item>
-        <item>other</item>
+        <item>mp3</item>
+        <item>mp4</item>
+        <item>pdf</item>
+        <item>png</item>
+        <item>ppt</item>
+        <item>pptx</item>
+        <item>rtf</item>
+        <item>svg</item>
+        <item>txt</item>
+        <item>xls</item>
+        <item>xlsx</item>
+        <item>xml</item>
+        <item>zip</item>
     </string-array>
 </resources>
+

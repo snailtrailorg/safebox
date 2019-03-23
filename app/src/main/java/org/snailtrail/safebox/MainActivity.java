@@ -1,5 +1,6 @@
 package org.snailtrail.safebox;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -12,6 +13,7 @@ import android.provider.Settings;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.PermissionRequest;
 
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
@@ -71,6 +73,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         break;
                     case R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM:
                         new SaveLocalFileDialog(mainActivity, R.layout.save_local_file_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        requestStoragePermission();
                         break;
                     case R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
                         new SaveGeneralAccountDialog(mainActivity, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
@@ -181,7 +184,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         int id = item.getItemId();
 
         if (id == R.id.nav_camera) {
-            // Handle the camera action
+            byte[] testData = new byte[10000];
+            for (int i=0; i<10000; i++) { testData[i] = 65; }
+            String encryptedData = Utilities.rsaEncrypt(m_publicKey, new String(testData));
+            String decryptedData = Utilities.rsaDecrypt(m_privateKey, encryptedData);
+            if (decryptedData.length() == 10000) {
+                Utilities.jam(this, "rsa encrypt & decrypt test ok");
+            }
         } else if (id == R.id.nav_gallery) {
 
         } else if (id == R.id.nav_slideshow) {
@@ -247,10 +256,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                             dialog.dismiss();
                         }
                     }).create().show();
-
             }
-
         }
 
+        ActivityCompat.requestPermissions(this, new String[] { android.Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE }, getResources().getInteger(R.integer.MESSAGE_REQUEST_PERMISSION));
     }
 }

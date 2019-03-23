@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:fitsSystemWindows="true"
     android:gravity="center_horizontal">
 
@@ -14,15 +15,12 @@
             android:id="@+id/save_item_form_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="@dimen/general_margin_mini"
             android:orientation="vertical">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/general_margin_small"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small"
-                android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
                 android:text="@string/general_account_form_title"
                 android:textSize="20sp"
@@ -37,8 +35,6 @@
                     android:id="@+id/save_item_icon"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/general_margin_tiny"
-                    android:layout_marginEnd="@dimen/general_margin_small"
                     android:adjustViewBounds="true"
                     android:contentDescription="@string/save_item_prompt_icon"
                     android:maxWidth="@dimen/app_icon_size_medium"
@@ -49,9 +45,7 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_height="wrap_content">
 
                 <EditText
                     android:id="@+id/save_item_name"
@@ -59,17 +53,17 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/save_item_prompt_name"
                     android:imeOptions="actionNext"
+                    android:inputType="text"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:singleLine="true"
+                    android:importantForAutofill="no" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_height="wrap_content">
 
                 <EditText
                     android:id="@+id/save_item_description"
@@ -77,6 +71,8 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/save_item_prompt_description"
                     android:imeOptions="actionNext"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
                     android:maxLength="50"
                     android:maxLines="1"
                     android:singleLine="true" />
@@ -85,9 +81,7 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_height="wrap_content">
 
                 <EditText
                     android:id="@+id/save_general_account_website"
@@ -95,6 +89,8 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/general_account_prompt_website"
                     android:imeOptions="actionNext"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
                     android:maxLength="50"
                     android:maxLines="1"
                     android:singleLine="true" />
@@ -103,9 +99,7 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_height="wrap_content">
 
                 <EditText
                     android:id="@+id/save_general_account_username"
@@ -113,6 +107,8 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/general_account_prompt_username"
                     android:imeOptions="actionNext"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
                     android:maxLength="50"
                     android:maxLines="1"
                     android:singleLine="true" />
@@ -122,8 +118,7 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                app:passwordToggleEnabled="true">
 
                 <EditText
                     android:id="@+id/save_general_account_password"
@@ -131,17 +126,17 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/general_account_prompt_password"
                     android:imeOptions="actionNext"
+                    android:inputType="textPassword"
                     android:maxLength="50"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:singleLine="true"
+                    android:importantForAutofill="no" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small">
+                android:layout_height="wrap_content">
 
                 <EditText
                     android:id="@+id/save_general_account_remarks"
@@ -149,9 +144,12 @@
                     android:layout_height="wrap_content"
                     android:hint="@string/general_account_prompt_remarks"
                     android:imeOptions="actionNext"
+                    android:inputType="textMultiLine"
                     android:maxLength="2048"
+                    android:minLines="3"
                     android:nextFocusForward="@id/save_item_save_button"
-                    android:singleLine="false" />
+                    android:singleLine="false"
+                    android:importantForAutofill="no" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -170,9 +168,6 @@
                         style="?android:textAppearanceSmall"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/general_margin_small"
-                        android:layout_marginEnd="@dimen/general_margin_tiny"
-                        android:layout_marginBottom="@dimen/general_margin_small"
                         android:text="@string/save_item_prompt_cancel"
                         android:textAllCaps="false" />
 
@@ -188,9 +183,6 @@
                         style="?android:textAppearanceSmall"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/general_margin_tiny"
-                        android:layout_marginEnd="@dimen/general_margin_small"
-                        android:layout_marginBottom="@dimen/general_margin_small"
                         android:text="@string/save_item_prompt_save"
                         android:textAllCaps="false"
                         android:textStyle="bold" />
@@ -205,15 +197,12 @@
             android:id="@+id/save_item_progress_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="@dimen/general_margin_mini"
             android:orientation="vertical">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/general_margin_small"
-                android:layout_marginLeft="@dimen/general_margin_small"
-                android:layout_marginRight="@dimen/general_margin_small"
-                android:layout_marginBottom="@dimen/general_margin_tiny"
                 android:gravity="center_horizontal"
                 android:text="@string/save_item_progress_title"
                 android:textSize="20sp"
@@ -227,20 +216,13 @@
 
                 <ProgressBar
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/general_margin_small"
-                    android:layout_marginTop="@dimen/general_margin_tiny"
-                    android:layout_marginEnd="@dimen/general_margin_tiny"
-                    android:layout_marginBottom="@dimen/general_margin_small" />
+                    android:layout_height="wrap_content" />
 
                 <TextView
                     android:id="@+id/save_item_progress_message"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/general_margin_tiny"
-                    android:layout_marginTop="@dimen/general_margin_tiny"
-                    android:layout_marginEnd="@dimen/general_margin_small"
-                    android:layout_marginBottom="@dimen/general_margin_small"
+                    android:layout_marginStart="@dimen/general_margin_mini"
                     android:text="@string/save_item_progress_processing_message" />
 
             </LinearLayout>

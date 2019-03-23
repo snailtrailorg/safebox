@@ -7,6 +7,7 @@
     <integer name="MESSAGE_SET_USER_PRIVATE_KEY">600</integer>
     <integer name="MESSAGE_LOAD_USER_ITEMS">700</integer>
     <integer name="MESSAGE_MODIFY_ANDROID_APP_ITEM">800</integer>
-    <integer name="MESSAGE_MODIFY_LOCAL_FILE_ITEM">800</integer>
-    <integer name="MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM">800</integer>
+    <integer name="MESSAGE_MODIFY_LOCAL_FILE_ITEM">900</integer>
+    <integer name="MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM">1000</integer>
+    <integer name="MESSAGE_REQUEST_PERMISSION">8000</integer>
 </resources>

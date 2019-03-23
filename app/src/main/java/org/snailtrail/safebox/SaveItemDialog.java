@@ -85,7 +85,12 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         name.setText(m_itemInfo.m_name);
         description.setText(m_itemInfo.m_description);
 
-        extractItemData();
+        if (m_itemInfo.m_data != null && m_itemInfo.m_data.length() > 0) {
+            m_itemInfo.m_data = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
+            extractItemData();
+        } else {
+            m_itemInfo.m_data = "";
+        }
 
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
@@ -141,10 +146,12 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         EditText name = m_view.findViewById(R.id.save_item_name);
         EditText description = m_view.findViewById(R.id.save_item_description);
 
-        m_itemInfo.m_name = (name == null) ? null : name.getText().toString();
-        m_itemInfo.m_description = (description == null) ? null : description.getText().toString();
+        m_itemInfo.m_name = (name == null) ? "" : name.getText().toString();
+        m_itemInfo.m_description = (description == null) ? "" : description.getText().toString();
 
         composeItemData();
+
+        if (m_itemInfo.m_data == null) { m_itemInfo.m_data = ""; }
 
         m_view.findViewById(R.id.save_item_form_panel).setVisibility(View.GONE);
         m_view.findViewById(R.id.save_item_progress_panel).setVisibility(View.VISIBLE);
@@ -182,11 +189,15 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
 
             publishProgress(SAVE_ITEM_PROGRESS_ENCRYPT_DATA);
 
-            String encryptedData = Utilities.rsaEncrypt(m_publicKey, itemInfo.m_data);
-            if (encryptedData == null) {
-                return SAVE_ITEM_RESULT_ERROR_ENCRYPT_DATA_FAILED;
+            if (itemInfo.m_data != null && itemInfo.m_data.length() > 0) {
+                String encryptedData = Utilities.rsaEncrypt(m_publicKey, itemInfo.m_data);
+                if (encryptedData == null) {
+                    return SAVE_ITEM_RESULT_ERROR_ENCRYPT_DATA_FAILED;
+                } else {
+                    itemInfo.m_data = encryptedData;
+                }
             } else {
-                itemInfo.m_data = encryptedData;
+                itemInfo.m_data = "";
             }
 
             publishProgress(SAVE_ITEM_PROGRESS_SAVE_ITEM);

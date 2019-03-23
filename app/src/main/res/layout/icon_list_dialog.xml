@@ -4,13 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center_horizontal"
-    >
+    android:padding="@dimen/general_margin_mini"
+    android:gravity="center_horizontal">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/general_margin_small"
         android:gravity="center_horizontal"
         android:text="@string/icon_list_dialog_title"
         android:textSize="20sp"
@@ -20,12 +19,11 @@
         android:id="@+id/icon_list_dialog_grid_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:gravity="center_horizontal"
         android:layout_weight="10"
-        android:columnWidth="@dimen/app_icon_size_large"
+        android:columnWidth="@dimen/app_icon_size_medium"
         android:horizontalSpacing="@dimen/general_margin_tiny"
         android:numColumns="auto_fit"
-        android:paddingHorizontal="@dimen/general_margin_tiny"
-        android:paddingVertical="@dimen/general_margin_tiny"
         android:verticalSpacing="@dimen/general_margin_tiny">
 
     </GridView>
@@ -35,7 +33,6 @@
         style="?android:textAppearanceSmall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/general_margin_small"
         android:text="@string/icon_list_dialog_button_cancel"
         android:textAllCaps="false"
         android:textStyle="bold" />

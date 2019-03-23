@@ -24,7 +24,7 @@ public class AndroidAppIconListDialog extends IconListDialog {
         ArrayList<IconInfo> iconInfos = new ArrayList<>();
 
         for(PackageInfo packgeInfo : packgeInfos) {
-            if ((0 & packgeInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM)  == 0) {
+            if ((packgeInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM)  == 0) {
                 String appName = packgeInfo.applicationInfo.loadLabel(packageManager).toString();
                 String packageName = packgeInfo.packageName;
                 Drawable drawable = packgeInfo.applicationInfo.loadIcon(packageManager);
