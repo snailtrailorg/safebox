@@ -40,7 +40,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         m_itemInfo = itemInfo;
     }
 
-    private Handler m_handler = new Handler(Looper.getMainLooper()) {
+    protected Handler m_iconHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
             if (msg.what == R.id.save_item_icon) {
@@ -51,6 +51,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         }
     };
 
+    public abstract void initializeItem();
     public abstract void selectItemIcon(Handler handler);
     public abstract void setItemIconInfo(IconListDialog.IconInfo iconInfo);
     public abstract Drawable getIconInfoByIdentifier(Context context, String identifier);
@@ -97,6 +98,15 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
     }
 
     @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+
+        if (m_itemInfo.m_did == 0) {
+            initializeItem();
+        }
+    }
+
+    @Override
     public void dismiss() {
         m_view.findViewById(R.id.save_item_form_panel).setOnClickListener(null);
         m_view.findViewById(R.id.save_item_save_button).setOnClickListener(null);
@@ -110,7 +120,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.save_item_icon:
-                selectItemIcon(m_handler);
+                selectItemIcon(m_iconHandler);
                 break;
             case R.id.save_item_cancel_button:
                 onClickCancel(view);

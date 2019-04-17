@@ -13,7 +13,7 @@ import java.util.List;
 
 public class AndroidAppIconListDialog extends IconListDialog {
     protected AndroidAppIconListDialog(Context context, int resource, Handler handler) {
-        super(context, resource, handler);
+        super(context, resource, handler, R.string.android_app_icon_list_dialog_title);
     }
 
     @Override

@@ -29,6 +29,7 @@ public abstract  class IconListDialog extends AlertDialog {
     public ArrayList<IconInfo> m_iconInfos;
     public View m_view;
     public Handler m_handler;
+    public int m_title;
 
     static class IconInfo {
         Drawable m_drawable;
@@ -42,12 +43,13 @@ public abstract  class IconListDialog extends AlertDialog {
         }
     }
 
-    protected IconListDialog(Context context, int resource, Handler handler) {
+    protected IconListDialog(Context context, int resource, Handler handler, int title) {
         super(context);
         m_context = context;
         m_resource = resource;
         m_handler = handler;
         m_iconInfos = loadIconInfos();
+        m_title = title;
     }
 
     protected abstract ArrayList<IconInfo> loadIconInfos();
@@ -61,6 +63,11 @@ public abstract  class IconListDialog extends AlertDialog {
         setContentView(m_view);
 
         setCancelable(false);
+
+        if (m_title != 0) {
+            TextView textView = (TextView)findViewById(R.id.icon_list_dialog_title);
+            if (textView != null) textView.setText(m_title);
+        }
 
         GridView gridView = m_view.findViewById(R.id.icon_list_dialog_grid_view);
 

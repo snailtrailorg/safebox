@@ -6,11 +6,19 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.util.Base64;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
@@ -40,6 +48,10 @@ public class SaveLocalFileDialog extends SaveItemDialog {
         super(context, resource, uiHandler, publicKey, privateKey, itemInfo);
     }
 
+    public void chooseOpenFile() {
+        new ChooseFileDialog(getContext(), m_fileHandler, CHOOSE_OPEN_FILE).show();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,10 +65,15 @@ public class SaveLocalFileDialog extends SaveItemDialog {
     @Override
     public void onClick(View view) {
         if (view.getId() == R.id.save_local_file_browse_button) {
-            new ChooseFileDialog(getContext(), m_fileHandler, CHOOSE_OPEN_FILE).show();
+            chooseOpenFile();
         } else {
             super.onClick(view);
         }
+    }
+
+    @Override
+    public void initializeItem() {
+        chooseOpenFile();
     }
 
     @Override
@@ -85,11 +102,51 @@ public class SaveLocalFileDialog extends SaveItemDialog {
 
     @Override
     public void composeItemData() {
+        byte[] buff=new byte[ChooseFileDialog.MAX_FILE_LENGTH];
+        int hasRead=0;
 
+        try {
+            FileInputStream fileInputStream = new FileInputStream(new File(this.m_pathname));
+
+            while ((hasRead = fileInputStream.read(buff, hasRead, ChooseFileDialog.MAX_FILE_LENGTH-hasRead)) > 0);
+
+            fileInputStream.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        EditText filename = m_view.findViewById(R.id.save_local_file_filename);
+
+        JSONObject jsonObject = new JSONObject();
+        try {
+            jsonObject.put("filename",filename.getText().toString());
+            jsonObject.put("content",Base64.encodeToString(buff,0, hasRead, Base64.DEFAULT));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        m_itemInfo.m_data = jsonObject.toString();
     }
 
     @Override
     public void extractItemData() {
+        EditText filename = m_view.findViewById(R.id.save_local_file_filename);
 
+        JSONObject jsonObject = null;
+        try {
+            jsonObject = new JSONObject(m_itemInfo.m_data);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        if (jsonObject != null) {
+            try {
+                filename.setText(jsonObject.getString("filename"));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

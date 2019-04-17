@@ -154,17 +154,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             //noinspection SimplifiableIfStatement
             switch (menuItemId) {
                 case R.id.menu_item_add_android_app:
-                    itemInfo.m_type = R.id.menu_item_add_android_app;
+                    itemInfo.m_type = R.integer.ITEM_TYPE_ANDROID_APP;
                     new SaveAndroidAppDialog(this, R.layout.save_android_app_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
                     return true;
 
                 case R.id.menu_item_add_general_account:
-                    itemInfo.m_type = R.id.menu_item_add_general_account;
+                    itemInfo.m_type = R.integer.ITEM_TYPE_GENERAL_ACCOUNT;
                     new SaveGeneralAccountDialog(this, R.layout.save_general_account_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
                     return true;
 
                 case R.id.menu_item_add_local_file:
-                    itemInfo.m_type = R.id.menu_item_add_local_file;
+                    itemInfo.m_type = R.integer.ITEM_TYPE_LOCAL_FILE;
                     new SaveLocalFileDialog(this, R.layout.save_local_file_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
                     requestStoragePermission();
                     return true;

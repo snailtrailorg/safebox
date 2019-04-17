@@ -113,6 +113,7 @@
     <string name="save_item_result_success">Save item success.</string>
 
     <string name="icon_list_dialog_title">Choose an icon</string>
+    <string name="android_app_icon_list_dialog_title">Choose an App</string>
     <string name="icon_list_dialog_button_cancel">Cancel</string>
 
     <string name="modify_item_failed_cannot_find_item">Cannot find item, modification failed.</string>
@@ -134,6 +135,7 @@
     <string name="choose_save_file_error_empty_filename">File name is empty.</string>
     <string name="choose_save_file_error_file_exist">File exist.</string>
     <string name="choose_save_file_error_create_file">Create file error.</string>
+    <string name="choose_save_file_error_file_too_large">Selected file is larger than %d byte.</string>
 
     <string name="icon_list_item_icon_content_description">Icon</string>
 

@@ -8,6 +8,10 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -17,6 +21,11 @@ import java.util.ListIterator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import static android.database.Cursor.FIELD_TYPE_BLOB;
+import static android.database.Cursor.FIELD_TYPE_FLOAT;
+import static android.database.Cursor.FIELD_TYPE_INTEGER;
+import static android.database.Cursor.FIELD_TYPE_STRING;
 
 class SqliteOpenHelper extends SQLiteOpenHelper {
 
@@ -35,6 +44,61 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         db.execSQL(sql_create_item_table);
         String sql_create_log_table = "create table log (lid integer primary key autoincrement, content varchar(256), time timestamp);";
         db.execSQL(sql_create_log_table);
+    }
+
+    public JSONArray dumpTable(String table, String... columns) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query(table, null, null, null, null, null, null);
+
+        JSONArray jsonArray = new JSONArray();
+
+        while (cursor.moveToNext()) {
+            JSONObject jsonObject = new JSONObject();
+            for (String column : columns) {
+                try {
+                    switch (cursor.getType(cursor.getColumnIndex(column))) {
+                        case FIELD_TYPE_BLOB:
+                            jsonObject.put("column", cursor.getBlob(cursor.getColumnIndex("column")));
+                            break;
+                        case FIELD_TYPE_FLOAT:
+                            jsonObject.put("column", cursor.getFloat(cursor.getColumnIndex("column")));
+                            break;
+                        case FIELD_TYPE_INTEGER:
+                            jsonObject.put("column", cursor.getInt(cursor.getColumnIndex("column")));
+                            break;
+                        case FIELD_TYPE_STRING:
+                            jsonObject.put("column", cursor.getString(cursor.getColumnIndex("column")));
+                            break;
+                        default:
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            jsonArray.put(jsonObject);
+        }
+
+        cursor.close();
+        db.close();
+
+        return jsonArray;
+    }
+
+    public String exportDatabase() {
+        JSONArray userTable = dumpTable("user", "uid", "email", "shadow", "rsapubkey", "rsaprivkey");
+        JSONArray itemTable = dumpTable("item", "did", "uid", "type", "icon", "name", "description", "data");
+
+        JSONObject jsonObject = new JSONObject();
+
+        try {
+            jsonObject.put("user", userTable);
+            jsonObject.put("item", itemTable);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return jsonObject.toString();
     }
 
     @Override

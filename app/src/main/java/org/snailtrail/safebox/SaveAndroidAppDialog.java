@@ -25,6 +25,11 @@ public class SaveAndroidAppDialog extends SaveItemDialog {
     }
 
     @Override
+    public void initializeItem() {
+        selectItemIcon(m_iconHandler);
+    }
+
+    @Override
     public void selectItemIcon(Handler handler) {
         new AndroidAppIconListDialog(getContext(), R.layout.icon_list_dialog, handler).show();
     }

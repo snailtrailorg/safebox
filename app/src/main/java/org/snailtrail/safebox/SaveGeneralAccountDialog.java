@@ -20,6 +20,11 @@ public class SaveGeneralAccountDialog extends SaveItemDialog {
     }
 
     @Override
+    public void initializeItem() {
+        selectItemIcon(m_iconHandler);
+    }
+
+    @Override
     public void selectItemIcon(Handler handler) {
         new GeneralAccountIconListDialog(getContext(), R.layout.icon_list_dialog, handler).show();
     }
@@ -69,10 +74,9 @@ public class SaveGeneralAccountDialog extends SaveItemDialog {
         EditText password = m_view.findViewById(R.id.save_general_account_password);
         EditText remarks = m_view.findViewById(R.id.save_general_account_remarks);
 
-        String decryptedData = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
         JSONObject jsonObject = null;
         try {
-            jsonObject = new JSONObject(decryptedData);
+            jsonObject = new JSONObject(m_itemInfo.m_data);
         } catch (JSONException e) {
             e.printStackTrace();
         }

@@ -101,11 +101,14 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                 if (m_type == CHOOSE_OPEN_FILE) {
                     FileInfo fileInfo = m_fileInfos.get(m_selected);
                     File file = new File(fileInfo.m_pathname);
-                    if (file.exists() && file.isFile() && file.canRead()) {
+                    if (file.length() > MAX_FILE_LENGTH) {
+                        Utilities.showMessageBox(m_context, m_context.getString(R.string.error_dialog_title), String.format(getContext().getString(R.string.choose_save_file_error_file_too_large), MAX_FILE_LENGTH));
+                    }else  if (file.exists() && file.isFile() && file.canRead()) {
                         m_handler.obtainMessage(CHOOSE_OPEN_FILE, m_fileInfos.get(m_selected)).sendToTarget();
                         setDefaultFolder(m_folder);
                         dismiss();
-                    } else {
+                    }
+                    else {
                         Utilities.showMessageBox(m_context, R.string.error_dialog_title, R.string.choose_open_file_error);
                     }
                 } else {
@@ -189,6 +192,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     }
 
     private final String DEFAULT_FOLDER_KEY = "DefaultFolder";
+    public static final int MAX_FILE_LENGTH = 8192;
     public static final int CHOOSE_OPEN_FILE = 1;
     public static final int CHOOSE_SAVE_FILE = 2;
     private int m_type;

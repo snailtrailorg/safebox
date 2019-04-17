@@ -57,6 +57,9 @@ class Utilities {
         Toast.makeText(context, message_id, Toast.LENGTH_SHORT).show();
     }
 
+    static void showMessageBox(Context context, String title, String message) {
+        new AlertDialog.Builder(context).setTitle(title).setMessage(message).setPositiveButton(R.string.error_dialog_button_ok, null).show();
+    }
     static void showMessageBox(Context context, int title, int message) {
         new AlertDialog.Builder(context).setTitle(title).setMessage(message).setPositiveButton(R.string.error_dialog_button_ok, null).show();
     }

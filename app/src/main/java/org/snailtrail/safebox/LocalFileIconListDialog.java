@@ -9,7 +9,7 @@ import java.util.ArrayList;
 
 public class LocalFileIconListDialog extends IconListDialog {
     protected LocalFileIconListDialog(Context context, int resource, Handler handler) {
-        super(context, resource, handler);
+        super(context, resource, handler, 0);
     }
 
     @Override
