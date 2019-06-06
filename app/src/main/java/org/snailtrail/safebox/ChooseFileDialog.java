@@ -21,14 +21,12 @@ import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-
-import androidx.core.content.ContextCompat;
-
-import static android.os.Environment.getDataDirectory;
 
 public class ChooseFileDialog extends AlertDialog implements ListAdapter, AdapterView.OnItemClickListener, View.OnClickListener {
     private final DataSetObservable mDataSetObservable = new DataSetObservable();
@@ -102,8 +100,8 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                 if (m_type == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
                     FileInfo fileInfo = m_fileInfos.get(m_selected);
                     File file = new File(fileInfo.m_pathname);
-                    if (file.length() > MAX_FILE_LENGTH) {
-                        Utilities.showMessageBox(m_context, m_context.getString(R.string.error_dialog_title), String.format(getContext().getString(R.string.choose_save_file_error_file_too_large), MAX_FILE_LENGTH));
+                    if (m_max_open_file_length !=0 && file.length() > m_max_open_file_length) {
+                        Utilities.showMessageBox(m_context, m_context.getString(R.string.error_dialog_title), String.format(getContext().getString(R.string.choose_save_file_error_file_too_large), m_max_open_file_length));
                     }else  if (file.exists() && file.isFile() && file.canRead()) {
                         m_handler.obtainMessage(R.integer.MESSAGE_CHOOSE_OPEN_FILE, m_fileInfos.get(m_selected)).sendToTarget();
                         setDefaultFolder(m_folder);
@@ -193,7 +191,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     }
 
     private final String DEFAULT_FOLDER_KEY = "DefaultFolder";
-    public static final int MAX_FILE_LENGTH = 8192;
+    private int m_max_open_file_length;
     private int m_type;
     private String m_folder="";
     private String m_filename="";
@@ -211,11 +209,12 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     private HashMap<String, Drawable> m_iconMap;
     private int m_selected;
 
-    protected ChooseFileDialog(Context context, Handler handler, int type) {
+    protected ChooseFileDialog(Context context, Handler handler, int type, int max_open_file_length) {
         super(context);
         m_context = context;
         m_handler = handler;
         m_type = type;
+        m_max_open_file_length = max_open_file_length;
 
         m_fileInfos = new ArrayList<>();
 

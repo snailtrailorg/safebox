@@ -25,6 +25,7 @@ import java.security.PublicKey;
 import androidx.core.content.ContextCompat;
 
 public class SaveLocalFileDialog extends SaveItemDialog {
+    private static final int MAX_FILE_LENGTH = 4096;
     private String m_pathname = "";
 
     private Handler m_fileHandler = new Handler(Looper.getMainLooper()) {
@@ -47,7 +48,7 @@ public class SaveLocalFileDialog extends SaveItemDialog {
     }
 
     public void chooseOpenFile() {
-        new ChooseFileDialog(getContext(), m_fileHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE).show();
+        new ChooseFileDialog(getContext(), m_fileHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE, MAX_FILE_LENGTH).show();
     }
 
     @Override
@@ -100,13 +101,13 @@ public class SaveLocalFileDialog extends SaveItemDialog {
 
     @Override
     public void composeItemData() {
-        byte[] buff=new byte[ChooseFileDialog.MAX_FILE_LENGTH];
+        byte[] buff=new byte[MAX_FILE_LENGTH];
         int hasRead=0;
 
         try {
             FileInputStream fileInputStream = new FileInputStream(new File(this.m_pathname));
 
-            while ((hasRead = fileInputStream.read(buff, hasRead, ChooseFileDialog.MAX_FILE_LENGTH-hasRead)) > 0);
+            while ((hasRead = fileInputStream.read(buff, hasRead, MAX_FILE_LENGTH-hasRead)) > 0);
 
             fileInputStream.close();
         } catch (FileNotFoundException e) {

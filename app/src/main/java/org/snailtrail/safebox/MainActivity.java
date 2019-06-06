@@ -252,10 +252,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 }
                 break;
             case R.id.drawer_menu_item_backup:
-                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_SAVE_FILE).show();
+                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_SAVE_FILE, 0).show();
                 break;
             case R.id.drawer_menu_item_restore:
-                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE).show();
+                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE, 0).show();
                 break;
             case R.id.drawer_menu_item_change_password:
                 break;
