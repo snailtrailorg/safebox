@@ -25,6 +25,8 @@
         android:id="@+id/choose_file_dialog_filename"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:imeOptions="actionNext"
+        android:inputType="text"
         android:hint="@string/choose_file_dialog_filename_prompt"/>
 
     <GridView

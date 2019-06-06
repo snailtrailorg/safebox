@@ -23,7 +23,7 @@ import java.lang.ref.WeakReference;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
-public abstract class SaveItemDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
+public abstract class SaveItemDialog extends AlertDialog implements View.OnClickListener {
     public int m_resource;
     public Handler m_uiHandler;
     public View m_view;
@@ -133,18 +133,6 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
                 imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
     }
-
-    @Override
-    public boolean onTouch(View v, MotionEvent event) {
-        /*
-        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-
-        v.performClick();
-        */
-        return false;
-    }
-
     private void onClickCancel(View view) {
         dismiss();
     }

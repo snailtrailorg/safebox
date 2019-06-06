@@ -258,7 +258,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
             publishProgress(SIGN_UP_PROGRESS_CHECK_EMAIL);
 
             sqliteOpenHelper = new SqliteOpenHelper(getContext());
-            boolean conflict = sqliteOpenHelper.checkEmailConfliction(email);
+            boolean conflict = sqliteOpenHelper.checkEmailConflict(email);
             sqliteOpenHelper.close();
             if (conflict) {
                 return SIGN_UP_RESULT_ERROR_EMAIL_CONFLICTED;
@@ -286,7 +286,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
             String encrypted_private_key = Utilities.tripleDesEncrypt(private_key, password);
 
             sqliteOpenHelper = new SqliteOpenHelper(getContext());
-            sqliteOpenHelper.insertUser(email, shadow, encrypted_public_key, encrypted_private_key);
+            sqliteOpenHelper.saveUser(0, email, shadow, encrypted_public_key, encrypted_private_key);
             sqliteOpenHelper.close();
 
             publishProgress(SIGN_UP_PROGRESS_FINISHED);

@@ -7,20 +7,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.Settings;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.webkit.PermissionRequest;
-
-import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.snackbar.Snackbar;
-
-import java.lang.ref.WeakReference;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
@@ -31,6 +23,17 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.navigation.NavigationView;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     private static boolean m_isUserSignedIn;
@@ -44,13 +47,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         private WeakReference<MainActivity> m_mainActivity;
         private WeakReference<Context> m_context;
 
-        protected SecureHandler (MainActivity activity) {
+        protected SecureHandler (MainActivity activity, Context context) {
             m_mainActivity = new WeakReference<>(activity);
+            m_context = new WeakReference<>(context);
         }
 
         @Override
         public void handleMessage(Message message) {
             MainActivity mainActivity = m_mainActivity.get();
+            Context context = m_context.get();
 
             if (mainActivity != null) {
                 switch (message.what) {
@@ -73,10 +78,62 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         break;
                     case R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM:
                         new SaveLocalFileDialog(mainActivity, R.layout.save_local_file_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
-                        requestStoragePermission();
                         break;
                     case R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
                         new SaveGeneralAccountDialog(mainActivity, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        break;
+                    case R.integer.MESSAGE_CHOOSE_SAVE_FILE: {
+                            SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
+                            String database_content = sqliteOpenHelper.exportDatabase();
+
+                            String fileName = (String) message.obj;
+
+                            if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                                File file = new File(fileName);
+                                FileOutputStream fileOutputStream = null;
+                                try {
+                                    fileOutputStream = new FileOutputStream(file);
+                                } catch (FileNotFoundException e) {
+                                    e.printStackTrace();
+                                }
+                                if (fileOutputStream != null) {
+                                    try {
+                                        fileOutputStream.write(database_content.getBytes());
+                                        fileOutputStream.close();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            }
+                        }
+                            break;
+                    case R.integer.MESSAGE_CHOOSE_OPEN_FILE: {
+                            ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) (message.obj);
+                            if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                                File file = new File(fileInfo.m_pathname);
+                                int length = (int)(file.length());
+                                byte[] buffer = new byte[length];
+                                FileInputStream fileInputStream = null;
+                                try {
+                                    fileInputStream = new FileInputStream(file);
+                                } catch (FileNotFoundException e) {
+                                    e.printStackTrace();
+                                }
+                                if (fileInputStream != null) {
+                                    try {
+                                        fileInputStream.read(buffer);
+                                        fileInputStream.close();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+
+                                SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
+                                sqliteOpenHelper.importDatabase(new String(buffer));
+                                Utilities.jam(getApplicationContext(), R.string.restore_database_and_sign_in);
+                                this.obtainMessage(R.integer.MESSAGE_DO_SIGN_IN).sendToTarget();
+                            }
+                        }
                         break;
                     default:
                         super.handleMessage(message);
@@ -87,7 +144,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    private SecureHandler m_secureHandler = new SecureHandler (this);
+    private SecureHandler m_secureHandler = new SecureHandler (this, this);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,6 +174,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else {
             m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_UP);
         }
+
+        requestStoragePermission();
     }
 
     @Override
@@ -166,7 +225,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 case R.id.menu_item_add_local_file:
                     itemInfo.m_type = R.integer.ITEM_TYPE_LOCAL_FILE;
                     new SaveLocalFileDialog(this, R.layout.save_local_file_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
-                    requestStoragePermission();
                     return true;
 
                 default:
@@ -183,24 +241,27 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_camera) {
-            byte[] testData = new byte[10000];
-            for (int i=0; i<10000; i++) { testData[i] = 65; }
-            String encryptedData = Utilities.rsaEncrypt(m_publicKey, new String(testData));
-            String decryptedData = Utilities.rsaDecrypt(m_privateKey, encryptedData);
-            if (decryptedData.length() == 10000) {
-                Utilities.jam(this, "rsa encrypt & decrypt test ok");
-            }
-        } else if (id == R.id.nav_gallery) {
-
-        } else if (id == R.id.nav_slideshow) {
-
-        } else if (id == R.id.nav_manage) {
-
-        } else if (id == R.id.nav_share) {
-
-        } else if (id == R.id.nav_send) {
-
+        switch (id) {
+            case R.id.drawer_menu_item_synchronize:
+                byte[] testData = new byte[10000];
+                for (int i=0; i<10000; i++) { testData[i] = 65; }
+                String encryptedData = Utilities.rsaEncrypt(m_publicKey, new String(testData));
+                String decryptedData = Utilities.rsaDecrypt(m_privateKey, encryptedData);
+                if (decryptedData.length() == 10000) {
+                    Utilities.jam(this, "rsa encrypt & decrypt test ok");
+                }
+                break;
+            case R.id.drawer_menu_item_backup:
+                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_SAVE_FILE).show();
+                break;
+            case R.id.drawer_menu_item_restore:
+                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE).show();
+                break;
+            case R.id.drawer_menu_item_change_password:
+                break;
+            case R.id.drawer_menu_item_about:
+                break;
+            default:
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);

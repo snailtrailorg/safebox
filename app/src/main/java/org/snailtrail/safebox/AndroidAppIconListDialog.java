@@ -1,7 +1,6 @@
 package org.snailtrail.safebox;
 
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
@@ -19,15 +18,15 @@ public class AndroidAppIconListDialog extends IconListDialog {
     @Override
     protected ArrayList<IconInfo> loadIconInfos() {
         PackageManager packageManager = m_context .getPackageManager();
-        List<PackageInfo> packgeInfos = packageManager.getInstalledPackages(0);
+        List<PackageInfo> packageInfos = packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES);
 
         ArrayList<IconInfo> iconInfos = new ArrayList<>();
 
-        for(PackageInfo packgeInfo : packgeInfos) {
-            if ((packgeInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM)  == 0) {
-                String appName = packgeInfo.applicationInfo.loadLabel(packageManager).toString();
-                String packageName = packgeInfo.packageName;
-                Drawable drawable = packgeInfo.applicationInfo.loadIcon(packageManager);
+        for(PackageInfo packageInfo : packageInfos) {
+            if (packageInfo.activities != null && packageInfo.applicationInfo.icon != 0) {
+                String appName = packageInfo.applicationInfo.loadLabel(packageManager).toString();
+                String packageName = packageInfo.packageName;
+                Drawable drawable = packageInfo.applicationInfo.loadIcon(packageManager);
                 IconInfo iconInfo = new IconInfo(drawable, appName, packageName);
                 iconInfos.add(iconInfo);
             }

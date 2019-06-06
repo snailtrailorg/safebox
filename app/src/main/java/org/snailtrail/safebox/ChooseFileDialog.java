@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
@@ -98,13 +99,13 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.choose_file_dialog_ok_button:
-                if (m_type == CHOOSE_OPEN_FILE) {
+                if (m_type == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
                     FileInfo fileInfo = m_fileInfos.get(m_selected);
                     File file = new File(fileInfo.m_pathname);
                     if (file.length() > MAX_FILE_LENGTH) {
                         Utilities.showMessageBox(m_context, m_context.getString(R.string.error_dialog_title), String.format(getContext().getString(R.string.choose_save_file_error_file_too_large), MAX_FILE_LENGTH));
                     }else  if (file.exists() && file.isFile() && file.canRead()) {
-                        m_handler.obtainMessage(CHOOSE_OPEN_FILE, m_fileInfos.get(m_selected)).sendToTarget();
+                        m_handler.obtainMessage(R.integer.MESSAGE_CHOOSE_OPEN_FILE, m_fileInfos.get(m_selected)).sendToTarget();
                         setDefaultFolder(m_folder);
                         dismiss();
                     }
@@ -126,7 +127,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                         try {
                             if (file.createNewFile()) {
                                 //file.delete();
-                                m_handler.obtainMessage(CHOOSE_SAVE_FILE, pathname).sendToTarget();
+                                m_handler.obtainMessage(R.integer.MESSAGE_CHOOSE_SAVE_FILE, pathname).sendToTarget();
                                 setDefaultFolder(m_folder);
                                 dismiss();
                             }
@@ -193,8 +194,6 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
 
     private final String DEFAULT_FOLDER_KEY = "DefaultFolder";
     public static final int MAX_FILE_LENGTH = 8192;
-    public static final int CHOOSE_OPEN_FILE = 1;
-    public static final int CHOOSE_SAVE_FILE = 2;
     private int m_type;
     private String m_folder="";
     private String m_filename="";
@@ -256,11 +255,11 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         m_folderView = findViewById(R.id.choose_file_dialog_folder);
         m_filenameEdit = findViewById(R.id.choose_file_dialog_filename);
 
-        if (m_type == CHOOSE_OPEN_FILE) {
+        if (m_type == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
             if (m_titleView != null) { m_titleView.setText(R.string.choose_file_dialog_open_title); }
             if (m_filenameEdit != null) { m_filenameEdit.setEnabled(false); }
             if (m_okButton != null) {m_okButton.setText(R.string.choose_file_dialog_open_button); }
-        } else if (m_type == CHOOSE_SAVE_FILE) {
+        } else if (m_type == R.integer.MESSAGE_CHOOSE_SAVE_FILE) {
             if (m_titleView != null) { m_titleView.setText(R.string.choose_file_dialog_save_title); }
             if (m_filenameEdit != null) { m_filenameEdit.setEnabled(true); }
             if (m_okButton != null) {m_okButton.setText(R.string.choose_file_dialog_save_button); }
@@ -269,6 +268,9 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         }
 
         setFolder(getDefaultFolder());
+
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
     }
 
     protected String getDefaultFolder() {

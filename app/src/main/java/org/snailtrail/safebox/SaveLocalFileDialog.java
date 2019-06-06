@@ -24,15 +24,13 @@ import java.security.PublicKey;
 
 import androidx.core.content.ContextCompat;
 
-import static org.snailtrail.safebox.ChooseFileDialog.CHOOSE_OPEN_FILE;
-
 public class SaveLocalFileDialog extends SaveItemDialog {
     private String m_pathname = "";
 
     private Handler m_fileHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
-            if (msg.what == CHOOSE_OPEN_FILE) {
+            if (msg.what == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
                 ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) msg.obj;
                 setItemIconInfo(new IconListDialog.IconInfo(fileInfo.m_icon, fileInfo.m_type, fileInfo.m_type));
                 EditText filename = m_view.findViewById(R.id.save_local_file_filename);
@@ -49,7 +47,7 @@ public class SaveLocalFileDialog extends SaveItemDialog {
     }
 
     public void chooseOpenFile() {
-        new ChooseFileDialog(getContext(), m_fileHandler, CHOOSE_OPEN_FILE).show();
+        new ChooseFileDialog(getContext(), m_fileHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE).show();
     }
 
     @Override

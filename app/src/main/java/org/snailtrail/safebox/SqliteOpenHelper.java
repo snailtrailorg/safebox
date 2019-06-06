@@ -1,5 +1,6 @@
 package org.snailtrail.safebox;
 
+import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -40,65 +41,10 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
     public void onCreate(SQLiteDatabase db) {
         String sql_create_user_table = "create table user (uid integer primary key autoincrement, email varchar(64), shadow varchar(256), rsapubkey varchar(4096), rsaprivkey varchar(8192))";
         db.execSQL(sql_create_user_table);
-        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid int, type int, icon varchar(256), name varchar(64), description varchar(128), data varchar(4096), time timestamp)";
+        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid int, type int, icon varchar(256), name varchar(64), description varchar(128), data varchar(4096))";
         db.execSQL(sql_create_item_table);
         String sql_create_log_table = "create table log (lid integer primary key autoincrement, content varchar(256), time timestamp);";
         db.execSQL(sql_create_log_table);
-    }
-
-    public JSONArray dumpTable(String table, String... columns) {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query(table, null, null, null, null, null, null);
-
-        JSONArray jsonArray = new JSONArray();
-
-        while (cursor.moveToNext()) {
-            JSONObject jsonObject = new JSONObject();
-            for (String column : columns) {
-                try {
-                    switch (cursor.getType(cursor.getColumnIndex(column))) {
-                        case FIELD_TYPE_BLOB:
-                            jsonObject.put("column", cursor.getBlob(cursor.getColumnIndex("column")));
-                            break;
-                        case FIELD_TYPE_FLOAT:
-                            jsonObject.put("column", cursor.getFloat(cursor.getColumnIndex("column")));
-                            break;
-                        case FIELD_TYPE_INTEGER:
-                            jsonObject.put("column", cursor.getInt(cursor.getColumnIndex("column")));
-                            break;
-                        case FIELD_TYPE_STRING:
-                            jsonObject.put("column", cursor.getString(cursor.getColumnIndex("column")));
-                            break;
-                        default:
-                    }
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            jsonArray.put(jsonObject);
-        }
-
-        cursor.close();
-        db.close();
-
-        return jsonArray;
-    }
-
-    public String exportDatabase() {
-        JSONArray userTable = dumpTable("user", "uid", "email", "shadow", "rsapubkey", "rsaprivkey");
-        JSONArray itemTable = dumpTable("item", "did", "uid", "type", "icon", "name", "description", "data");
-
-        JSONObject jsonObject = new JSONObject();
-
-        try {
-            jsonObject.put("user", userTable);
-            jsonObject.put("item", itemTable);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return jsonObject.toString();
     }
 
     @Override
@@ -108,7 +54,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
     int getUserCount() {
         SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query("user",new String[]{"email"},null, null,null,null,null);
+        Cursor cursor = db.query("user", new String[]{"email"}, null, null, null, null, null);
 
         int result = cursor.getCount();
 
@@ -120,7 +66,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
     ArrayList<String> getUserEmailList() {
         SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query("user", new String[]{"email"},null, null, null, null, null);
+        Cursor cursor = db.query("user", new String[]{"email"}, null, null, null, null, null);
 
         ArrayList<String> result = new ArrayList<>();
 
@@ -134,9 +80,9 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         return result;
     }
 
-    boolean checkEmailConfliction(String email) {
+    boolean checkEmailConflict(String email) {
         SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query("user",new String[]{"email"},"email=?",new String[]{email},null,null,null);
+        Cursor cursor = db.query("user", new String[]{"email"}, "email=?", new String[]{email}, null, null, null);
 
         boolean result = cursor.moveToNext();
 
@@ -153,7 +99,8 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         String m_public_key;
         String m_private_key;
 
-        UserInfo() {}
+        UserInfo() {
+        }
 
         UserInfo(int uid, String email, String shadow, String public_key, String private_key) {
             m_uid = uid;
@@ -164,20 +111,27 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         }
     }
 
-    long insertUser(UserInfo userInfo) {
-        return insertUser(userInfo.m_email, userInfo.m_shadow, userInfo.m_public_key, userInfo.m_private_key);
+    long saveUser(UserInfo userInfo) {
+        return saveUser(userInfo.m_uid, userInfo.m_email, userInfo.m_shadow, userInfo.m_public_key, userInfo.m_private_key);
     }
 
-    long insertUser(String email, String shadow, String public_key, String private_key) {
+    long saveUser(int uid, String email, String shadow, String public_key, String private_key) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
 
         values.put("email", email);
-        values.put("shadow",shadow);
+        values.put("shadow", shadow);
         values.put("rsapubkey", public_key);
         values.put("rsaprivkey", private_key);
 
-        long result = db.insert("user", null, values);
+        long result = -1;
+
+        if (uid == 0) {
+            result = db.insert("user", null, values);
+
+        } else {
+            result = db.update("user", values, "uid=?", new String[]{new Integer(uid).toString()});
+        }
 
         db.close();
 
@@ -221,7 +175,8 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         String m_description;
         String m_data;
 
-        public ItemInfo() {}
+        public ItemInfo() {
+        }
 
         public ItemInfo(int did, int uid, int type, String icon, String name, String description, String data) {
             this.m_did = did;
@@ -243,7 +198,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         ContentValues values = new ContentValues();
 
         values.put("uid", uid);
-        values.put("type",type);
+        values.put("type", type);
         values.put("icon", icon);
         values.put("name", name);
         values.put("description", description);
@@ -252,18 +207,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         long result = -1;
 
         if (did == 0) {
-            //result = db.insert("item", null, values);
-            try
-            {
-                result = db.insertOrThrow("item", null, values);
-            }
-            catch(SQLException e)
-            {
-                // Sep 12, 2013 6:50:17 AM
-                Log.e("Exception","SQLException"+String.valueOf(e.getMessage()));
-                e.printStackTrace();
-            }
-
+            result = db.insert("item", null, values);
         } else {
             result = db.update("item", values, "did=?", new String[]{new Integer(did).toString()});
         }
@@ -329,5 +273,149 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
 
         return db.delete("item", "did=?", new String[]{new Integer(did).toString()});
+    }
+
+    public String exportDatabase() {
+        JSONObject database = new JSONObject();
+        JSONArray userTable = new JSONArray();
+        JSONArray itemTable = new JSONArray();
+
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query("user", null, null, null, null, null, null);
+
+        while (cursor.moveToNext()) {
+            JSONObject jsonObject = new JSONObject();
+            try {
+                jsonObject.put("uid", cursor.getInt(cursor.getColumnIndex("uid")));
+                jsonObject.put("email", cursor.getString(cursor.getColumnIndex("email")));
+                jsonObject.put("shadow", cursor.getString(cursor.getColumnIndex("shadow")));
+                jsonObject.put("public_key", cursor.getString(cursor.getColumnIndex("rsapubkey")));
+                jsonObject.put("private_key", cursor.getString(cursor.getColumnIndex("rsaprivkey")));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            userTable.put(jsonObject);
+        }
+
+        cursor.close();
+
+        cursor = db.query("item", null, null, null, null, null, null);
+
+        while (cursor.moveToNext()) {
+            JSONObject jsonObject = new JSONObject();
+            try {
+                jsonObject.put("did", cursor.getInt(cursor.getColumnIndex("did")));
+                jsonObject.put("uid", cursor.getInt(cursor.getColumnIndex("uid")));
+                jsonObject.put("type", cursor.getInt(cursor.getColumnIndex("type")));
+                jsonObject.put("icon", cursor.getString(cursor.getColumnIndex("icon")));
+                jsonObject.put("name", cursor.getString(cursor.getColumnIndex("name")));
+                jsonObject.put("description", cursor.getString(cursor.getColumnIndex("description")));
+                jsonObject.put("data", cursor.getString(cursor.getColumnIndex("data")));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            itemTable.put(jsonObject);
+        }
+
+        cursor.close();
+        db.close();
+
+        try {
+            database.put("user", userTable);
+            database.put("item", itemTable);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return database.toString();
+    }
+
+    public void importDatabase (String source) {
+        JSONObject database = new JSONObject();
+        JSONArray userTable = new JSONArray();
+        JSONArray itemTable = new JSONArray();
+        UserInfo userInfo = null;
+        ItemInfo itemInfo = null;
+        JSONObject jsonObject = null;
+
+        try {
+            database = new JSONObject(source);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        if (database != null) {
+
+            SQLiteDatabase db = getWritableDatabase();
+
+            db.delete("user", null, null);
+            db.delete("item", null, null);
+
+            try {
+                userTable = database.getJSONArray("user");
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            for (int i=0; i<userTable.length(); i++) {
+                try {
+                    jsonObject = (JSONObject)(userTable.get(i));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                if (jsonObject != null) {
+                    ContentValues values = new ContentValues();
+
+                    try {
+                        values.put("uid", jsonObject.getInt("uid"));
+                        values.put("email", jsonObject.getString("email"));
+                        values.put("shadow", jsonObject.getString("shadow"));
+                        values.put("rsapubkey", jsonObject.getString("public_key"));
+                        values.put("rsaprivkey", jsonObject.getString("private_key"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                    db.insert("user", null, values);
+                }
+            }
+
+            try {
+                itemTable = database.getJSONArray("item");
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            for (int i=0; i<itemTable.length(); i++) {
+                try {
+                    jsonObject = (JSONObject)(itemTable.get(i));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                if (jsonObject != null) {
+                    ContentValues values = new ContentValues();
+
+                    try {
+                        values.put("did", jsonObject.getInt("did"));
+                        values.put("uid", jsonObject.getInt("uid"));
+                        values.put("type", jsonObject.getInt("type"));
+                        values.put("icon", jsonObject.getString("icon"));
+                        values.put("name", jsonObject.getString("name"));
+                        values.put("description", jsonObject.getString("description"));
+                        values.put("data", jsonObject.getString("data"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                    db.insert("item", null, values);
+                }
+            }
+
+            db.close();
+        }
     }
 }
