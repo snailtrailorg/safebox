@@ -1,35 +1,26 @@
 package org.snailtrail.safebox;
 
-import android.animation.ObjectAnimator;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
-import android.os.Message;
-import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.TranslateAnimation;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
-
-import java.security.PublicKey;
-import java.util.ArrayList;
-import java.util.List;
 
 import androidx.annotation.NonNull;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
-public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapter.SafeViewHolder>  implements RecyclerView.OnItemTouchListener{
+import java.security.PublicKey;
+import java.util.List;
+
+public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapter.SafeViewHolder>  implements RecyclerView.OnItemTouchListener {
 
     RecyclerView m_recyclerView;
     MainActivity.SecureHandler m_uiHandler;
@@ -83,30 +74,6 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         final float begin = start;
         final float end = stop;
         long duration = Math.abs((long)((end - begin) / ((velocity == 0) ? 100 : velocity) * 1000));
-
-        /*
-        final ObjectAnimator objectAnimator = ObjectAnimator.ofFloat(body, "translationX", start, stop);
-        objectAnimator.setDuration(duration);
-        ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
-            @Override
-            public void run() {
-                objectAnimator.start();
-                Log.i("SafeBox", "animateTranslation callback, use ObjectAnimator, begin:" + begin + ", end:" + end);
-            }
-        });
-        */
-        /*
-        final TranslateAnimation translateAnimation = new TranslateAnimation(start, stop, 0.0f, 0.0f);
-        translateAnimation.setDuration(duration);
-        translateAnimation.setFillAfter(true);
-        ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
-            @Override
-            public void run() {
-                body.startAnimation(translateAnimation);
-                Log.i("SafeBox", "animateTranslation callback, use TranslateAnimation, begin:" + begin + ", end:" + end);
-            }
-        });
-        */
 
         ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
             @Override
@@ -261,6 +228,27 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
 
         safeViewHolder.m_name.setText(m_itemInfos.get(position).m_name);
         safeViewHolder.m_description.setText(m_itemInfos.get(position).m_description);
+
+        safeViewHolder.m_body.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_recyclerView.findContainingViewHolder(v);
+                if (holder != null) {
+                    switch (holder.m_itemInfo.m_type) {
+                        case R.integer.ITEM_TYPE_ANDROID_APP:
+                            m_uiHandler.obtainMessage(R.integer.MESSAGE_VIEW_ANDROID_APP_ITEM, holder.m_itemInfo).sendToTarget();
+                            break;
+                        case R.integer.ITEM_TYPE_GENERAL_ACCOUNT:
+                            m_uiHandler.obtainMessage(R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM, holder.m_itemInfo).sendToTarget();
+                            break;
+                        case R.integer.ITEM_TYPE_LOCAL_FILE:
+                            m_uiHandler.obtainMessage(R.integer.MESSAGE_VIEW_LOCAL_FILE_ITEM, holder.m_itemInfo).sendToTarget();
+                            break;
+                        default:
+                    }
+                }
+            }
+        });
 
         safeViewHolder.m_delete.setOnClickListener(new View.OnClickListener() {
             @Override

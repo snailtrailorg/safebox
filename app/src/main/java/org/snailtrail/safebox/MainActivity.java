@@ -82,6 +82,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     case R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
                         new SaveGeneralAccountDialog(mainActivity, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
+                    case R.integer.MESSAGE_VIEW_ANDROID_APP_ITEM:
+                        new ViewAndroidAppDialog(mainActivity, R.layout.view_android_app_dialog, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        break;
+                    case R.integer.MESSAGE_VIEW_LOCAL_FILE_ITEM:
+                        new ViewLocalFileDialog(mainActivity, R.layout.view_local_file_dialog, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        break;
+                    case R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM:
+                        new ViewGeneralAccountDialog(mainActivity, R.layout.view_general_account_dialog, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        break;
                     case R.integer.MESSAGE_CHOOSE_SAVE_FILE: {
                             SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
                             String database_content = sqliteOpenHelper.exportDatabase();
@@ -106,7 +115,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 }
                             }
                         }
-                            break;
+                        break;
                     case R.integer.MESSAGE_CHOOSE_OPEN_FILE: {
                             ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) (message.obj);
                             if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {

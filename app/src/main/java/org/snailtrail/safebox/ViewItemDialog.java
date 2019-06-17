@@ -3,35 +3,30 @@ package org.snailtrail.safebox;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowManager;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.security.KeyPair;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 
-public abstract class ViewItemDialog extends AlertDialog implements View.OnClickListener {
+import static android.view.MotionEvent.ACTION_CANCEL;
+import static android.view.MotionEvent.ACTION_DOWN;
+import static android.view.MotionEvent.ACTION_UP;
+
+public abstract class ViewItemDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
     public int m_resource;
     public View m_view;
     public PrivateKey m_privateKey;
     public SqliteOpenHelper.ItemInfo m_itemInfo;
 
-
-    public ViewItemDialog(Context context, int resource, PrivateKey privateKey, SqliteOpenHelper.ItemInfo m_itemInfo) {
+    public ViewItemDialog(Context context, int resource, SqliteOpenHelper.ItemInfo itemInfo) {
         super(context);
         m_resource = resource;
-        m_privateKey = privateKey;
-        m_itemInfo = m_itemInfo;
+        m_itemInfo = itemInfo;
     }
 
     public abstract Drawable getIconInfoByIdentifier(Context context, String identifier);
@@ -47,20 +42,19 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
 
         setCancelable(false);
 
-        m_view.findViewById(R.id.save_item_progress_panel).setVisibility(View.GONE);
-        m_view.findViewById(R.id.save_item_form_panel).setVisibility(View.VISIBLE);
+        m_view.findViewById(R.id.safe_list_item_modify).setVisibility(View.GONE);
+        m_view.findViewById(R.id.safe_list_item_delete).setVisibility(View.GONE);
+        m_view.findViewById(R.id.safe_list_item_view).setVisibility(View.GONE);
 
-        m_view.findViewById(R.id.save_item_icon).setOnClickListener(this);
-        m_view.findViewById(R.id.save_item_cancel_button).setOnClickListener(this);
-        m_view.findViewById(R.id.save_item_save_button).setOnClickListener(this);
-        m_view.findViewById(R.id.save_item_form_panel).setOnClickListener(this);
+        m_view.findViewById(R.id.view_item_ok_button).setOnClickListener(this);
+        m_view.findViewById(R.id.view_item_view_button).setOnTouchListener(this);
 
-        ImageView icon = m_view.findViewById(R.id.save_item_icon);
+        ImageView icon = m_view.findViewById(R.id.safe_list_item_icon);
         Drawable drawable = getIconInfoByIdentifier(getContext(), m_itemInfo.m_icon);
         if (drawable != null) { icon.setImageDrawable(drawable);}
 
-        EditText name = m_view.findViewById(R.id.save_item_name);
-        EditText description = m_view.findViewById(R.id.save_item_description);
+        TextView name = m_view.findViewById(R.id.safe_list_item_name);
+        TextView description = m_view.findViewById(R.id.safe_list_item_description);
 
         name.setText(m_itemInfo.m_name);
         description.setText(m_itemInfo.m_description);
@@ -71,14 +65,12 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
         } else {
             m_itemInfo.m_data = "";
         }
-
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
     }
 
     @Override
     public void dismiss() {
         m_view.findViewById(R.id.view_item_ok_button).setOnClickListener(null);
+        m_view.findViewById(R.id.view_item_view_button).setOnTouchListener(null);
 
         super.dismiss();
     }
@@ -87,14 +79,28 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.view_item_ok_button:
-                onClickOK(view);
+                dismiss();
                 break;
             default:
                 //do nothing
         }
     }
 
-    private void onClickOK(View view) {
-        dismiss();
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        if (v.getId() == R.id.view_item_view_button) {
+            switch (event.getAction()) {
+                case ACTION_DOWN:
+                    m_view.findViewById(R.id.view_item_mask).setAlpha(0.0f);
+                    break;
+                case ACTION_UP:
+                case ACTION_CANCEL:
+                    m_view.findViewById(R.id.view_item_mask).setAlpha(1.0f);
+                    break;
+                default:
+                    //do nothing
+            }
+        }
+        return false;
     }
 }
