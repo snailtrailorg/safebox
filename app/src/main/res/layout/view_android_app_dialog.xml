@@ -84,9 +84,7 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/general_margin_small"
-                    android:layout_marginRight="@dimen/general_margin_small">
+                    android:layout_height="wrap_content">
 
                     <EditText
                         android:id="@+id/view_android_app_username"
@@ -99,9 +97,7 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/general_margin_small"
-                    android:layout_marginRight="@dimen/general_margin_small">
+                    android:layout_height="wrap_content">
 
                     <EditText
                         android:id="@+id/view_android_app_password"
@@ -114,9 +110,7 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/general_margin_small"
-                    android:layout_marginRight="@dimen/general_margin_small">
+                    android:layout_height="wrap_content">
 
                     <EditText
                         android:id="@+id/view_android_app_remarks"
@@ -149,15 +143,13 @@
                 android:layout_gravity="start">
 
                 <Button
-                    android:id="@+id/view_item_view_button"
+                    android:id="@+id/view_item_cancel_button"
                     style="?android:textAppearanceSmall"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/general_margin_small"
-                    android:layout_marginEnd="@dimen/general_margin_tiny"
-                    android:layout_marginBottom="@dimen/general_margin_small"
-                    android:text="@string/view_item_prompt_view"
-                    android:textAllCaps="false" />
+                    android:text="@string/view_item_prompt_cancel"
+                    android:textAllCaps="false"
+                    android:textStyle="bold" />
 
             </LinearLayout>
 
@@ -167,16 +159,12 @@
                 android:gravity="end">
 
                 <Button
-                    android:id="@+id/view_item_ok_button"
+                    android:id="@+id/view_item_view_button"
                     style="?android:textAppearanceSmall"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/general_margin_tiny"
-                    android:layout_marginEnd="@dimen/general_margin_small"
-                    android:layout_marginBottom="@dimen/general_margin_small"
-                    android:text="@string/view_item_prompt_ok"
-                    android:textAllCaps="false"
-                    android:textStyle="bold" />
+                    android:text="@string/view_item_prompt_view"
+                    android:textAllCaps="false" />
 
             </LinearLayout>
 

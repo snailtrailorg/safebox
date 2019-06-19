@@ -25,7 +25,6 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
     RecyclerView m_recyclerView;
     MainActivity.SecureHandler m_uiHandler;
     Context m_context;
-    PublicKey m_publicKey;
     List<SqliteOpenHelper.ItemInfo> m_itemInfos;
 
     SafeRecyclerAdapter(Context context, MainActivity.SecureHandler uiHandler, RecyclerView recyclerView) {
@@ -79,7 +78,6 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
             @Override
             public void run() {
                 body.setTranslationX(end);
-                Log.i("SafeBox", "animateTranslation, direct use setTranslationX, begin:" + begin + ", end:" + end);
             }
         });
     }
@@ -95,6 +93,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
     private SafeViewHolder  m_selectedViewHolder;
     private VelocityTracker m_velocityTracker;
     private float m_thresholdTranslationX;
+    private boolean m_bIsSlide;
 
     @Override
     public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
@@ -122,33 +121,34 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
 
                     m_velocityTracker.clear();
                     m_velocityTracker.addMovement(e);
-
                 }
 
-                Log.i("SafeBox", " onInterceptTouchEvent ACTION_DOWN, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
-
+                m_bIsSlide = false;
                 return false;
 
             case MotionEvent.ACTION_MOVE:
                 if (m_selectedViewHolder != null) {
                     m_velocityTracker.addMovement(e);
                     m_velocityTracker.computeCurrentVelocity(1000);
-                    float velocity = m_velocityTracker.getXVelocity();
+
+                    float velocityX = m_velocityTracker.getXVelocity();
                     float translateX = m_initialTranslateX + e.getX() - m_initialTouchX;
+
                     if (translateX < 0.0f) {
                         float alpha = (m_thresholdTranslationX == 0.0f) ? 0.0f : (translateX / m_thresholdTranslationX);
                         alpha = (alpha < 0.0f) ? 0.0f : ((alpha > 1.0f) ? 1.0f : alpha);
                         m_selectedViewHolder.m_delete.setAlpha(alpha);
                         m_selectedViewHolder.m_modify.setAlpha(alpha);
                     }
-                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, translateX, velocity);
+                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, translateX, velocityX);
                     m_lastTranslateX = translateX;
                     //m_selectedViewHolder.m_body.setTranslationX(m_initialTranslationX + e.getX() - m_initialTouchX);
-                    Log.i("SafeBox", " onInterceptTouchEvent ACTION_MOVE, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
                 }
 
+                m_bIsSlide = true;
                 return false;
 
+            case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP:
                 if (m_selectedViewHolder != null) {
                     if (m_lastTranslateX <= m_thresholdTranslationX) {
@@ -160,38 +160,16 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                     }
                 }
 
-                Log.i("SafeBox", " onInterceptTouchEvent ACTION_UP, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
-                return false;
-
-            case MotionEvent.ACTION_CANCEL:
-                Log.i("SafeBox", " onInterceptTouchEvent ACTION_CANCEL, m_initialTranslateX:" + m_initialTranslateX + ", m_lastTranslateX:" + m_lastTranslateX + ",m_thresholdTranslationX:" + m_thresholdTranslationX);
-                return false;
+                return m_bIsSlide;
 
             default:
-                Log.i("SafeBox", " onInterceptTouchEvent " + e.getAction());
                 return false;
         }
     }
 
     @Override
     public void onTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
-        switch (e.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                Log.i("SafeBox", " onTouchEvent ACTION_DOWN");
-                break;
-            case MotionEvent.ACTION_MOVE:
-                Log.i("SafeBox", " onTouchEvent ACTION_MOVE");
-                break;
-            case MotionEvent.ACTION_UP:
-                Log.i("SafeBox", " onTouchEvent ACTION_UP");
-                break;
-            case MotionEvent.ACTION_CANCEL:
-                Log.i("SafeBox", " onTouchEvent ACTION_CANCEL");
-                break;
-            default:
-                Log.i("SafeBox", " onTouchEvent " + e.getAction());
-                break;
-        }
+
     }
 
     @Override

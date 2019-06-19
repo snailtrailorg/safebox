@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -42,19 +41,15 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
 
         setCancelable(false);
 
-        m_view.findViewById(R.id.safe_list_item_modify).setVisibility(View.GONE);
-        m_view.findViewById(R.id.safe_list_item_delete).setVisibility(View.GONE);
-        m_view.findViewById(R.id.safe_list_item_view).setVisibility(View.GONE);
-
-        m_view.findViewById(R.id.view_item_ok_button).setOnClickListener(this);
+        m_view.findViewById(R.id.view_item_cancel_button).setOnClickListener(this);
         m_view.findViewById(R.id.view_item_view_button).setOnTouchListener(this);
 
-        ImageView icon = m_view.findViewById(R.id.safe_list_item_icon);
+        ImageView icon = m_view.findViewById(R.id.view_item_icon);
         Drawable drawable = getIconInfoByIdentifier(getContext(), m_itemInfo.m_icon);
         if (drawable != null) { icon.setImageDrawable(drawable);}
 
-        TextView name = m_view.findViewById(R.id.safe_list_item_name);
-        TextView description = m_view.findViewById(R.id.safe_list_item_description);
+        TextView name = m_view.findViewById(R.id.view_item_name);
+        TextView description = m_view.findViewById(R.id.view_item_description);
 
         name.setText(m_itemInfo.m_name);
         description.setText(m_itemInfo.m_description);
@@ -69,7 +64,7 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
 
     @Override
     public void dismiss() {
-        m_view.findViewById(R.id.view_item_ok_button).setOnClickListener(null);
+        m_view.findViewById(R.id.view_item_cancel_button).setOnClickListener(null);
         m_view.findViewById(R.id.view_item_view_button).setOnTouchListener(null);
 
         super.dismiss();
@@ -78,7 +73,7 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.view_item_ok_button:
+            case R.id.view_item_cancel_button:
                 dismiss();
                 break;
             default:

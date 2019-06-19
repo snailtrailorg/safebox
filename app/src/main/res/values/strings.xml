@@ -96,7 +96,7 @@
     <string name="save_item_prompt_cancel">Cancel</string>
 
     <string name="view_item_prompt_view">View</string>
-    <string name="view_item_prompt_ok">OK</string>
+    <string name="view_item_prompt_cancel">Cancel</string>
 
     <string name="save_item_progress_title">Processing, please wait…</string>
     <string name="save_item_progress_processing_message">Processing, please wait…</string>

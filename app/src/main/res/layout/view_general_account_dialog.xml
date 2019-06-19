@@ -117,7 +117,7 @@
                     android:layout_marginStart="@dimen/general_margin_tiny"
                     android:layout_marginEnd="@dimen/general_margin_small"
                     android:layout_marginBottom="@dimen/general_margin_small"
-                    android:text="@string/view_item_prompt_ok"
+                    android:text="@string/view_item_prompt_cancel"
                     android:textAllCaps="false"
                     android:textStyle="bold" />
 
