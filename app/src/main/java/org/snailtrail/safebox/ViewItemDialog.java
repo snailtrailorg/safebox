@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.AlphaAnimation;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -84,16 +85,27 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         if (v.getId() == R.id.view_item_view_button) {
-            switch (event.getAction()) {
-                case ACTION_DOWN:
-                    m_view.findViewById(R.id.view_item_mask).setAlpha(0.0f);
-                    break;
-                case ACTION_UP:
-                case ACTION_CANCEL:
-                    m_view.findViewById(R.id.view_item_mask).setAlpha(1.0f);
-                    break;
-                default:
-                    //do nothing
+            View mask = m_view.findViewById(R.id.view_item_mask);
+            if (mask != null) {
+                AlphaAnimation alphaAnimation;
+
+                switch (event.getAction()) {
+                    case ACTION_DOWN:
+                        alphaAnimation = new AlphaAnimation(1.0f, 0.0f);
+                        alphaAnimation.setFillAfter(true);
+                        alphaAnimation.setDuration(1000);
+                        mask.startAnimation(alphaAnimation);
+                        break;
+                    case ACTION_UP:
+                    case ACTION_CANCEL:
+                        alphaAnimation = new AlphaAnimation(0.0f, 1.0f);
+                        alphaAnimation.setFillAfter(true);
+                        alphaAnimation.setDuration(1000);
+                        mask.startAnimation(alphaAnimation);
+                        break;
+                    default:
+                        //do nothing
+                }
             }
         }
         return false;

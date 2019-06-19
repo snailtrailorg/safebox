@@ -148,8 +148,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/view_item_prompt_cancel"
-                    android:textAllCaps="false"
-                    android:textStyle="bold" />
+                    android:textAllCaps="false" />
 
             </LinearLayout>
 
@@ -164,7 +163,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/view_item_prompt_view"
-                    android:textAllCaps="false" />
+                    android:textAllCaps="false"
+                    android:textStyle="bold" />
 
             </LinearLayout>
 
