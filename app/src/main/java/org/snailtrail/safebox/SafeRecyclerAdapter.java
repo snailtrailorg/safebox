@@ -5,8 +5,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
-import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -18,20 +16,17 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
-public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapter.SafeViewHolder>  implements RecyclerView.OnItemTouchListener {
+public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapter.SafeViewHolder> {
 
-    RecyclerView m_recyclerView;
+    SafeRecyclerView m_safeRecyclerView;
     MainActivity.SecureHandler m_uiHandler;
     Context m_context;
     List<SqliteOpenHelper.ItemInfo> m_itemInfos;
 
-    SafeRecyclerAdapter(Context context, MainActivity.SecureHandler uiHandler, RecyclerView recyclerView) {
+    SafeRecyclerAdapter(Context context, MainActivity.SecureHandler uiHandler, SafeRecyclerView safeRecyclerView) {
         m_context = context;
         m_uiHandler = uiHandler;
-        m_recyclerView = recyclerView;
-        m_recyclerView.addOnItemTouchListener(this);
-        m_velocityTracker = VelocityTracker.obtain();
-        m_thresholdTranslationX = 0.0f;
+        m_safeRecyclerView = safeRecyclerView;
     }
 
     public Context getContext() { return m_context; }
@@ -57,6 +52,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         public SafeViewHolder(@NonNull View itemView) {
             super(itemView);
             m_itemView = itemView;
+            m_itemView.setTag(this);
             m_icon = itemView.findViewById(R.id.safe_list_item_icon);
             m_name = itemView.findViewById(R.id.safe_list_item_name);
             m_description = itemView.findViewById(R.id.safe_list_item_description);
@@ -64,115 +60,6 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
             m_delete = itemView.findViewById(R.id.safe_list_item_delete);
             m_modify = itemView.findViewById(R.id.safe_list_item_modify);
         }
-    }
-
-    public void animateTranslation(final SafeViewHolder safeViewHolder, float start, float stop, float velocity) {
-        final View body = safeViewHolder.m_body;
-        final float begin = start;
-        final float end = stop;
-        long duration = Math.abs((long)((end - begin) / ((velocity == 0) ? 100 : velocity) * 1000));
-
-        ViewCompat.postOnAnimation(m_recyclerView, new Runnable() {
-            @Override
-            public void run() {
-                body.setTranslationX(end);
-            }
-        });
-    }
-
-    public float getViewWidthOverall(View view) {
-        ViewGroup.MarginLayoutParams layoutParams = (ViewGroup.MarginLayoutParams)view.getLayoutParams();
-        return layoutParams.leftMargin + layoutParams.rightMargin + view.getWidth();
-    }
-
-    private float m_initialTouchX;
-    private float m_initialTranslateX;
-    private float m_lastTranslateX;
-    private SafeViewHolder  m_selectedViewHolder;
-    private VelocityTracker m_velocityTracker;
-    private float m_thresholdTranslationX;
-    private boolean m_bIsSlide;
-
-    @Override
-    public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
-        switch (e.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-
-                View view = rv.findChildViewUnder(e.getX(), e.getY());
-                SafeViewHolder safeViewHolder = (view == null) ? null : (SafeViewHolder) rv.findContainingViewHolder(view);
-
-                if (safeViewHolder != null) {
-                    if (m_selectedViewHolder != null && m_selectedViewHolder != safeViewHolder && m_lastTranslateX != 0.0f) {
-                        animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
-                    }
-
-                    if (m_selectedViewHolder != safeViewHolder) {
-                        m_selectedViewHolder = safeViewHolder;
-                        m_initialTranslateX = 0.0f;
-                        m_lastTranslateX = m_initialTranslateX;
-                    } else {
-                        m_initialTranslateX = m_lastTranslateX;
-                    }
-
-                    m_thresholdTranslationX = 0.0f - (getViewWidthOverall(m_selectedViewHolder.m_delete) + getViewWidthOverall(m_selectedViewHolder.m_modify));
-                    m_initialTouchX = e.getX();
-
-                    m_velocityTracker.clear();
-                    m_velocityTracker.addMovement(e);
-                }
-
-                m_bIsSlide = false;
-                return false;
-
-            case MotionEvent.ACTION_MOVE:
-                if (m_selectedViewHolder != null) {
-                    m_velocityTracker.addMovement(e);
-                    m_velocityTracker.computeCurrentVelocity(1000);
-
-                    float velocityX = m_velocityTracker.getXVelocity();
-                    float translateX = m_initialTranslateX + e.getX() - m_initialTouchX;
-
-                    if (translateX < 0.0f) {
-                        float alpha = (m_thresholdTranslationX == 0.0f) ? 0.0f : (translateX / m_thresholdTranslationX);
-                        alpha = (alpha < 0.0f) ? 0.0f : ((alpha > 1.0f) ? 1.0f : alpha);
-                        m_selectedViewHolder.m_delete.setAlpha(alpha);
-                        m_selectedViewHolder.m_modify.setAlpha(alpha);
-                    }
-                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, translateX, velocityX);
-                    m_lastTranslateX = translateX;
-                    //m_selectedViewHolder.m_body.setTranslationX(m_initialTranslationX + e.getX() - m_initialTouchX);
-                }
-
-                m_bIsSlide = true;
-                return false;
-
-            case MotionEvent.ACTION_CANCEL:
-            case MotionEvent.ACTION_UP:
-                if (m_selectedViewHolder != null) {
-                    if (m_lastTranslateX <= m_thresholdTranslationX) {
-                        animateTranslation(m_selectedViewHolder, m_lastTranslateX, m_thresholdTranslationX, 3000.0f);
-                        m_lastTranslateX = m_thresholdTranslationX;
-                    } else {
-                        animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
-                        m_lastTranslateX = 0.0f;
-                    }
-                }
-
-                return m_bIsSlide;
-
-            default:
-                return false;
-        }
-    }
-
-    @Override
-    public void onTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
-
-    }
-
-    @Override
-    public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {
-
     }
 
     @Override
@@ -208,7 +95,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         safeViewHolder.m_body.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_recyclerView.findContainingViewHolder(v);
+                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_safeRecyclerView.findContainingViewHolder(v);
                 if (holder != null) {
                     switch (holder.m_itemInfo.m_type) {
                         case R.integer.ITEM_TYPE_ANDROID_APP:
@@ -222,6 +109,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                             break;
                         default:
                     }
+                    m_safeRecyclerView.resetItemTranslation();
                 }
             }
         });
@@ -229,7 +117,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         safeViewHolder.m_delete.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_recyclerView.findContainingViewHolder(v);
+                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_safeRecyclerView.findContainingViewHolder(v);
                 if (holder != null) {
                     new AlertDialog.Builder(getContext())
                             .setTitle(R.string.delete_item_confirm_dialog_title)
@@ -240,7 +128,6 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                                 public void onClick(DialogInterface dialog, int which) {
                                     SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(getContext());
                                     sqliteOpenHelper.removeItem(holder.m_itemInfo.m_did);
-                                    m_selectedViewHolder = null;
                                     m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
                                 }
                             })
@@ -252,8 +139,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                             })
                             .create()
                             .show();
-                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
-                    m_lastTranslateX = 0.0f;
+                    m_safeRecyclerView.resetItemTranslation();
                 } else {
                     Utilities.jam(getContext(), R.string.delete_item_failed_cannot_find_item);
                 }
@@ -263,7 +149,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         safeViewHolder.m_modify.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_recyclerView.findContainingViewHolder(v);
+                final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_safeRecyclerView.findContainingViewHolder(v);
                 if (holder != null) {
                     switch (holder.m_itemInfo.m_type) {
                         case R.integer.ITEM_TYPE_ANDROID_APP:
@@ -277,8 +163,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                             break;
                         default:
                     }
-                    animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
-                    m_lastTranslateX = 0.0f;
+                    m_safeRecyclerView.resetItemTranslation();
                 } else {
                     Utilities.jam(getContext(), R.string.modify_item_failed_cannot_find_item);
                 }

@@ -3,9 +3,11 @@ package org.snailtrail.safebox;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
 
+import java.security.PrivateKey;
+
 public class ViewLocalFileDialog extends ViewItemDialog {
-    public ViewLocalFileDialog(Context context, int resource, SqliteOpenHelper.ItemInfo itemInfo) {
-        super(context, resource, itemInfo);
+    public ViewLocalFileDialog(Context context, int resource, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
+        super(context, resource, privateKey, itemInfo);
     }
 
     @Override

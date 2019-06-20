@@ -7,9 +7,11 @@ import android.widget.EditText;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.security.PrivateKey;
+
 public class ViewAndroidAppDialog extends ViewItemDialog {
-    public ViewAndroidAppDialog(Context context, int resource, SqliteOpenHelper.ItemInfo itemInfo) {
-        super(context, resource, itemInfo);
+    public ViewAndroidAppDialog(Context context, int resource, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
+        super(context, resource, privateKey, itemInfo);
     }
 
     @Override

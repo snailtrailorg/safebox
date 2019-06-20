@@ -22,7 +22,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.navigation.NavigationView;
 
@@ -83,13 +82,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         new SaveGeneralAccountDialog(mainActivity, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_VIEW_ANDROID_APP_ITEM:
-                        new ViewAndroidAppDialog(mainActivity, R.layout.view_android_app_dialog, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new ViewAndroidAppDialog(mainActivity, R.layout.view_android_app_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_VIEW_LOCAL_FILE_ITEM:
-                        new ViewLocalFileDialog(mainActivity, R.layout.view_local_file_dialog, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new ViewLocalFileDialog(mainActivity, R.layout.view_local_file_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM:
-                        new ViewGeneralAccountDialog(mainActivity, R.layout.view_general_account_dialog, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new ViewGeneralAccountDialog(mainActivity, R.layout.view_general_account_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_CHOOSE_SAVE_FILE: {
                             SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
@@ -170,10 +169,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        RecyclerView recyclerView = findViewById(R.id.safe_recycle_view);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        m_safeRecycleAdapter = new SafeRecyclerAdapter(this, m_secureHandler, recyclerView);
-        recyclerView.setAdapter(m_safeRecycleAdapter);
+        SafeRecyclerView safeRecyclerView = findViewById(R.id.safe_recycle_view);
+        safeRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        m_safeRecycleAdapter = new SafeRecyclerAdapter(this, m_secureHandler, safeRecyclerView);
+        safeRecyclerView.setAdapter(m_safeRecycleAdapter);
 
         m_isUserSignedIn = false;
 

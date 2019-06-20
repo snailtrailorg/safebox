@@ -40,7 +40,7 @@
             app:layout_behavior="@string/app_bar_scrolling_view_behavior"
             tools:context=".MainActivity">
 
-            <androidx.recyclerview.widget.RecyclerView
+            <org.snailtrail.safebox.SafeRecyclerView
                 android:id="@+id/safe_recycle_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"

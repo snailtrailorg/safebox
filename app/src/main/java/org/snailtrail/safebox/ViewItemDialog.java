@@ -23,9 +23,10 @@ public abstract class ViewItemDialog extends AlertDialog implements View.OnClick
     public PrivateKey m_privateKey;
     public SqliteOpenHelper.ItemInfo m_itemInfo;
 
-    public ViewItemDialog(Context context, int resource, SqliteOpenHelper.ItemInfo itemInfo) {
+    public ViewItemDialog(Context context, int resource, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
         super(context);
         m_resource = resource;
+        m_privateKey = privateKey;
         m_itemInfo = itemInfo;
     }
 
