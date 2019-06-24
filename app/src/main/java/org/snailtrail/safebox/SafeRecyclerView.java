@@ -21,6 +21,7 @@ public class SafeRecyclerView extends RecyclerView {
     private VelocityTracker m_velocityTracker;
     private float m_thresholdTranslationX;
     private float m_initialTouchX;
+    private float m_initialTouchY;
     private float m_initialTranslateX;
     private float m_lastTranslateX;
     private float m_touchSlop;
@@ -74,6 +75,7 @@ public class SafeRecyclerView extends RecyclerView {
 
                     m_thresholdTranslationX = 0.0f - getViewWidthOverall(m_selectedViewHolder.m_delete) - getViewWidthOverall(m_selectedViewHolder.m_modify);
                     m_initialTouchX = e.getX();
+                    m_initialTouchY = e.getY();
 
                     m_velocityTracker.clear();
                     m_velocityTracker.addMovement(e);
@@ -88,23 +90,25 @@ public class SafeRecyclerView extends RecyclerView {
                     m_velocityTracker.computeCurrentVelocity(1000);
 
                     float velocityX = m_velocityTracker.getXVelocity();
-                    float translateX = m_initialTranslateX + e.getX() - m_initialTouchX;
+                    float translateX = e.getX() - m_initialTouchX;
+                    float translateY = e.getY() - m_initialTouchY;
 
-                    if (! m_bIsHorizontalSlide && Math.abs(translateX) > m_touchSlop) {
+                    if (! m_bIsHorizontalSlide && Math.abs(translateX) > Math.abs(translateY) && Math.abs(translateX) > m_touchSlop) {
                         m_bIsHorizontalSlide = true;
                     }
 
+                    float totalTranslateX = m_initialTranslateX + translateX;
+
                     if (m_bIsHorizontalSlide) {
-                        if (translateX < 0.0f) {
-                            float alpha = (m_thresholdTranslationX == 0.0f) ? 0.0f : (translateX / m_thresholdTranslationX);
+                        if (totalTranslateX < 0.0f) {
+                            float alpha = (m_thresholdTranslationX == 0.0f) ? 0.0f : (totalTranslateX / m_thresholdTranslationX);
                             alpha = (alpha < 0.0f) ? 0.0f : ((alpha > 1.0f) ? 1.0f : alpha);
                             m_selectedViewHolder.m_delete.setAlpha(alpha);
                             m_selectedViewHolder.m_modify.setAlpha(alpha);
                         }
-                        animateTranslation(m_selectedViewHolder, m_lastTranslateX, translateX, velocityX);
-                        m_lastTranslateX = translateX;
+                        animateTranslation(m_selectedViewHolder, m_lastTranslateX, totalTranslateX, velocityX);
+                        m_lastTranslateX = totalTranslateX;
                     }
-                    //m_selectedViewHolder.m_body.setTranslationX(m_initialTranslationX + e.getX() - m_initialTouchX);
                 }
 
                 if (m_bIsHorizontalSlide) {
@@ -116,12 +120,14 @@ public class SafeRecyclerView extends RecyclerView {
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP:
                 if (m_selectedViewHolder != null) {
-                    if (m_lastTranslateX <= m_thresholdTranslationX) {
+                    if (m_lastTranslateX < m_thresholdTranslationX) {
                         animateTranslation(m_selectedViewHolder, m_lastTranslateX, m_thresholdTranslationX, 3000.0f);
                         m_lastTranslateX = m_thresholdTranslationX;
-                    } else {
+                    } else if (m_lastTranslateX > m_thresholdTranslationX) {
                         animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
                         m_lastTranslateX = 0.0f;
+                    } else {
+
                     }
                 }
 

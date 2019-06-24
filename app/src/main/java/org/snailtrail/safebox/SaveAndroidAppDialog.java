@@ -67,15 +67,15 @@ public class SaveAndroidAppDialog extends SaveItemDialog {
     }
 
     @Override
-    public void extractItemData() {
-        if (m_itemInfo.m_data != null && m_itemInfo.m_data.length() > 0) {
+    public void extractItemData(String data) {
+        if (data != null && data.length() > 0) {
             EditText username = m_view.findViewById(R.id.save_android_app_username);
             EditText password = m_view.findViewById(R.id.save_android_app_password);
             EditText remarks = m_view.findViewById(R.id.save_android_app_remarks);
 
             JSONObject jsonObject = null;
             try {
-                jsonObject = new JSONObject(m_itemInfo.m_data);
+                jsonObject = new JSONObject(data);
             } catch (JSONException e) {
                 e.printStackTrace();
             }

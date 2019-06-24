@@ -20,8 +20,8 @@ public class ViewGeneralAccountDialog extends ViewItemDialog {
     }
 
     @Override
-    public void extractItemData() {
-        if (m_itemInfo.m_data != null && m_itemInfo.m_data.length() > 0) {
+    public void extractItemData(String data) {
+        if (data != null && data.length() > 0) {
             EditText website = m_view.findViewById(R.id.view_general_account_website);
             EditText username = m_view.findViewById(R.id.view_general_account_username);
             EditText password = m_view.findViewById(R.id.view_general_account_password);
@@ -29,7 +29,7 @@ public class ViewGeneralAccountDialog extends ViewItemDialog {
 
             JSONObject jsonObject = null;
             try {
-                jsonObject = new JSONObject(m_itemInfo.m_data);
+                jsonObject = new JSONObject(data);
             } catch (JSONException e) {
                 e.printStackTrace();
             }

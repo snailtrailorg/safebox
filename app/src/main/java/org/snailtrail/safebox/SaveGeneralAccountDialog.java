@@ -68,27 +68,29 @@ public class SaveGeneralAccountDialog extends SaveItemDialog {
     }
 
     @Override
-    public void extractItemData() {
-        EditText website = m_view.findViewById(R.id.save_general_account_website);
-        EditText username = m_view.findViewById(R.id.save_general_account_username);
-        EditText password = m_view.findViewById(R.id.save_general_account_password);
-        EditText remarks = m_view.findViewById(R.id.save_general_account_remarks);
+    public void extractItemData(String data) {
+        if (data != null && data.length() > 0) {
+            EditText website = m_view.findViewById(R.id.save_general_account_website);
+            EditText username = m_view.findViewById(R.id.save_general_account_username);
+            EditText password = m_view.findViewById(R.id.save_general_account_password);
+            EditText remarks = m_view.findViewById(R.id.save_general_account_remarks);
 
-        JSONObject jsonObject = null;
-        try {
-            jsonObject = new JSONObject(m_itemInfo.m_data);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        if (jsonObject != null) {
+            JSONObject jsonObject = null;
             try {
-                website.setText(jsonObject.getString("website"));
-                username.setText(jsonObject.getString("username"));
-                password.setText(jsonObject.getString("password"));
-                remarks.setText(jsonObject.getString("remarks"));
+                jsonObject = new JSONObject(data);
             } catch (JSONException e) {
                 e.printStackTrace();
+            }
+
+            if (jsonObject != null) {
+                try {
+                    website.setText(jsonObject.getString("website"));
+                    username.setText(jsonObject.getString("username"));
+                    password.setText(jsonObject.getString("password"));
+                    remarks.setText(jsonObject.getString("remarks"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

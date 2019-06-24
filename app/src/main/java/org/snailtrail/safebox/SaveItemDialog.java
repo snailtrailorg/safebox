@@ -56,7 +56,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
     public abstract void setItemIconInfo(IconListDialog.IconInfo iconInfo);
     public abstract Drawable getIconInfoByIdentifier(Context context, String identifier);
     public abstract void composeItemData();
-    public abstract void extractItemData();
+    public abstract void extractItemData(String data);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,8 +87,8 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
         description.setText(m_itemInfo.m_description);
 
         if (m_itemInfo.m_data != null && m_itemInfo.m_data.length() > 0) {
-            m_itemInfo.m_data = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
-            extractItemData();
+            String data = Utilities.rsaDecrypt(m_privateKey, m_itemInfo.m_data);
+            extractItemData(data);
         } else {
             m_itemInfo.m_data = "";
         }

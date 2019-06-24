@@ -91,12 +91,16 @@
 
     <string name="local_file_prompt_pathname">Choose a File…</string>
     <string name="local_file_prompt_browse">Browse…</string>
+    <string name="local_file_prompt_filename">File Name:</string>
 
     <string name="save_item_prompt_save">Save…</string>
     <string name="save_item_prompt_cancel">Cancel</string>
 
-    <string name="view_item_prompt_view">View</string>
     <string name="view_item_prompt_cancel">Cancel</string>
+    <string name="view_item_prompt_view">View</string>
+    <string name="view_item_prompt_download">Download</string>
+    <string name="view_item_prompt_download_ok">File download success.</string>
+    <string name="view_item_prompt_download_failed">File download failed.</string>
 
     <string name="save_item_progress_title">Processing, please wait…</string>
     <string name="save_item_progress_processing_message">Processing, please wait…</string>

@@ -209,11 +209,12 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     private HashMap<String, Drawable> m_iconMap;
     private int m_selected;
 
-    protected ChooseFileDialog(Context context, Handler handler, int type, int max_open_file_length) {
+    protected ChooseFileDialog(Context context, Handler handler, int type, String filename, int max_open_file_length) {
         super(context);
         m_context = context;
         m_handler = handler;
         m_type = type;
+        m_filename = filename;
         m_max_open_file_length = max_open_file_length;
 
         m_fileInfos = new ArrayList<>();
@@ -260,7 +261,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
             if (m_okButton != null) {m_okButton.setText(R.string.choose_file_dialog_open_button); }
         } else if (m_type == R.integer.MESSAGE_CHOOSE_SAVE_FILE) {
             if (m_titleView != null) { m_titleView.setText(R.string.choose_file_dialog_save_title); }
-            if (m_filenameEdit != null) { m_filenameEdit.setEnabled(true); }
+            if (m_filenameEdit != null) { m_filenameEdit.setEnabled(true); if (m_filename != null) { m_filenameEdit.setText(m_filename); } }
             if (m_okButton != null) {m_okButton.setText(R.string.choose_file_dialog_save_button); }
         } else {
             // do nothing, 4 future use

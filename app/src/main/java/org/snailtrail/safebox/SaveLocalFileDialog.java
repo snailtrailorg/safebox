@@ -48,7 +48,7 @@ public class SaveLocalFileDialog extends SaveItemDialog {
     }
 
     public void chooseOpenFile() {
-        new ChooseFileDialog(getContext(), m_fileHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE, MAX_FILE_LENGTH).show();
+        new ChooseFileDialog(getContext(), m_fileHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE, null, MAX_FILE_LENGTH).show();
     }
 
     @Override
@@ -130,21 +130,23 @@ public class SaveLocalFileDialog extends SaveItemDialog {
     }
 
     @Override
-    public void extractItemData() {
-        EditText filename = m_view.findViewById(R.id.save_local_file_filename);
+    public void extractItemData(String data) {
+        if (data != null && data.length() > 0) {
+            EditText filename = m_view.findViewById(R.id.save_local_file_filename);
 
-        JSONObject jsonObject = null;
-        try {
-            jsonObject = new JSONObject(m_itemInfo.m_data);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        if (jsonObject != null) {
+            JSONObject jsonObject = null;
             try {
-                filename.setText(jsonObject.getString("filename"));
+                jsonObject = new JSONObject(data);
             } catch (JSONException e) {
                 e.printStackTrace();
+            }
+
+            if (jsonObject != null) {
+                try {
+                    filename.setText(jsonObject.getString("filename"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
