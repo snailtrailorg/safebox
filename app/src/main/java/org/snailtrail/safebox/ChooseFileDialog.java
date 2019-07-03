@@ -8,10 +8,10 @@ import android.database.DataSetObserver;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -40,9 +40,9 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     @Override
     public void unregisterDataSetObserver(DataSetObserver observer) { mDataSetObservable.unregisterObserver(observer); }
 
-    public void notifyDataSetChanged() { mDataSetObservable.notifyChanged(); }
+    private void notifyDataSetChanged() { mDataSetObservable.notifyChanged(); }
 
-    public void notifyDataSetInvalidated() { mDataSetObservable.notifyInvalidated(); }
+    private void notifyDataSetInvalidated() { mDataSetObservable.notifyInvalidated(); }
 
     @Override
     public boolean areAllItemsEnabled() { return true; }
@@ -103,7 +103,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                     if (m_max_open_file_length !=0 && file.length() > m_max_open_file_length) {
                         Utilities.showMessageBox(m_context, m_context.getString(R.string.error_dialog_title), String.format(getContext().getString(R.string.choose_save_file_error_file_too_large), m_max_open_file_length));
                     }else  if (file.exists() && file.isFile() && file.canRead()) {
-                        m_handler.obtainMessage(R.integer.MESSAGE_CHOOSE_OPEN_FILE, m_fileInfos.get(m_selected)).sendToTarget();
+                        m_callback.doFileOperation(m_type, m_fileInfos.get(m_selected));
                         setDefaultFolder(m_folder);
                         dismiss();
                     }
@@ -125,7 +125,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                         try {
                             if (file.createNewFile()) {
                                 //file.delete();
-                                m_handler.obtainMessage(R.integer.MESSAGE_CHOOSE_SAVE_FILE, pathname).sendToTarget();
+                                m_callback.doFileOperation(m_type, m_fileInfos.get(m_selected));
                                 setDefaultFolder(m_folder);
                                 dismiss();
                             }
@@ -174,14 +174,14 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         }
     }
 
-    public class FileInfo {
+    class FileInfo {
         String m_pathname;
         String m_filename;
         String m_type;
         Drawable m_icon;
         boolean m_dir;
 
-        public FileInfo(String pathname, String filename, String type, Drawable icon, boolean dir) {
+        FileInfo(String pathname, String filename, String type, Drawable icon, boolean dir) {
             m_pathname = pathname;
             m_filename = filename;
             m_type = type;
@@ -194,25 +194,24 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     private int m_max_open_file_length;
     private int m_type;
     private String m_folder="";
-    private String m_filename="";
+    private String m_filename;
     private Context m_context;
-    private View m_view;
-    private GridView m_gridView;
-    private Button m_cancelButton;
-    private Button m_okButton;
-    private TextView m_titleView;
     private TextView m_folderView;
     private EditText m_filenameEdit;
-    private Handler m_handler;
     private ArrayList<FileInfo> m_fileInfos;
     private Drawable m_folderIcon;
     private HashMap<String, Drawable> m_iconMap;
     private int m_selected;
+    private Callback m_callback;
 
-    protected ChooseFileDialog(Context context, Handler handler, int type, String filename, int max_open_file_length) {
+    public interface Callback{
+        void doFileOperation(int type, FileInfo fileInfo);
+    }
+
+    ChooseFileDialog(Context context, Callback callback, int type, String filename, int max_open_file_length) {
         super(context);
         m_context = context;
-        m_handler = handler;
+        m_callback = callback;
         m_type = type;
         m_filename = filename;
         m_max_open_file_length = max_open_file_length;
@@ -224,12 +223,10 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         m_iconMap = new HashMap<>();
         m_iconMap.put("folder", Utilities.getLocalFileIcon(m_context, "folder"));
 
-        String[] filetypes = m_context.getResources().getStringArray(R.array.local_file_icon_list);
+        String[] fileTypes = m_context.getResources().getStringArray(R.array.local_file_icon_list);
 
-        if (filetypes != null && filetypes.length > 0) {
-            for (String filetype : filetypes) {
-                m_iconMap.put(filetype, Utilities.getLocalFileIcon(m_context, filetype));
-            }
+        for (String fileType : fileTypes) {
+            m_iconMap.put(fileType, Utilities.getLocalFileIcon(m_context, fileType));
         }
     }
 
@@ -238,54 +235,57 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         super.onCreate(savedInstanceState);
 
         LayoutInflater inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        m_view = inflater.inflate(R.layout.choose_file_dialog, null);
-        setContentView(m_view);
+        View view = inflater.inflate(R.layout.choose_file_dialog, null);
+        setContentView(view);
 
-        m_gridView = m_view.findViewById(R.id.choose_file_dialog_grid_view);
-        m_gridView.setOnItemClickListener(this);
-        m_gridView.setAdapter(this);
+        GridView gridView = view.findViewById(R.id.choose_file_dialog_grid_view);
+        gridView.setOnItemClickListener(this);
+        gridView.setAdapter(this);
 
-        m_cancelButton = findViewById(R.id.choose_file_dialog_cancel_button);
-        if (m_cancelButton != null) { m_cancelButton.setOnClickListener(this); }
+        Button cancelButton = findViewById(R.id.choose_file_dialog_cancel_button);
+        if (cancelButton != null) { cancelButton.setOnClickListener(this); }
 
-        m_okButton = findViewById(R.id.choose_file_dialog_ok_button);
-        if (m_okButton != null) { m_okButton.setOnClickListener(this); }
+        Button okButton = findViewById(R.id.choose_file_dialog_ok_button);
+        if (okButton != null) { okButton.setOnClickListener(this); }
 
-        m_titleView = findViewById(R.id.choose_file_dialog_title);
+        TextView titleView = findViewById(R.id.choose_file_dialog_title);
         m_folderView = findViewById(R.id.choose_file_dialog_folder);
         m_filenameEdit = findViewById(R.id.choose_file_dialog_filename);
 
         if (m_type == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
-            if (m_titleView != null) { m_titleView.setText(R.string.choose_file_dialog_open_title); }
+            if (titleView != null) { titleView.setText(R.string.choose_file_dialog_open_title); }
             if (m_filenameEdit != null) { m_filenameEdit.setEnabled(false); }
-            if (m_okButton != null) {m_okButton.setText(R.string.choose_file_dialog_open_button); }
+            if (okButton != null) {
+                okButton.setText(R.string.choose_file_dialog_open_button); }
         } else if (m_type == R.integer.MESSAGE_CHOOSE_SAVE_FILE) {
-            if (m_titleView != null) { m_titleView.setText(R.string.choose_file_dialog_save_title); }
+            if (titleView != null) { titleView.setText(R.string.choose_file_dialog_save_title); }
             if (m_filenameEdit != null) { m_filenameEdit.setEnabled(true); if (m_filename != null) { m_filenameEdit.setText(m_filename); } }
-            if (m_okButton != null) {m_okButton.setText(R.string.choose_file_dialog_save_button); }
-        } else {
-            // do nothing, 4 future use
+            if (okButton != null) {
+                okButton.setText(R.string.choose_file_dialog_save_button); }
         }
 
         setFolder(getDefaultFolder());
 
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        Window window = getWindow();
+        if (window != null) {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+            getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        }
     }
 
-    protected String getDefaultFolder() {
+    private String getDefaultFolder() {
         SharedPreferences sharedPreferences = m_context.getSharedPreferences(m_context.getPackageName(), Context.MODE_PRIVATE);
         return sharedPreferences.getString(DEFAULT_FOLDER_KEY, Environment.getExternalStorageDirectory().getAbsolutePath());
     }
 
-    protected void setDefaultFolder(String folder) {
+    private void setDefaultFolder(String folder) {
         SharedPreferences sharedPreferences = m_context.getSharedPreferences(m_context.getPackageName(), Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(DEFAULT_FOLDER_KEY, folder);
         editor.apply();
     }
 
-    protected void setFolder(String folder) {
+    private void setFolder(String folder) {
         m_folder = folder;
         m_folderView.setText(m_folder);
         m_fileInfos.clear();
@@ -320,5 +320,6 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         }
 
         notifyDataSetChanged();
+        notifyDataSetInvalidated();
     }
 }

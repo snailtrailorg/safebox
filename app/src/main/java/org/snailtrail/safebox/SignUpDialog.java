@@ -11,6 +11,7 @@ import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AutoCompleteTextView;
@@ -50,8 +51,11 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
         m_view.findViewById(R.id.sign_up_sign_up).setOnClickListener(this);
         m_view.setOnTouchListener(this);
 
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        Window window = getWindow();
+        if (window != null) {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+            getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        }
     }
 
     @Override
@@ -204,8 +208,10 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
     }
 
     private void onClickSwitchSignIn(View view) {
-        m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
-        dismiss();
+        if (view.getId() == R.id.sign_up_switch_sign_in) {
+            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
+            dismiss();
+        }
     }
 
     private void onClickSignUp(View view) {

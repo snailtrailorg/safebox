@@ -42,11 +42,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static PrivateKey m_privateKey;
     SafeRecyclerAdapter m_safeRecycleAdapter;
 
-    public class SecureHandler extends Handler {
+    public static class SecureHandler extends Handler {
         private WeakReference<MainActivity> m_mainActivity;
         private WeakReference<Context> m_context;
 
-        protected SecureHandler (MainActivity activity, Context context) {
+        SecureHandler(MainActivity activity, Context context) {
             m_mainActivity = new WeakReference<>(activity);
             m_context = new WeakReference<>(context);
         }
@@ -73,22 +73,22 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         mainActivity.loadUserItems();
                         break;
                     case R.integer.MESSAGE_MODIFY_ANDROID_APP_ITEM:
-                        new SaveAndroidAppDialog(mainActivity, R.layout.save_android_app_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new SaveAndroidAppDialog(context, R.layout.save_android_app_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM:
-                        new SaveLocalFileDialog(mainActivity, R.layout.save_local_file_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new SaveLocalFileDialog(context, R.layout.save_local_file_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
-                        new SaveGeneralAccountDialog(mainActivity, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new SaveGeneralAccountDialog(context, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_VIEW_ANDROID_APP_ITEM:
-                        new ViewAndroidAppDialog(mainActivity, R.layout.view_android_app_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new ViewAndroidAppDialog(context, R.layout.view_android_app_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_VIEW_LOCAL_FILE_ITEM:
-                        new ViewLocalFileDialog(mainActivity, R.layout.view_local_file_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new ViewLocalFileDialog(context, R.layout.view_local_file_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM:
-                        new ViewGeneralAccountDialog(mainActivity, R.layout.view_general_account_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
+                        new ViewGeneralAccountDialog(context, R.layout.view_general_account_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
                     case R.integer.MESSAGE_CHOOSE_SAVE_FILE: {
                             SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
@@ -121,6 +121,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 File file = new File(fileInfo.m_pathname);
                                 int length = (int)(file.length());
                                 byte[] buffer = new byte[length];
+                                int count = -1;
                                 FileInputStream fileInputStream = null;
                                 try {
                                     fileInputStream = new FileInputStream(file);
@@ -129,17 +130,19 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 }
                                 if (fileInputStream != null) {
                                     try {
-                                        fileInputStream.read(buffer);
+                                        count = fileInputStream.read(buffer);
                                         fileInputStream.close();
                                     } catch (IOException e) {
                                         e.printStackTrace();
                                     }
                                 }
 
-                                SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
-                                sqliteOpenHelper.importDatabase(new String(buffer));
-                                Utilities.jam(getApplicationContext(), R.string.restore_database_and_sign_in);
-                                this.obtainMessage(R.integer.MESSAGE_DO_SIGN_IN).sendToTarget();
+                                if (count == length) {
+                                    SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
+                                    sqliteOpenHelper.importDatabase(new String(buffer));
+                                    Utilities.jam(context, R.string.restore_database_and_sign_in);
+                                    this.obtainMessage(R.integer.MESSAGE_DO_SIGN_IN).sendToTarget();
+                                }
                             }
                         }
                         break;
@@ -151,8 +154,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         }
     }
-
-    private SecureHandler m_secureHandler = new SecureHandler (this, this);
+    public SecureHandler m_secureHandler = new SecureHandler (this, this);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -176,19 +178,24 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         m_isUserSignedIn = false;
 
-        int nUserCount = new SqliteOpenHelper(this).getUserCount();
-        if (nUserCount > 0) {
-            m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
-        } else {
-            m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_UP);
-        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int nUserCount = new SqliteOpenHelper(MainActivity.this).getUserCount();
+                if (nUserCount > 0) {
+                    m_secureHandler.obtainMessage(R.integer.MESSAGE_DO_SIGN_IN).sendToTarget();
+                } else {
+                    m_secureHandler.obtainMessage(R.integer.MESSAGE_DO_SIGN_UP).sendToTarget();
+                }
+            }
+        }).start();
 
         requestStoragePermission();
     }
 
     @Override
     public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
         } else {

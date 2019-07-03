@@ -9,6 +9,7 @@ import android.os.Message;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
@@ -30,8 +31,6 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
         String m_email;
         PublicKey m_publicKey;
         PrivateKey m_privateKey;
-
-        SignInMessageObject() {}
 
         SignInMessageObject(int uid, String email, PublicKey publicKey, PrivateKey privateKey) {
             m_uid = uid;
@@ -63,8 +62,11 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
         m_view.findViewById(R.id.sign_in_sign_in).setOnClickListener(this);
         m_view.setOnTouchListener(this);
 
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        Window window = getWindow();
+        if (window != null) {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+            getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        }
 
         ArrayList<String> mruEmailList = new SqliteOpenHelper(getContext()).getUserEmailList();
         if (mruEmailList != null && ! mruEmailList.isEmpty()) {
