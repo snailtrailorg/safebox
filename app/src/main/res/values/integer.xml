@@ -16,6 +16,6 @@
     <integer name="MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM">1500</integer>
     <integer name="MESSAGE_VIEW_LOCAL_FILE_ITEM">1600</integer>
     <integer name="MESSAGE_REQUEST_PERMISSION">1700</integer>
-    <integer name="MESSAGE_CHOOSE_OPEN_FILE">1800</integer>
-    <integer name="MESSAGE_CHOOSE_SAVE_FILE">1900</integer>
+    <integer name="MESSAGE_BACKUP_DATABASE">1800</integer>
+    <integer name="MESSAGE_RESTORE_DATABASE">1900</integer>
 </resources>

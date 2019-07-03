@@ -97,7 +97,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.choose_file_dialog_ok_button:
-                if (m_type == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
+                if (m_type == TYPE_OPEN_FILE) {
                     FileInfo fileInfo = m_fileInfos.get(m_selected);
                     File file = new File(fileInfo.m_pathname);
                     if (m_max_open_file_length !=0 && file.length() > m_max_open_file_length) {
@@ -190,6 +190,8 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         }
     }
 
+    public final static int TYPE_OPEN_FILE = 0;
+    public final static int TYPE_SAVE_FILE = 1;
     private final String DEFAULT_FOLDER_KEY = "DefaultFolder";
     private int m_max_open_file_length;
     private int m_type;
@@ -252,12 +254,12 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         m_folderView = findViewById(R.id.choose_file_dialog_folder);
         m_filenameEdit = findViewById(R.id.choose_file_dialog_filename);
 
-        if (m_type == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
+        if (m_type == TYPE_OPEN_FILE) {
             if (titleView != null) { titleView.setText(R.string.choose_file_dialog_open_title); }
             if (m_filenameEdit != null) { m_filenameEdit.setEnabled(false); }
             if (okButton != null) {
                 okButton.setText(R.string.choose_file_dialog_open_button); }
-        } else if (m_type == R.integer.MESSAGE_CHOOSE_SAVE_FILE) {
+        } else if (m_type == TYPE_SAVE_FILE) {
             if (titleView != null) { titleView.setText(R.string.choose_file_dialog_save_title); }
             if (m_filenameEdit != null) { m_filenameEdit.setEnabled(true); if (m_filename != null) { m_filenameEdit.setText(m_filename); } }
             if (okButton != null) {

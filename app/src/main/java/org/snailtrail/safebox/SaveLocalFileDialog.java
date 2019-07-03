@@ -4,13 +4,13 @@ import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
 import android.util.Base64;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+
+import androidx.core.content.ContextCompat;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,33 +22,26 @@ import java.io.IOException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
-import androidx.core.content.ContextCompat;
+import static org.snailtrail.safebox.ChooseFileDialog.TYPE_OPEN_FILE;
 
 public class SaveLocalFileDialog extends SaveItemDialog {
     private static final int MAX_FILE_LENGTH = 4096;
     private String m_pathname = "";
 
-    private Handler m_fileHandler = new Handler(Looper.getMainLooper()) {
-        @Override
-        public void handleMessage(Message msg) {
-            if (msg.what == R.integer.MESSAGE_CHOOSE_OPEN_FILE) {
-                ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) msg.obj;
+    SaveLocalFileDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
+        super(context, resource, uiHandler, publicKey, privateKey, itemInfo);
+    }
+
+    private void chooseOpenFile() {
+        new ChooseFileDialog(getContext(), new ChooseFileDialog.Callback() {
+            @Override
+            public void doFileOperation(int type, ChooseFileDialog.FileInfo fileInfo) {
                 setItemIconInfo(new IconListDialog.IconInfo(fileInfo.m_icon, fileInfo.m_type, fileInfo.m_type));
                 EditText filename = m_view.findViewById(R.id.save_local_file_filename);
                 filename.setText(fileInfo.m_filename);
                 m_pathname = fileInfo.m_pathname;
-            } else {
-                super.handleMessage(msg);
             }
-        }
-    };
-
-    public SaveLocalFileDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
-        super(context, resource, uiHandler, publicKey, privateKey, itemInfo);
-    }
-
-    public void chooseOpenFile() {
-        new ChooseFileDialog(getContext(), m_fileHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE, null, MAX_FILE_LENGTH).show();
+        }, TYPE_OPEN_FILE, null, MAX_FILE_LENGTH).show();
     }
 
     @Override
@@ -106,9 +99,7 @@ public class SaveLocalFileDialog extends SaveItemDialog {
 
         try {
             FileInputStream fileInputStream = new FileInputStream(new File(this.m_pathname));
-
-            while ((hasRead = fileInputStream.read(buff, hasRead, MAX_FILE_LENGTH-hasRead)) > 0);
-
+            do { hasRead = fileInputStream.read(buff, hasRead, MAX_FILE_LENGTH - hasRead); } while (hasRead > 0);
             fileInputStream.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();

@@ -4,9 +4,6 @@ import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
 import android.util.Base64;
 import android.view.View;
 import android.widget.Button;
@@ -21,10 +18,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.PrivateKey;
 
+import static org.snailtrail.safebox.ChooseFileDialog.TYPE_SAVE_FILE;
+
 public class ViewLocalFileDialog extends ViewItemDialog {
-    String m_fileName;
-    String m_fileContent;
-    public ViewLocalFileDialog(Context context, int resource, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
+    private String m_fileName;
+    private String m_fileContent;
+    ViewLocalFileDialog(Context context, int resource, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {
         super(context, resource, privateKey, itemInfo);
     }
 
@@ -57,36 +56,6 @@ public class ViewLocalFileDialog extends ViewItemDialog {
         }
     }
 
-    Handler m_handler = new Handler(Looper.getMainLooper()) {
-        @Override
-        public void handleMessage(Message msg) {
-            if (msg.what == R.integer.MESSAGE_CHOOSE_SAVE_FILE) {
-                String fileName = (String) msg.obj;
-
-                if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-                    File file = new File(fileName);
-                    FileOutputStream fileOutputStream = null;
-                    try {
-                        fileOutputStream = new FileOutputStream(file);
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
-                    if (fileOutputStream != null && m_fileContent != null) {
-                        try {
-                            fileOutputStream.write(Base64.decode(m_fileContent, Base64.DEFAULT));
-                            fileOutputStream.close();
-                            Utilities.jam(getContext(), R.string.view_item_prompt_download_ok);
-                            dismiss();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                } else {
-                }
-            }
-        }
-    };
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -98,7 +67,32 @@ public class ViewLocalFileDialog extends ViewItemDialog {
                 @Override
                 public void onClick(View v) {
                     if (v.getId() == R.id.view_item_download_button) {
-                        new ChooseFileDialog(getContext(), m_handler, R.integer.MESSAGE_CHOOSE_SAVE_FILE, m_fileName, 0).show();
+                        new ChooseFileDialog(getContext(), new ChooseFileDialog.Callback() {
+                            @Override
+                            public void doFileOperation(int type, ChooseFileDialog.FileInfo fileInfo) {
+                                String fileName = fileInfo.m_pathname;
+
+                                if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                                    File file = new File(fileName);
+                                    FileOutputStream fileOutputStream = null;
+                                    try {
+                                        fileOutputStream = new FileOutputStream(file);
+                                    } catch (FileNotFoundException e) {
+                                        e.printStackTrace();
+                                    }
+                                    if (fileOutputStream != null && m_fileContent != null) {
+                                        try {
+                                            fileOutputStream.write(Base64.decode(m_fileContent, Base64.DEFAULT));
+                                            fileOutputStream.close();
+                                            Utilities.jam(getContext(), R.string.view_item_prompt_download_ok);
+                                            dismiss();
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                }
+                            }
+                        }, TYPE_SAVE_FILE, m_fileName, 0).show();
                     }
                 }
             });

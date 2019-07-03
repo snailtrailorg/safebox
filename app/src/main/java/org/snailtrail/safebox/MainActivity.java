@@ -14,6 +14,7 @@ import android.provider.Settings;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -90,11 +91,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     case R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM:
                         new ViewGeneralAccountDialog(context, R.layout.view_general_account_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_CHOOSE_SAVE_FILE: {
+                    case R.integer.MESSAGE_BACKUP_DATABASE: {
                             SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
                             String database_content = sqliteOpenHelper.exportDatabase();
 
-                            String fileName = (String) message.obj;
+                            ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) (message.obj);
+                            String fileName = fileInfo.m_pathname;
 
                             if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
                                 File file = new File(fileName);
@@ -115,7 +117,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                             }
                         }
                         break;
-                    case R.integer.MESSAGE_CHOOSE_OPEN_FILE: {
+                    case R.integer.MESSAGE_RESTORE_DATABASE: {
                             ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) (message.obj);
                             if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
                                 File file = new File(fileInfo.m_pathname);
@@ -160,15 +162,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawer.addDrawerListener(toggle);
         toggle.syncState();
 
-        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+        NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
         SafeRecyclerView safeRecyclerView = findViewById(R.id.safe_recycle_view);
@@ -250,9 +252,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         return false;
     }
 
-    @SuppressWarnings("StatementWithEmptyBody")
     @Override
-    public boolean onNavigationItemSelected(MenuItem item) {
+    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
@@ -267,10 +268,20 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 }
                 break;
             case R.id.drawer_menu_item_backup:
-                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_SAVE_FILE, null, 0).show();
+                new ChooseFileDialog(this, new ChooseFileDialog.Callback() {
+                    @Override
+                    public void doFileOperation(int type, ChooseFileDialog.FileInfo fileInfo) {
+                        m_secureHandler.obtainMessage(type, fileInfo).sendToTarget();
+                    }
+                }, R.integer.MESSAGE_BACKUP_DATABASE, null, 0).show();
                 break;
             case R.id.drawer_menu_item_restore:
-                new ChooseFileDialog(this, m_secureHandler, R.integer.MESSAGE_CHOOSE_OPEN_FILE, null, 0).show();
+                new ChooseFileDialog(this, new ChooseFileDialog.Callback() {
+                    @Override
+                    public void doFileOperation(int type, ChooseFileDialog.FileInfo fileInfo) {
+                        m_secureHandler.obtainMessage(type, fileInfo).sendToTarget();
+                    }
+                }, R.integer.MESSAGE_RESTORE_DATABASE, null, 0).show();
                 break;
             case R.id.drawer_menu_item_change_password:
                 break;
@@ -279,7 +290,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             default:
         }
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
