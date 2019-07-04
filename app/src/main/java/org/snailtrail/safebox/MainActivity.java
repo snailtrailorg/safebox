@@ -366,6 +366,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         }
 
-        ActivityCompat.requestPermissions(this, new String[] { android.Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE }, getResources().getInteger(MESSAGE_REQUEST_PERMISSION));
+        ActivityCompat.requestPermissions(this, new String[] { android.Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE }, MESSAGE_REQUEST_PERMISSION);
     }
 }

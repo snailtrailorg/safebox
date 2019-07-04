@@ -126,8 +126,6 @@ public class SafeRecyclerView extends RecyclerView {
                     } else if (m_lastTranslateX > m_thresholdTranslationX) {
                         animateTranslation(m_selectedViewHolder, m_lastTranslateX, 0.0f, 3000.0f);
                         m_lastTranslateX = 0.0f;
-                    } else {
-
                     }
                 }
 

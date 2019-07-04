@@ -21,6 +21,8 @@ import android.widget.TextView;
 import java.security.KeyPair;
 import java.util.regex.Pattern;
 
+import static org.snailtrail.safebox.MainActivity.MESSAGE_DO_SIGN_IN;
+
 public class SignUpDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
     private Handler m_uiHandler;
     private View m_view;

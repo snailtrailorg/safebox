@@ -24,6 +24,8 @@ import java.lang.ref.WeakReference;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
+import static org.snailtrail.safebox.MainActivity.MESSAGE_LOAD_USER_ITEMS;
+
 public abstract class SaveItemDialog extends AlertDialog implements View.OnClickListener {
     public int m_resource;
     public Handler m_uiHandler;

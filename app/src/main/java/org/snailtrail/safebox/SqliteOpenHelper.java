@@ -1,32 +1,17 @@
 package org.snailtrail.safebox;
 
-import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.security.PublicKey;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
-import static android.database.Cursor.FIELD_TYPE_BLOB;
-import static android.database.Cursor.FIELD_TYPE_FLOAT;
-import static android.database.Cursor.FIELD_TYPE_INTEGER;
-import static android.database.Cursor.FIELD_TYPE_STRING;
 
 class SqliteOpenHelper extends SQLiteOpenHelper {
 
@@ -41,7 +26,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
     public void onCreate(SQLiteDatabase db) {
         String sql_create_user_table = "create table user (uid integer primary key autoincrement, email varchar(64), shadow varchar(256), rsapubkey varchar(4096), rsaprivkey varchar(8192))";
         db.execSQL(sql_create_user_table);
-        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid int, type int, icon varchar(256), name varchar(64), description varchar(128), data varchar(8192))";
+        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid int, type varchar(16), icon varchar(256), name varchar(64), description varchar(128), data varchar(8192))";
         db.execSQL(sql_create_item_table);
         String sql_create_log_table = "create table log (lid integer primary key autoincrement, content varchar(256), time timestamp);";
         db.execSQL(sql_create_log_table);
@@ -124,13 +109,13 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         values.put("rsapubkey", public_key);
         values.put("rsaprivkey", private_key);
 
-        long result = -1;
+        long result;
 
         if (uid == 0) {
             result = db.insert("user", null, values);
 
         } else {
-            result = db.update("user", values, "uid=?", new String[]{new Integer(uid).toString()});
+            result = db.update("user", values, "uid=?", new String[]{Integer.valueOf(uid).toString()});
         }
 
         db.close();
@@ -141,7 +126,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
     long removeUser(int uid) {
         SQLiteDatabase db = getWritableDatabase();
 
-        return db.delete("user", "uid=?", new String[]{new Integer(uid).toString()});
+        return db.delete("user", "uid=?", new String[]{Integer.valueOf(uid).toString()});
     }
 
     UserInfo getUserInfo(String email) {
@@ -204,12 +189,12 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         values.put("description", description);
         values.put("data", data);
 
-        long result = -1;
+        long result;
 
         if (did == 0) {
             result = db.insert("item", null, values);
         } else {
-            result = db.update("item", values, "did=?", new String[]{new Integer(did).toString()});
+            result = db.update("item", values, "did=?", new String[]{Integer.valueOf(did).toString()});
         }
 
         db.close();
@@ -219,7 +204,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
     ItemInfo getItemInfo(int did) {
         SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery("select * from item where did=?", new String[]{new Integer(did).toString()});
+        Cursor cursor = db.rawQuery("select * from item where did=?", new String[]{Integer.valueOf(did).toString()});
 
         if (cursor.moveToFirst()) {
             ItemInfo itemInfo = new ItemInfo();
@@ -247,7 +232,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
         SQLiteDatabase db = getWritableDatabase();
 
-        Cursor cursor = db.rawQuery("select * from item where uid=?", new String[]{new Integer(uid).toString()});
+        Cursor cursor = db.rawQuery("select * from item where uid=?", new String[]{Integer.valueOf(uid).toString()});
 
         while (cursor.moveToNext()) {
             ItemInfo itemInfo = new ItemInfo();
@@ -269,13 +254,13 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         return itemInfos;
     }
 
-    long removeItem(int did) {
+    int removeItem(int did) {
         SQLiteDatabase db = getWritableDatabase();
 
         return db.delete("item", "did=?", new String[]{new Integer(did).toString()});
     }
 
-    public String exportDatabase() {
+    String exportDatabase() {
         JSONObject database = new JSONObject();
         JSONArray userTable = new JSONArray();
         JSONArray itemTable = new JSONArray();
@@ -307,7 +292,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
             try {
                 jsonObject.put("did", cursor.getInt(cursor.getColumnIndex("did")));
                 jsonObject.put("uid", cursor.getInt(cursor.getColumnIndex("uid")));
-                jsonObject.put("type", cursor.getInt(cursor.getColumnIndex("type")));
+                jsonObject.put("type", cursor.getString(cursor.getColumnIndex("type")));
                 jsonObject.put("icon", cursor.getString(cursor.getColumnIndex("icon")));
                 jsonObject.put("name", cursor.getString(cursor.getColumnIndex("name")));
                 jsonObject.put("description", cursor.getString(cursor.getColumnIndex("description")));
@@ -332,12 +317,10 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         return database.toString();
     }
 
-    public void importDatabase (String source) {
-        JSONObject database = new JSONObject();
+    void importDatabase (String source) {
+        JSONObject database = null;
         JSONArray userTable = new JSONArray();
         JSONArray itemTable = new JSONArray();
-        UserInfo userInfo = null;
-        ItemInfo itemInfo = null;
         JSONObject jsonObject = null;
 
         try {
@@ -402,7 +385,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
                     try {
                         values.put("did", jsonObject.getInt("did"));
                         values.put("uid", jsonObject.getInt("uid"));
-                        values.put("type", jsonObject.getInt("type"));
+                        values.put("type", jsonObject.getString("type"));
                         values.put("icon", jsonObject.getString("icon"));
                         values.put("name", jsonObject.getString("name"));
                         values.put("description", jsonObject.getString("description"));

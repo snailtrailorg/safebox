@@ -11,17 +11,27 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
+import static org.snailtrail.safebox.MainActivity.ITEM_TYPE_ANDROID_APP;
+import static org.snailtrail.safebox.MainActivity.ITEM_TYPE_GENERAL_ACCOUNT;
+import static org.snailtrail.safebox.MainActivity.ITEM_TYPE_LOCAL_FILE;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_LOAD_USER_ITEMS;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_MODIFY_ANDROID_APP_ITEM;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_MODIFY_LOCAL_FILE_ITEM;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_VIEW_ANDROID_APP_ITEM;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_VIEW_LOCAL_FILE_ITEM;
+
 public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapter.SafeViewHolder> {
 
-    SafeRecyclerView m_safeRecyclerView;
-    MainActivity.SecureHandler m_uiHandler;
-    Context m_context;
-    List<SqliteOpenHelper.ItemInfo> m_itemInfos;
+    private SafeRecyclerView m_safeRecyclerView;
+    private MainActivity.SecureHandler m_uiHandler;
+    private Context m_context;
+    private List<SqliteOpenHelper.ItemInfo> m_itemInfos;
 
     SafeRecyclerAdapter(Context context, MainActivity.SecureHandler uiHandler, SafeRecyclerView safeRecyclerView) {
         m_context = context;
@@ -33,23 +43,23 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
 
     public void setContext(Context context) { m_context = context; }
 
-    public void loadItemInfos(int uid) {
+    void loadItemInfos(int uid) {
         SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(getContext());
         m_itemInfos = sqliteOpenHelper.getUserItemList(uid);
         notifyDataSetChanged();
     }
 
-    public static class SafeViewHolder extends RecyclerView.ViewHolder {
-        public View m_itemView;
-        public ImageView m_icon;
-        public TextView m_name;
-        public TextView m_description;
-        public View m_body;
-        public View m_delete;
-        public View m_modify;
-        public SqliteOpenHelper.ItemInfo m_itemInfo;
+    static class SafeViewHolder extends RecyclerView.ViewHolder {
+        View m_itemView;
+        ImageView m_icon;
+        TextView m_name;
+        TextView m_description;
+        View m_body;
+        View m_delete;
+        View m_modify;
+        SqliteOpenHelper.ItemInfo m_itemInfo;
 
-        public SafeViewHolder(@NonNull View itemView) {
+        SafeViewHolder(@NonNull View itemView) {
             super(itemView);
             m_itemView = itemView;
             m_itemView.setTag(this);

@@ -22,6 +22,10 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
 
+import static org.snailtrail.safebox.MainActivity.MESSAGE_DO_SIGN_UP;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_LOAD_USER_ITEMS;
+import static org.snailtrail.safebox.MainActivity.MESSAGE_SET_USER_INFO;
+
 public class SignInDialog extends AlertDialog implements View.OnClickListener, View.OnTouchListener {
     private Handler m_uiHandler;
     private View m_view;
