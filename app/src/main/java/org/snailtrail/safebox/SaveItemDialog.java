@@ -254,7 +254,7 @@ public abstract class SaveItemDialog extends AlertDialog implements View.OnClick
                     Utilities.showMessageBox(getContext(), R.string.error_dialog_title, R.string.save_item_result_error_upload_item_failed);
                     break;
                 case SAVE_ITEM_RESULT_SUCCESS:
-                    m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
+                    m_uiHandler.sendEmptyMessage(MESSAGE_LOAD_USER_ITEMS);
                     Utilities.jam(getContext(), R.string.save_item_result_success);
                     dismiss();
                     break;

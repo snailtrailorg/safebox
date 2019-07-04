@@ -36,6 +36,26 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+    public final static String ITEM_TYPE_ANDROID_APP = "android";
+    public final static String ITEM_TYPE_GENERAL_ACCOUNT = "account";
+    public final static String ITEM_TYPE_LOCAL_FILE = "file";
+
+    public final static int MESSAGE_DO_SIGN_IN = 100;
+    public final static int MESSAGE_DO_SIGN_UP = 200;
+    public final static int MESSAGE_SET_USER_INFO = 300;
+    public final static int MESSAGE_SET_USER_PUBLIC_KEY = 500;
+    public final static int MESSAGE_SET_USER_PRIVATE_KEY = 600;
+    public final static int MESSAGE_LOAD_USER_ITEMS = 700;
+    public final static int MESSAGE_MODIFY_ANDROID_APP_ITEM = 1100;
+    public final static int MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM = 1200;
+    public final static int MESSAGE_MODIFY_LOCAL_FILE_ITEM = 1300;
+    public final static int MESSAGE_VIEW_ANDROID_APP_ITEM = 1400;
+    public final static int MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM = 1500;
+    public final static int MESSAGE_VIEW_LOCAL_FILE_ITEM = 1600;
+    public final static int MESSAGE_REQUEST_PERMISSION = 1700;
+    public final static int MESSAGE_BACKUP_DATABASE = 1800;
+    public final static int MESSAGE_RESTORE_DATABASE = 1900;
+
     private static boolean m_isUserSignedIn;
     private static int m_signInUserId;
     private static String m_email;
@@ -59,39 +79,39 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
             if (mainActivity != null) {
                 switch (message.what) {
-                    case R.integer.MESSAGE_DO_SIGN_IN:
+                    case MESSAGE_DO_SIGN_IN:
                         mainActivity.doSignIn();
                         break;
-                    case R.integer.MESSAGE_DO_SIGN_UP:
+                    case MESSAGE_DO_SIGN_UP:
                         mainActivity.doSignUp();
                         break;
-                    case R.integer.MESSAGE_SET_USER_INFO:
+                    case MESSAGE_SET_USER_INFO:
                         SignInDialog.SignInMessageObject obj = (SignInDialog.SignInMessageObject) message.obj;
                         assert obj != null && obj.m_email != null && obj.m_publicKey != null && obj.m_privateKey != null;
                         mainActivity.setUserInfo(obj.m_uid, obj.m_email, obj.m_publicKey, obj.m_privateKey);
                         break;
-                    case R.integer.MESSAGE_LOAD_USER_ITEMS:
+                    case MESSAGE_LOAD_USER_ITEMS:
                         mainActivity.loadUserItems();
                         break;
-                    case R.integer.MESSAGE_MODIFY_ANDROID_APP_ITEM:
+                    case MESSAGE_MODIFY_ANDROID_APP_ITEM:
                         new SaveAndroidAppDialog(context, R.layout.save_android_app_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM:
+                    case MESSAGE_MODIFY_LOCAL_FILE_ITEM:
                         new SaveLocalFileDialog(context, R.layout.save_local_file_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
+                    case MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM:
                         new SaveGeneralAccountDialog(context, R.layout.save_general_account_dialog, this, m_publicKey, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_VIEW_ANDROID_APP_ITEM:
+                    case MESSAGE_VIEW_ANDROID_APP_ITEM:
                         new ViewAndroidAppDialog(context, R.layout.view_android_app_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_VIEW_LOCAL_FILE_ITEM:
+                    case MESSAGE_VIEW_LOCAL_FILE_ITEM:
                         new ViewLocalFileDialog(context, R.layout.view_local_file_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM:
+                    case MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM:
                         new ViewGeneralAccountDialog(context, R.layout.view_general_account_dialog, m_privateKey, (SqliteOpenHelper.ItemInfo)(message.obj)).show();
                         break;
-                    case R.integer.MESSAGE_BACKUP_DATABASE: {
+                    case MESSAGE_BACKUP_DATABASE: {
                             SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
                             String database_content = sqliteOpenHelper.exportDatabase();
 
@@ -117,7 +137,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                             }
                         }
                         break;
-                    case R.integer.MESSAGE_RESTORE_DATABASE: {
+                    case MESSAGE_RESTORE_DATABASE: {
                             ChooseFileDialog.FileInfo fileInfo = (ChooseFileDialog.FileInfo) (message.obj);
                             if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
                                 File file = new File(fileInfo.m_pathname);
@@ -143,7 +163,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                     SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
                                     sqliteOpenHelper.importDatabase(new String(buffer));
                                     Utilities.jam(context, R.string.restore_database_and_sign_in);
-                                    this.obtainMessage(R.integer.MESSAGE_DO_SIGN_IN).sendToTarget();
+                                    this.obtainMessage(MESSAGE_DO_SIGN_IN).sendToTarget();
                                 }
                             }
                         }
@@ -185,9 +205,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             public void run() {
                 int nUserCount = new SqliteOpenHelper(MainActivity.this).getUserCount();
                 if (nUserCount > 0) {
-                    m_secureHandler.obtainMessage(R.integer.MESSAGE_DO_SIGN_IN).sendToTarget();
+                    m_secureHandler.obtainMessage(MESSAGE_DO_SIGN_IN).sendToTarget();
                 } else {
-                    m_secureHandler.obtainMessage(R.integer.MESSAGE_DO_SIGN_UP).sendToTarget();
+                    m_secureHandler.obtainMessage(MESSAGE_DO_SIGN_UP).sendToTarget();
                 }
             }
         }).start();
@@ -230,17 +250,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             //noinspection SimplifiableIfStatement
             switch (menuItemId) {
                 case R.id.menu_item_add_android_app:
-                    itemInfo.m_type = R.integer.ITEM_TYPE_ANDROID_APP;
+                    itemInfo.m_type = ITEM_TYPE_ANDROID_APP;
                     new SaveAndroidAppDialog(this, R.layout.save_android_app_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
                     return true;
 
                 case R.id.menu_item_add_general_account:
-                    itemInfo.m_type = R.integer.ITEM_TYPE_GENERAL_ACCOUNT;
+                    itemInfo.m_type = ITEM_TYPE_GENERAL_ACCOUNT;
                     new SaveGeneralAccountDialog(this, R.layout.save_general_account_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
                     return true;
 
                 case R.id.menu_item_add_local_file:
-                    itemInfo.m_type = R.integer.ITEM_TYPE_LOCAL_FILE;
+                    itemInfo.m_type = ITEM_TYPE_LOCAL_FILE;
                     new SaveLocalFileDialog(this, R.layout.save_local_file_dialog, m_secureHandler, m_publicKey, m_privateKey, itemInfo).show();
                     return true;
 
@@ -271,17 +291,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 new ChooseFileDialog(this, new ChooseFileDialog.Callback() {
                     @Override
                     public void doFileOperation(int type, ChooseFileDialog.FileInfo fileInfo) {
-                        m_secureHandler.obtainMessage(type, fileInfo).sendToTarget();
+                        m_secureHandler.obtainMessage(MESSAGE_BACKUP_DATABASE, fileInfo).sendToTarget();
                     }
-                }, R.integer.MESSAGE_BACKUP_DATABASE, null, 0).show();
+                }, ChooseFileDialog.TYPE_SAVE_FILE, null, 0).show();
                 break;
             case R.id.drawer_menu_item_restore:
                 new ChooseFileDialog(this, new ChooseFileDialog.Callback() {
                     @Override
                     public void doFileOperation(int type, ChooseFileDialog.FileInfo fileInfo) {
-                        m_secureHandler.obtainMessage(type, fileInfo).sendToTarget();
+                        m_secureHandler.obtainMessage(MESSAGE_RESTORE_DATABASE, fileInfo).sendToTarget();
                     }
-                }, R.integer.MESSAGE_RESTORE_DATABASE, null, 0).show();
+                }, ChooseFileDialog.TYPE_OPEN_FILE, null, 0).show();
                 break;
             case R.id.drawer_menu_item_change_password:
                 break;
@@ -309,7 +329,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         m_publicKey = publicKey;
         m_privateKey = privateKey;
         m_isUserSignedIn = true;
-        m_secureHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
+        m_secureHandler.sendEmptyMessage(MESSAGE_LOAD_USER_ITEMS);
     }
 
     private void loadUserItems() {
@@ -346,6 +366,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         }
 
-        ActivityCompat.requestPermissions(this, new String[] { android.Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE }, getResources().getInteger(R.integer.MESSAGE_REQUEST_PERMISSION));
+        ActivityCompat.requestPermissions(this, new String[] { android.Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE }, getResources().getInteger(MESSAGE_REQUEST_PERMISSION));
     }
 }

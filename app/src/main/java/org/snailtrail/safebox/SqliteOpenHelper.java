@@ -169,7 +169,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
     static class ItemInfo {
         int m_did;
         int m_uid;
-        int m_type;
+        String m_type;
         String m_icon;
         String m_name;
         String m_description;
@@ -178,7 +178,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         public ItemInfo() {
         }
 
-        public ItemInfo(int did, int uid, int type, String icon, String name, String description, String data) {
+        public ItemInfo(int did, int uid, String type, String icon, String name, String description, String data) {
             this.m_did = did;
             this.m_uid = uid;
             this.m_type = type;
@@ -193,7 +193,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
         return saveItem(itemInfo.m_did, itemInfo.m_uid, itemInfo.m_type, itemInfo.m_icon, itemInfo.m_name, itemInfo.m_description, itemInfo.m_data);
     }
 
-    long saveItem(int did, int uid, int type, String icon, String name, String description, String data) {
+    long saveItem(int did, int uid, String type, String icon, String name, String description, String data) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
 
@@ -225,7 +225,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
             ItemInfo itemInfo = new ItemInfo();
             itemInfo.m_did = cursor.getInt(cursor.getColumnIndex("did"));
             itemInfo.m_uid = cursor.getInt(cursor.getColumnIndex("uid"));
-            itemInfo.m_type = cursor.getInt(cursor.getColumnIndex("type"));
+            itemInfo.m_type = cursor.getString(cursor.getColumnIndex("type"));
             itemInfo.m_icon = cursor.getString(cursor.getColumnIndex("icon"));
             itemInfo.m_name = cursor.getString(cursor.getColumnIndex("name"));
             itemInfo.m_description = cursor.getString(cursor.getColumnIndex("description"));
@@ -254,7 +254,7 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
             itemInfo.m_did = cursor.getInt(cursor.getColumnIndex("did"));
             itemInfo.m_uid = cursor.getInt(cursor.getColumnIndex("uid"));
-            itemInfo.m_type = cursor.getInt(cursor.getColumnIndex("type"));
+            itemInfo.m_type = cursor.getString(cursor.getColumnIndex("type"));
             itemInfo.m_icon = cursor.getString(cursor.getColumnIndex("icon"));
             itemInfo.m_name = cursor.getString(cursor.getColumnIndex("name"));
             itemInfo.m_description = cursor.getString(cursor.getColumnIndex("description"));

@@ -209,7 +209,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
 
     private void onClickSwitchSignIn(View view) {
         if (view.getId() == R.id.sign_up_switch_sign_in) {
-            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
+            m_uiHandler.sendEmptyMessage(MESSAGE_DO_SIGN_IN);
             dismiss();
         }
     }
@@ -297,7 +297,7 @@ public class SignUpDialog extends AlertDialog implements View.OnClickListener, V
 
             publishProgress(SIGN_UP_PROGRESS_FINISHED);
 
-            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_IN);
+            m_uiHandler.sendEmptyMessage(MESSAGE_DO_SIGN_IN);
 
             return SIGN_UP_RESULT_SUCCESS;
         }

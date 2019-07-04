@@ -28,7 +28,7 @@
     <string name="safe_list_item_description">Description…</string>
 
     <string name="sign_in_form_title">Sign in</string>
-    <string name="sign_in_prompt_email">Email saveress:</string>
+    <string name="sign_in_prompt_email">Email address:</string>
     <string name="sign_in_prompt_password">Password:</string>
     <string name="sign_in_prompt_switch_sign_up">Sign up a new account</string>
     <string name="sign_in_prompt_sign_in">Sign in</string>

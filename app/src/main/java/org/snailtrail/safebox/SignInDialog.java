@@ -100,7 +100,7 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
     }
 
     private void OnClickSwitchSignUp(View view) {
-        m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_DO_SIGN_UP);
+        m_uiHandler.sendEmptyMessage(MESSAGE_DO_SIGN_UP);
         dismiss();
     }
 
@@ -189,9 +189,9 @@ public class SignInDialog extends AlertDialog implements View.OnClickListener, V
 
             publishProgress(SIGN_IN_PROGRESS_FINISHED);
 
-            m_uiHandler.obtainMessage(R.integer.MESSAGE_SET_USER_INFO, new SignInMessageObject(userInfo.m_uid, userInfo.m_email, publicKey, privateKey)).sendToTarget();
+            m_uiHandler.obtainMessage(MESSAGE_SET_USER_INFO, new SignInMessageObject(userInfo.m_uid, userInfo.m_email, publicKey, privateKey)).sendToTarget();
 
-            m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
+            m_uiHandler.sendEmptyMessage(MESSAGE_LOAD_USER_ITEMS);
 
             return SIGN_IN_RESULT_SUCCESS;
         }

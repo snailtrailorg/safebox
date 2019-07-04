@@ -70,15 +70,15 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
         safeViewHolder.m_itemInfo = itemInfo;
 
         switch (itemInfo.m_type) {
-            case R.integer.ITEM_TYPE_ANDROID_APP:
+            case ITEM_TYPE_ANDROID_APP:
                 drawable = Utilities.getAndroidAppIcon(getContext(), itemInfo.m_icon);
                 break;
 
-            case R.integer.ITEM_TYPE_GENERAL_ACCOUNT:
+            case ITEM_TYPE_GENERAL_ACCOUNT:
                 drawable = Utilities.getGeneralAccountIcon(getContext(), itemInfo.m_icon);
                 break;
 
-            case R.integer.ITEM_TYPE_LOCAL_FILE:
+            case ITEM_TYPE_LOCAL_FILE:
                 drawable = Utilities.getLocalFileIcon(getContext(), itemInfo.m_icon);
                 break;
 
@@ -98,14 +98,14 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                 final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_safeRecyclerView.findContainingViewHolder(v);
                 if (holder != null) {
                     switch (holder.m_itemInfo.m_type) {
-                        case R.integer.ITEM_TYPE_ANDROID_APP:
-                            m_uiHandler.obtainMessage(R.integer.MESSAGE_VIEW_ANDROID_APP_ITEM, holder.m_itemInfo).sendToTarget();
+                        case ITEM_TYPE_ANDROID_APP:
+                            m_uiHandler.obtainMessage(MESSAGE_VIEW_ANDROID_APP_ITEM, holder.m_itemInfo).sendToTarget();
                             break;
-                        case R.integer.ITEM_TYPE_GENERAL_ACCOUNT:
-                            m_uiHandler.obtainMessage(R.integer.MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM, holder.m_itemInfo).sendToTarget();
+                        case ITEM_TYPE_GENERAL_ACCOUNT:
+                            m_uiHandler.obtainMessage(MESSAGE_VIEW_GENERAL_ACCOUNT_ITEM, holder.m_itemInfo).sendToTarget();
                             break;
-                        case R.integer.ITEM_TYPE_LOCAL_FILE:
-                            m_uiHandler.obtainMessage(R.integer.MESSAGE_VIEW_LOCAL_FILE_ITEM, holder.m_itemInfo).sendToTarget();
+                        case ITEM_TYPE_LOCAL_FILE:
+                            m_uiHandler.obtainMessage(MESSAGE_VIEW_LOCAL_FILE_ITEM, holder.m_itemInfo).sendToTarget();
                             break;
                         default:
                     }
@@ -128,7 +128,7 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                                 public void onClick(DialogInterface dialog, int which) {
                                     SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(getContext());
                                     sqliteOpenHelper.removeItem(holder.m_itemInfo.m_did);
-                                    m_uiHandler.sendEmptyMessage(R.integer.MESSAGE_LOAD_USER_ITEMS);
+                                    m_uiHandler.sendEmptyMessage(MESSAGE_LOAD_USER_ITEMS);
                                 }
                             })
                             .setNegativeButton(R.string.delete_item_confirm_dialog_button_cancel, new DialogInterface.OnClickListener() {
@@ -152,14 +152,14 @@ public class SafeRecyclerAdapter extends RecyclerView.Adapter<SafeRecyclerAdapte
                 final SafeViewHolder holder = (v == null) ? null : (SafeViewHolder) m_safeRecyclerView.findContainingViewHolder(v);
                 if (holder != null) {
                     switch (holder.m_itemInfo.m_type) {
-                        case R.integer.ITEM_TYPE_ANDROID_APP:
-                            m_uiHandler.obtainMessage(R.integer.MESSAGE_MODIFY_ANDROID_APP_ITEM, holder.m_itemInfo).sendToTarget();
+                        case ITEM_TYPE_ANDROID_APP:
+                            m_uiHandler.obtainMessage(MESSAGE_MODIFY_ANDROID_APP_ITEM, holder.m_itemInfo).sendToTarget();
                             break;
-                        case R.integer.ITEM_TYPE_GENERAL_ACCOUNT:
-                            m_uiHandler.obtainMessage(R.integer.MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM, holder.m_itemInfo).sendToTarget();
+                        case ITEM_TYPE_GENERAL_ACCOUNT:
+                            m_uiHandler.obtainMessage(MESSAGE_MODIFY_GENERAL_ACCOUNT_ITEM, holder.m_itemInfo).sendToTarget();
                             break;
-                        case R.integer.ITEM_TYPE_LOCAL_FILE:
-                            m_uiHandler.obtainMessage(R.integer.MESSAGE_MODIFY_LOCAL_FILE_ITEM, holder.m_itemInfo).sendToTarget();
+                        case ITEM_TYPE_LOCAL_FILE:
+                            m_uiHandler.obtainMessage(MESSAGE_MODIFY_LOCAL_FILE_ITEM, holder.m_itemInfo).sendToTarget();
                             break;
                         default:
                     }
