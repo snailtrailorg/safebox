@@ -24,11 +24,11 @@ class SqliteOpenHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String sql_create_user_table = "create table user (uid integer primary key autoincrement, email varchar(64), shadow varchar(256), rsapubkey varchar(4096), rsaprivkey varchar(8192))";
+        String sql_create_user_table = "create table user (uid integer primary key autoincrement, email text, shadow text, rsapubkey text, rsaprivkey text)";
         db.execSQL(sql_create_user_table);
-        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid int, type varchar(16), icon varchar(256), name varchar(64), description varchar(128), data varchar(8192))";
+        String sql_create_item_table = "create table item (did integer primary key autoincrement, uid integer, type text, icon text, name text, description text, data text)";
         db.execSQL(sql_create_item_table);
-        String sql_create_log_table = "create table log (lid integer primary key autoincrement, content varchar(256), time timestamp);";
+        String sql_create_log_table = "create table log (lid integer primary key autoincrement, content text, time timestamp);";
         db.execSQL(sql_create_log_table);
     }
 

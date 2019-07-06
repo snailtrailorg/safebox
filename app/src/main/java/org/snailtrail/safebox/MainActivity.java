@@ -133,6 +133,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                     } catch (IOException e) {
                                         e.printStackTrace();
                                     }
+
+                                    Utilities.jam(context, R.string.backup_database_success);
                                 }
                             }
                         }
@@ -162,7 +164,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 if (count == length) {
                                     SqliteOpenHelper sqliteOpenHelper = new SqliteOpenHelper(context);
                                     sqliteOpenHelper.importDatabase(new String(buffer));
-                                    Utilities.jam(context, R.string.restore_database_and_sign_in);
+                                    Utilities.jam(context, R.string.restore_database_success_and_sign_in);
                                     this.obtainMessage(MESSAGE_DO_SIGN_IN).sendToTarget();
                                 }
                             }
@@ -341,28 +343,31 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             if (ActivityCompat.shouldShowRequestPermissionRationale(this, android.Manifest.permission.READ_EXTERNAL_STORAGE)) {
 
                 new AlertDialog.Builder(this)
-                    .setTitle(R.string.permission_dialog_title)
-                    .setMessage(R.string.permission_dialog_message)
-                    .setIcon(R.mipmap.ic_launcher)
-                    .setCancelable(false)
-                    .setNegativeButton(R.string.permission_dialog_cancel_button, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) { dialog.dismiss(); }
-                    })
-                    .setPositiveButton(R.string.permission_dialog_setting_button, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            final Intent intent = new Intent();
-                            intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                            intent.addCategory(Intent.CATEGORY_DEFAULT);
-                            intent.setData(Uri.parse("package:" + getPackageName()));
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-                            startActivity(intent);
-                            dialog.dismiss();
-                        }
-                    }).create().show();
+                        .setTitle(R.string.permission_dialog_title)
+                        .setMessage(R.string.permission_dialog_message)
+                        .setIcon(R.mipmap.ic_launcher)
+                        .setCancelable(false)
+                        .setNegativeButton(R.string.permission_dialog_cancel_button, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                            }
+                        })
+                        .setPositiveButton(R.string.permission_dialog_setting_button, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                final Intent intent = new Intent();
+                                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                intent.addCategory(Intent.CATEGORY_DEFAULT);
+                                intent.setData(Uri.parse("package:" + getPackageName()));
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                                startActivity(intent);
+                                dialog.dismiss();
+                            }
+                        })
+                        .create().show();
             }
         }
 

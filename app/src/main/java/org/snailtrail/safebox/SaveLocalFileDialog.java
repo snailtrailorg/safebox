@@ -25,7 +25,7 @@ import java.security.PublicKey;
 import static org.snailtrail.safebox.ChooseFileDialog.TYPE_OPEN_FILE;
 
 public class SaveLocalFileDialog extends SaveItemDialog {
-    private static final int MAX_FILE_LENGTH = 4096;
+    private static final int MAX_FILE_LENGTH = 262144;
     private String m_pathname = "";
 
     SaveLocalFileDialog(Context context, int resource, Handler uiHandler, PublicKey publicKey, PrivateKey privateKey, SqliteOpenHelper.ItemInfo itemInfo) {

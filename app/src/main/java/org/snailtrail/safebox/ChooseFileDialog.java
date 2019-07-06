@@ -2,6 +2,7 @@ package org.snailtrail.safebox;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.database.DataSetObservable;
 import android.database.DataSetObserver;
@@ -93,6 +94,12 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
         return convertView;
     }
 
+    private void doSaveFileCallback(FileInfo fileInfo) {
+        m_callback.doFileOperation(m_type, m_fileInfos.get(m_selected));
+        setDefaultFolder(m_folder);
+        dismiss();
+    }
+
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
@@ -100,7 +107,7 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                 if (m_type == TYPE_OPEN_FILE) {
                     FileInfo fileInfo = m_fileInfos.get(m_selected);
                     File file = new File(fileInfo.m_pathname);
-                    if (m_max_open_file_length !=0 && file.length() > m_max_open_file_length) {
+                    if (m_max_open_file_length > 0 && file.length() > m_max_open_file_length) {
                         Utilities.showMessageBox(m_context, m_context.getString(R.string.error_dialog_title), String.format(getContext().getString(R.string.choose_save_file_error_file_too_large), m_max_open_file_length));
                     }else  if (file.exists() && file.isFile() && file.canRead()) {
                         m_callback.doFileOperation(m_type, m_fileInfos.get(m_selected));
@@ -115,24 +122,33 @@ public class ChooseFileDialog extends AlertDialog implements ListAdapter, Adapte
                     String pathname = m_folder + "/" + m_filename;
                     File folder = new File(m_folder);
                     File file = new File(pathname);
+                    final FileInfo fileInfo = new FileInfo(pathname, null, null, null, false);
+
                     if (!folder.canWrite()) {
                         Utilities.showMessageBox(m_context, R.string.error_dialog_title, R.string.choose_save_file_error_folder_cannot_write);
                     } else if (m_filename.equals("")) {
                         Utilities.showMessageBox(m_context, R.string.error_dialog_title, R.string.choose_save_file_error_empty_filename);
                     } else if (file.exists()) {
-                        Utilities.showMessageBox(m_context, R.string.error_dialog_title, R.string.choose_save_file_error_file_exist);
+                        new AlertDialog.Builder(m_context)
+                                .setTitle(R.string.error_dialog_title)
+                                .setMessage(R.string.choose_save_file_error_file_exist)
+                                .setCancelable(false)
+                                .setPositiveButton(R.string.error_dialog_button_ok, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        dialog.dismiss();
+                                        doSaveFileCallback(fileInfo);
+                                    }
+                                })
+                                .setNegativeButton(R.string.error_dialog_button_cancel, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        dialog.dismiss();
+                                    }
+                                })
+                                .create().show();
                     } else {
-                        try {
-                            if (file.createNewFile()) {
-                                //file.delete();
-                                m_callback.doFileOperation(m_type, m_fileInfos.get(m_selected));
-                                setDefaultFolder(m_folder);
-                                dismiss();
-                            }
-                        } catch (IOException e) {
-                            Utilities.showMessageBox(m_context, R.string.error_dialog_title, R.string.choose_save_file_error_create_file);
-                            e.printStackTrace();
-                        }
+                        doSaveFileCallback(fileInfo);
                     }
                 }
                 break;

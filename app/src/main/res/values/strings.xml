@@ -14,6 +14,7 @@
 
     <string name="error_dialog_title">Error</string>
     <string name="error_dialog_button_ok">OK</string>
+    <string name="error_dialog_button_cancel">Cancel</string>
 
     <string name="permission_dialog_title">Permission Required</string>
     <string name="permission_dialog_message">We need permissions to do stuff.\n Please allow.</string>
@@ -137,7 +138,7 @@
     <string name="choose_open_file_error">File doesn\'t exist, or is directory, or can\'t read.</string>
     <string name="choose_save_file_error_folder_cannot_write">Folder can not write.</string>
     <string name="choose_save_file_error_empty_filename">File name is empty.</string>
-    <string name="choose_save_file_error_file_exist">File exist.</string>
+    <string name="choose_save_file_error_file_exist">File exist, overwrite?</string>
     <string name="choose_save_file_error_create_file">Create file error.</string>
     <string name="choose_save_file_error_file_too_large">Selected file is larger than %d byte.</string>
 
@@ -150,7 +151,8 @@
     <string name="drawer_menu_group_title_system">System Settings</string>
     <string name="drawer_menu_item_change_password">Change password</string>
     <string name="drawer_menu_item_about">About SafeBox</string>
-    <string name="restore_database_and_sign_in">Resore success, please sign in</string>
+    <string name="backup_database_success">Backup database success.</string>
+    <string name="restore_database_success_and_sign_in">Restore success, please sign in</string>
 
 </resources>
 
