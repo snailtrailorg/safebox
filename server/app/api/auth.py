@@ -118,6 +118,7 @@ async def register_email(req: RegisterEmailRequest, db: AsyncSession = Depends(g
         phone=None,
         google_id=None,
         password=req.password_hash,
+        client_password_salt=req.password_salt,
         password_wrapped=req.password_wrapped,
         recovery_wrapped=req.recovery_wrapped,
         encrypted_private=req.encrypted_private,
@@ -145,6 +146,7 @@ async def register_phone(req: RegisterPhoneRequest, db: AsyncSession = Depends(g
     user = await create_user_with_keys(
         db=db, email=None, phone=req.phone, google_id=None,
         password=req.password_hash,
+        client_password_salt=req.password_salt,
         password_wrapped=req.password_wrapped,
         recovery_wrapped=req.recovery_wrapped,
         encrypted_private=req.encrypted_private,
@@ -173,6 +175,7 @@ async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends
     user = await create_user_with_keys(
         db=db, email=None, phone=None, google_id=google_id,
         password=req.password_hash,
+        client_password_salt=req.password_salt,
         password_wrapped=req.password_wrapped,
         recovery_wrapped=req.recovery_wrapped,
         encrypted_private=req.encrypted_private,
@@ -219,7 +222,7 @@ async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱或密码错误")
 
-    if not verify_password(req.password_hash, user.password_salt, user.password_hash):
+    if not verify_password(req.password_hash, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱或密码错误")
 
     return await _build_login_response(db, user)
@@ -235,7 +238,7 @@ async def login_phone(req: LoginPhoneRequest, db: AsyncSession = Depends(get_db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="手机号或密码错误")
 
-    if not verify_password(req.password_hash, user.password_salt, user.password_hash):
+    if not verify_password(req.password_hash, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="手机号或密码错误")
 
     return await _build_login_response(db, user)
@@ -272,9 +275,9 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
 
     # 更新密码哈希和 wrapped key
-    password_hash, password_salt = hash_password(req.new_password_hash)
+    password_hash = hash_password(req.new_password_hash)
     user.password_hash = password_hash
-    user.password_salt = password_salt
+    user.password_salt = req.new_password_salt
 
     keys = await get_user_keys(db, user.id)
     if keys:

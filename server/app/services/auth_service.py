@@ -14,17 +14,14 @@ from app.config import settings
 from app.models import Item, User, UserDevice, UserKeys
 
 
-def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
-    """PBKDF2-HMAC-SHA256 哈希密码。返回 (hash, salt)。"""
-    if salt is None:
-        salt = secrets.token_hex(16)
-    # passlib 的 pbkdf2_sha256 默认 100 万次迭代，对服务端 API 认证足够
-    h = pbkdf2_sha256.using(salt=salt.encode()).hash(password)
-    return h, salt
+def hash_password(password: str) -> str:
+    """PBKDF2-HMAC-SHA256 哈希密码。盐嵌入 hash 字符串中（passlib 标准格式）。"""
+    return pbkdf2_sha256.hash(password)
 
 
-def verify_password(password: str, salt: str, stored_hash: str) -> bool:
-    return pbkdf2_sha256.using(salt=salt.encode()).verify(password, stored_hash)
+def verify_password(password: str, stored_hash: str) -> bool:
+    """验证密码。盐从 stored_hash 中自动提取。"""
+    return pbkdf2_sha256.verify(password, stored_hash)
 
 
 def create_access_token(user_id: UUID) -> str:
@@ -88,6 +85,7 @@ async def create_user_with_keys(
     phone: str | None,
     google_id: str | None,
     password: str,
+    client_password_salt: str,
     password_wrapped: str,
     recovery_wrapped: str,
     encrypted_private: str,
@@ -96,14 +94,14 @@ async def create_user_with_keys(
     device_public_key: str,
     device_wrapped: str,
 ) -> User:
-    password_hash, password_salt = hash_password(password)
+    password_hash = hash_password(password)
 
     user = User(
         email=email,
         phone=phone,
         google_id=google_id,
         password_hash=password_hash,
-        password_salt=password_salt,
+        password_salt=client_password_salt,
     )
     db.add(user)
     await db.flush()
