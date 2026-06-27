@@ -11,3 +11,15 @@
 /build
 /captures
 .externalNativeBuild
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.env
+server/test.db
+
+# IDE
+.vscode/
+.idea/
