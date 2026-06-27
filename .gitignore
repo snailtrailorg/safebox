@@ -20,6 +20,10 @@ venv/
 .env
 server/test.db
 
+# Node
+node_modules/
+web/dist/
+
 # IDE
 .vscode/
 .idea/
