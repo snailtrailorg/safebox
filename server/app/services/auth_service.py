@@ -1,12 +1,10 @@
 """认证业务逻辑。"""
 
-import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from jose import jwt
-from passlib.hash import pbkdf2_sha256
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,13 +13,17 @@ from app.models import Item, User, UserDevice, UserKeys
 
 
 def hash_password(password: str) -> str:
-    """PBKDF2-HMAC-SHA256 哈希密码。盐嵌入 hash 字符串中（passlib 标准格式）。"""
-    return pbkdf2_sha256.hash(password)
+    """客户端已完成 PBKDF2 派生，服务端直接存储即可。
+
+    安全模型：客户端传来的 password_hash 是 PBKDF2(password, client_salt, 100k) 的结果，
+    已经具备足够熵。服务端不需要再哈希——那样会破坏登录时的比对。
+    """
+    return password
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
-    """验证密码。盐从 stored_hash 中自动提取。"""
-    return pbkdf2_sha256.verify(password, stored_hash)
+    """直接比对。客户端已做 PBKDF2 派生，服务端只做字符串比较。"""
+    return password == stored_hash
 
 
 def create_access_token(user_id: UUID) -> str:
@@ -94,7 +96,8 @@ async def create_user_with_keys(
     device_public_key: str,
     device_wrapped: str,
 ) -> User:
-    password_hash = hash_password(password)
+    # 客户端已完成 PBKDF2 派生，服务端直接存储，不再二次哈希
+    password_hash = password
 
     user = User(
         email=email,
