@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useVault } from "../../context/VaultContext";
@@ -14,6 +15,18 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
   const location = useLocation();
   const { logout } = useAuth();
   const { syncNow, isSyncing } = useVault();
+  const [offline, setOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const go = () => setOffline(true);
+    const back = () => setOffline(false);
+    window.addEventListener("offline", go);
+    window.addEventListener("online", back);
+    return () => {
+      window.removeEventListener("offline", go);
+      window.removeEventListener("online", back);
+    };
+  }, []);
 
   return (
     <div style={{
@@ -22,6 +35,14 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
       flexDirection: "column",
       background: "#f5f5f5",
     }}>
+      {offline && (
+        <div style={{
+          background: "#e74c3c", color: "#fff", textAlign: "center",
+          padding: "0.4rem", fontSize: "0.8rem", fontWeight: 500,
+        }}>
+          ⚠️ 网络已断开 — 数据将在恢复连接后自动同步
+        </div>
+      )}
       {/* 顶栏 */}
       <header style={{
         background: "linear-gradient(135deg, #1a1a2e, #16213e)",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
@@ -22,6 +22,19 @@ export function VaultListPage() {
   const { items, isLoading, error, deleteItem, clearError, syncNow, isSyncing } = useVault();
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
+  const fabRef = useRef<HTMLDivElement>(null);
+
+  // 点击 FAB 外部关闭菜单
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (fabRef.current && !fabRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const handleAdd = (type: ItemType) => {
     setMenuOpen(false);
@@ -105,7 +118,7 @@ export function VaultListPage() {
       )}
 
       {/* FAB */}
-      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 50 }}>
+      <div ref={fabRef} style={{ position: "fixed", bottom: 24, right: 24, zIndex: 50 }}>
         {menuOpen && (
           <div style={{
             position: "absolute", bottom: 60, right: 0,

@@ -57,15 +57,21 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 @router.get("/salt")
 async def get_salt(email: str | None = None, phone: str | None = None, db: AsyncSession = Depends(get_db)):
-    """获取用户密码 salt，用于客户端 PBKDF2 派生密钥。"""
+    """获取用户密码 salt，用于客户端 PBKDF2 派生密钥。
+
+    始终返回 200（即使用户不存在），防止用户枚举攻击。
+    """
     user = None
     if email:
         user = await find_user_by_email(db, email)
     elif phone:
         user = await find_user_by_phone(db, phone)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
-    return {"password_salt": user.password_salt}
+
+    if user:
+        return {"password_salt": user.password_salt}
+    # 用户不存在时返回随机 salt，防止枚举
+    import secrets
+    return {"password_salt": secrets.token_hex(16)}
 
 
 # ── 验证码 ──────────────────────────────────────────

@@ -47,5 +47,13 @@ export async function getDb(): Promise<IDBPDatabase<SafeBoxDB>> {
 
 /** 检测 IndexedDB 是否可用 */
 export function isIndexedDBAvailable(): boolean {
-  return typeof indexedDB !== "undefined";
+  try {
+    if (typeof indexedDB === "undefined") return false;
+    // 某些浏览器在无痕模式下会拒绝 open
+    const test = indexedDB.open("__test__", 1);
+    test.onblocked = () => {};
+    return true;
+  } catch {
+    return false;
+  }
 }

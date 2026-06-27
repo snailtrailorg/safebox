@@ -11,6 +11,34 @@ const TYPE_LABELS: Record<string, string> = {
   file: "本地文件",
 };
 
+function SensitiveField({ label, value }: { label: string; value: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div style={{
+      display: "flex", justifyContent: "space-between",
+      alignItems: "center", padding: "0.5rem 0",
+      borderBottom: "1px solid #f0f0f0",
+    }}>
+      <span style={{ fontSize: "0.85rem", color: "#666" }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <span style={{
+          fontSize: "0.95rem", fontWeight: 500, fontFamily: "monospace", color: "#333",
+          filter: visible ? "none" : "blur(5px)",
+          transition: "filter 0.15s",
+        }}>
+          {value}
+        </span>
+        <button
+          onClick={() => setVisible(!visible)}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", padding: "0.25rem" }}
+        >
+          {visible ? "🙈" : "👁️"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ItemDetailPage() {
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
@@ -137,18 +165,9 @@ export function ItemDetailPage() {
                 👆 按住查看敏感信息
               </button>
             ) : decryptedData ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{ display: "flex", flexDirection: "column" }}>
                 {Object.entries(decryptedData).map(([key, value]) => (
-                  <div key={key} style={{
-                    display: "flex", justifyContent: "space-between",
-                    alignItems: "center", padding: "0.5rem 0",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}>
-                    <span style={{ fontSize: "0.85rem", color: "#666" }}>{key}</span>
-                    <span style={{ fontSize: "0.95rem", fontWeight: 500, fontFamily: "monospace", color: "#333" }}>
-                      {value}
-                    </span>
-                  </div>
+                  <SensitiveField key={key} label={key} value={value} />
                 ))}
               </div>
             ) : null}

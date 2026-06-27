@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
@@ -202,25 +202,22 @@ export function ItemEditPage() {
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>密码</label>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input
-                    type="text"
-                    value={dataFields.password || ""}
-                    onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
-                    placeholder="密码"
-                    style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
-                  />
-                  <button
-                    onClick={() => handleGeneratePassword("password")}
-                    style={{
-                      padding: "0.5rem 0.75rem", background: "#3498db", color: "#fff",
-                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap",
-                    }}
-                  >
-                    🎲 生成
-                  </button>
-                </div>
+                <PasswordInput
+                  label="密码"
+                  value={dataFields.password || ""}
+                  onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
+                  placeholder="密码"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  onClick={() => handleGeneratePassword("password")}
+                  style={{
+                    padding: "0.5rem 0.75rem", background: "#3498db", color: "#fff",
+                    border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap",
+                  }}
+                >
+                  🎲 生成
+                </button>
               </div>
             </>
           )}
@@ -240,8 +237,8 @@ export function ItemEditPage() {
               <div style={{ marginBottom: "0.75rem" }}>
                 <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>密码</label>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input
-                    type="text"
+                  <PasswordInput
+                    label=""
                     value={dataFields.password || ""}
                     onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
                     placeholder="密码"

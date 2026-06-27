@@ -4,6 +4,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { keyManager } from "../services/keyManager";
 import { hasSession, clearSession, saveSession } from "../db/sessionStore";
+import { isIndexedDBAvailable } from "../db/database";
 import { apiClient } from "../services/api";
 
 interface AuthState {
@@ -11,6 +12,7 @@ interface AuthState {
   isUnlocked: boolean;
   isLoading: boolean;
   userId: string;
+  dbUnavailable: boolean;
 }
 
 interface AuthContextType extends AuthState {
@@ -28,16 +30,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isUnlocked: false,
     isLoading: true,
     userId: "",
+    dbUnavailable: false,
   });
 
   const checkSession = useCallback(async () => {
     setState((s) => ({ ...s, isLoading: true }));
+    if (!isIndexedDBAvailable()) {
+      setState({
+        isLoggedIn: false,
+        isUnlocked: false,
+        isLoading: false,
+        userId: "",
+        dbUnavailable: true,
+      });
+      return;
+    }
     const has = await hasSession();
     setState({
       isLoggedIn: has && keyManager.isUnlocked,
       isUnlocked: keyManager.isUnlocked,
       isLoading: false,
       userId: "",
+      dbUnavailable: false,
     });
   }, []);
 
@@ -48,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isUnlocked: true,
       isLoading: false,
       userId,
+      dbUnavailable: false,
     });
   }, []);
 
@@ -59,12 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isUnlocked: false,
       isLoading: false,
       userId: "",
+      dbUnavailable: false,
     });
   }, []);
 
   const lock = useCallback(() => {
     keyManager.lock();
-    setState((s) => ({ ...s, isUnlocked: false, isLoggedIn: false }));
+    setState((s) => ({ ...s, isUnlocked: false, isLoggedIn: false, dbUnavailable: false }));
   }, []);
 
   useEffect(() => {
