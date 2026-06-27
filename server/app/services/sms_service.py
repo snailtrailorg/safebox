@@ -1,36 +1,9 @@
-"""阿里云短信服务。"""
-
-import json
-import hmac
-import hashlib
-import base64
-import uuid
-from datetime import datetime, timezone
-from urllib.parse import urlencode
+"""Twilio 短信服务。"""
 
 import httpx
-
 from app.config import settings
 
-
-def _sign(secret: str, string_to_sign: str) -> str:
-    """HMAC-SHA1 签名并 Base64 编码。"""
-    h = hmac.new(f"{secret}&".encode(), string_to_sign.encode(), hashlib.sha1)
-    return base64.b64encode(h.digest()).decode()
-
-
-def _build_common_params() -> dict:
-    """构建阿里云短信 API 公共参数。"""
-    return {
-        "Format": "JSON",
-        "Version": "2017-05-25",
-        "AccessKeyId": settings.sms_access_key_id,
-        "SignatureMethod": "HMAC-SHA1",
-        "Timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "SignatureVersion": "1.0",
-        "SignatureNonce": str(uuid.uuid4()),
-        "RegionId": "cn-hangzhou",
-    }
+TWILIO_URL = "https://api.twilio.com/2010-04-01/Accounts"
 
 
 async def send_sms(phone: str, code: str) -> bool:
@@ -39,30 +12,23 @@ async def send_sms(phone: str, code: str) -> bool:
     Returns:
         True 如果发送成功。
     """
-    if not settings.sms_access_key_id:
+    if not settings.twilio_account_sid:
         print(f"[DEV] 短信未配置，验证码 {code} 应发送到 {phone}")
         return True
 
-    params = _build_common_params()
-    params.update({
-        "Action": "SendSms",
-        "PhoneNumbers": phone,
-        "SignName": settings.sms_sign_name,
-        "TemplateCode": settings.sms_template_code,
-        "TemplateParam": json.dumps({"code": code}),
-    })
+    # 确保号码有 + 前缀
+    if not phone.startswith("+"):
+        phone = f"+{phone}"
 
-    # 签名
-    sorted_params = sorted(params.items())
-    query_string = urlencode(sorted_params, safe="%-_.~")
-    string_to_sign = f"GET&%2F&{urlencode(query_string, safe='')}"
-    signature = _sign(settings.sms_access_key_secret, string_to_sign)
-    params["Signature"] = signature
+    url = f"{TWILIO_URL}/{settings.twilio_account_sid}/Messages.json"
+    auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+    body = {
+        "From": settings.twilio_phone_number,
+        "To": phone,
+        "Body": f"[SafeBox] 您的验证码为 {code}，{settings.verification_code_expire_seconds // 60} 分钟内有效。",
+    }
 
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://dysmsapi.aliyuncs.com/",
-            params=params,
-        )
+        resp = await client.post(url, data=body, auth=auth)
         data = resp.json()
-        return data.get("Code") == "OK"
+        return data.get("status") in ("queued", "sent", "delivered")

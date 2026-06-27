@@ -21,11 +21,10 @@ class Settings(BaseSettings):
     # Redis (验证码存储)
     redis_url: str = "redis://localhost:6379/0"
 
-    # SMS (阿里云)
-    sms_access_key_id: str = ""
-    sms_access_key_secret: str = ""
-    sms_sign_name: str = "SafeBox"
-    sms_template_code: str = ""
+    # SMS (Twilio)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""  # e.g. +1234567890
 
     # Email
     smtp_host: str = "smtp.example.com"
