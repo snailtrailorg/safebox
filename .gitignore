@@ -19,6 +19,7 @@ __pycache__/
 venv/
 .env
 server/test.db
+test.db
 
 # Node
 node_modules/
