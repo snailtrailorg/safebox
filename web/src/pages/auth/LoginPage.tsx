@@ -6,7 +6,7 @@ import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
 import { keyManager } from "../../services/keyManager";
 import { useAuth } from "../../context/AuthContext";
-import { getSession, saveSession } from "../../db/sessionStore";
+import { saveSession } from "../../db/sessionStore";
 import { deriveKeyHash } from "../../crypto/pbkdf2";
 import type { LoginResponse } from "../../types/api";
 
@@ -31,9 +31,8 @@ export function LoginPage() {
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
   const handleLoginResponse = async (response: LoginResponse) => {
-    // 恢复密钥
-    const { passwordSalt: salt, passwordWrapped: pwWrapped } = await getSession();
-    const actualSalt = salt || "";
+    // 使用服务端返回的 salt
+    const actualSalt = response.password_salt || "";
 
     if (tab === "email") {
       const ok = await keyManager.unlockWithPassword(password, actualSalt, response.password_wrapped ?? "");
@@ -65,21 +64,15 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const salt = await getSession().then(s => s.passwordSalt);
-
-      if (!salt) {
-        setToast({ message: "请先在已注册设备上登录，或使用恢复码", type: "error" });
-        setLoading(false);
-        return;
-      }
-
+      // 1. 从服务端获取 salt（新设备登录时本地没有）
+      const { password_salt: salt } = await apiClient.getSalt(email);
       const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
       const passwordHash = await deriveKeyHash(password, saltBytes);
       const response = await apiClient.loginEmail({ email, password_hash: passwordHash });
 
-      // 保存密钥材料
+      // 2. 保存密钥材料
       await saveSession({
-        passwordSalt: salt,
+        passwordSalt: response.password_salt,
         passwordWrapped: response.password_wrapped ?? "",
         recoveryWrapped: response.recovery_wrapped,
         encryptedPrivate: response.encrypted_private,
@@ -117,16 +110,12 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const salt = await getSession().then(s => s.passwordSalt);
-      if (!salt) {
-        setToast({ message: "请先在已注册设备上登录", type: "error" });
-        setLoading(false);
-        return;
-      }
+      const { password_salt: salt } = await apiClient.getSalt(undefined, phone);
       const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
       const passwordHash = await deriveKeyHash(phonePassword, saltBytes);
       const response = await apiClient.loginPhone({ phone, verification_code: code, password_hash: passwordHash });
       await saveSession({
+        passwordSalt: response.password_salt,
         passwordWrapped: response.password_wrapped ?? "",
         recoveryWrapped: response.recovery_wrapped,
         encryptedPrivate: response.encrypted_private,

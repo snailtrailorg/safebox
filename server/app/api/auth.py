@@ -53,6 +53,21 @@ from app.services.verification_service import (
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
+# ── 预登录 ──────────────────────────────────────────
+
+@router.get("/salt")
+async def get_salt(email: str | None = None, phone: str | None = None, db: AsyncSession = Depends(get_db)):
+    """获取用户密码 salt，用于客户端 PBKDF2 派生密钥。"""
+    user = None
+    if email:
+        user = await find_user_by_email(db, email)
+    elif phone:
+        user = await find_user_by_phone(db, phone)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    return {"password_salt": user.password_salt}
+
+
 # ── 验证码 ──────────────────────────────────────────
 
 @router.post("/send-code", response_model=SendCodeResponse)
@@ -179,6 +194,7 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
+        password_salt=user.password_salt,
         password_wrapped=keys.password_wrapped if keys else None,
         recovery_wrapped=keys.recovery_wrapped if keys else "",
         encrypted_private=keys.encrypted_private if keys else "",

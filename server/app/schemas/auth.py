@@ -84,6 +84,7 @@ class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     # 密钥材料（客户端用来解密 masterKey）
+    password_salt: str              # PBKDF2 salt，新设备登录时必需
     password_wrapped: str | None = None
     recovery_wrapped: str
     encrypted_private: str

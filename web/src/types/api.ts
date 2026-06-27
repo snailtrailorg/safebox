@@ -73,6 +73,7 @@ export interface DeviceInfo {
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;
+  password_salt: string;
   password_wrapped: string | null;
   recovery_wrapped: string;
   encrypted_private: string;
