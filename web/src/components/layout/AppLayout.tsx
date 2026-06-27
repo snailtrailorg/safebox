@@ -35,6 +35,19 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
         zIndex: 100,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {location.pathname !== "/" && (
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                background: "none", border: "none", color: "#fff",
+                fontSize: "1.2rem", cursor: "pointer", padding: 0,
+                lineHeight: 1,
+              }}
+              title="返回"
+            >
+              ←
+            </button>
+          )}
           <button
             onClick={() => navigate("/")}
             style={{
