@@ -56,7 +56,7 @@ class ApiClient {
       "Content-Type": "application/json",
     };
 
-    if (!skipAuth || path.includes("register-device")) {
+    if (!skipAuth || path.startsWith("/auth/register-device")) {
       const token = await getAccessToken();
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
