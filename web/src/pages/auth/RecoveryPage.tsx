@@ -6,6 +6,9 @@ import { Toast } from "../../components/ui/Toast";
 import { keyManager } from "../../services/keyManager";
 import { useAuth } from "../../context/AuthContext";
 import { getSession, saveSession } from "../../db/sessionStore";
+import { apiClient } from "../../services/api";
+import { generateSalt, deriveKeyHash, deriveKey } from "../../crypto/pbkdf2";
+import { aesEncrypt } from "../../crypto/aes";
 
 export function RecoveryPage() {
   const navigate = useNavigate();
@@ -47,17 +50,13 @@ export function RecoveryPage() {
 
       // 如果有新密码，重新生成密钥材料并更新
       if (newPassword && session.accessToken) {
-        const { generateSalt, deriveKeyHash } = await import("../../crypto/pbkdf2");
-        const { aesEncrypt, exportAesKey } = await import("../../crypto/aes");
         const newSalt = generateSalt();
-        const newDerivedKey = await (await import("../../crypto/pbkdf2")).deriveKey(newPassword, newSalt);
+        const newDerivedKey = await deriveKey(newPassword, newSalt);
         const masterRaw = await crypto.subtle.exportKey("raw", (keyManager as any).masterKey);
         const newPasswordWrapped = await aesEncrypt(newDerivedKey, new Uint8Array(masterRaw));
         const newPasswordHash = await deriveKeyHash(newPassword, newSalt);
         const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-        // 调用 reset-password API
-        const { apiClient } = await import("../../services/api");
         await apiClient.resetPassword({
           target: "email",
           value: "",

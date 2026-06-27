@@ -6,7 +6,8 @@ import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
 import { keyManager } from "../../services/keyManager";
 import { useAuth } from "../../context/AuthContext";
-import { saveSession } from "../../db/sessionStore";
+import { getSession, saveSession } from "../../db/sessionStore";
+import { deriveKeyHash } from "../../crypto/pbkdf2";
 import type { LoginResponse } from "../../types/api";
 
 type LoginTab = "email" | "phone";
@@ -31,7 +32,7 @@ export function LoginPage() {
 
   const handleLoginResponse = async (response: LoginResponse) => {
     // 恢复密钥
-    const { passwordSalt: salt, passwordWrapped: pwWrapped } = await import("../../db/sessionStore").then(m => m.getSession());
+    const { passwordSalt: salt, passwordWrapped: pwWrapped } = await getSession();
     const actualSalt = salt || "";
 
     if (tab === "email") {
@@ -64,8 +65,7 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const { deriveKeyHash } = await import("../../crypto/pbkdf2");
-      const salt = await import("../../db/sessionStore").then(m => m.getSession()).then(s => s.passwordSalt);
+      const salt = await getSession().then(s => s.passwordSalt);
 
       if (!salt) {
         setToast({ message: "请先在已注册设备上登录，或使用恢复码", type: "error" });
@@ -117,8 +117,7 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const { deriveKeyHash } = await import("../../crypto/pbkdf2");
-      const salt = await import("../../db/sessionStore").then(m => m.getSession()).then(s => s.passwordSalt);
+      const salt = await getSession().then(s => s.passwordSalt);
       if (!salt) {
         setToast({ message: "请先在已注册设备上登录", type: "error" });
         setLoading(false);
