@@ -1,8 +1,6 @@
-# SafeBox 后端本地调试指南
+# SafeBox 本地开发与调试指南
 
-## 前置条件
-
-在 Fedora 上安装 PostgreSQL 和 Redis：
+## 前置条件（Fedora）
 
 ```bash
 sudo dnf install -y postgresql-server postgresql redis
@@ -11,15 +9,13 @@ sudo dnf install -y postgresql-server postgresql redis
 ## 1. 初始化数据库
 
 ```bash
-# 初始化 PostgreSQL 数据目录
 sudo postgresql-setup --initdb
+sudo systemctl enable --now postgresql redis
 
-# 启动服务
-sudo systemctl start postgresql
-sudo systemctl start redis
-
-# 开机自启
-sudo systemctl enable postgresql redis
+# 修改 pg_hba.conf 允许密码认证
+sudo sed -i 's/^local\s\+all\s\+all\s\+peer/local   all             all                                     md5/' /var/lib/pgsql/data/pg_hba.conf
+sudo sed -i 's/^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+ident/host    all             all             127.0.0.1\/32            md5/' /var/lib/pgsql/data/pg_hba.conf
+sudo systemctl restart postgresql
 ```
 
 ## 2. 创建数据库和用户
@@ -34,60 +30,86 @@ GRANT ALL ON SCHEMA public TO safebox;
 SQL
 ```
 
-## 3. 验证连接
-
-```bash
-psql -h localhost -U safebox -d safebox -c "SELECT 1;"
-```
-
-如果提示 peer authentication failed，需要修改 `/var/lib/pgsql/data/pg_hba.conf`：
-
-```
-# 把 local all all peer 改为
-local   all             all                                     md5
-# 把 host all all 127.0.0.1/32 ident 改为
-host    all             all             127.0.0.1/32            md5
-```
-
-然后重启 PostgreSQL：
-
-```bash
-sudo systemctl restart postgresql
-```
-
-## 4. 配置环境变量
+## 3. 配置环境变量
 
 ```bash
 cd server/
-cp .env.example .env
-# 编辑 .env，填入实际的配置值
+cp docs/env.example .env
+# 编辑 .env，本地开发用默认值即可
 ```
 
-## 5. 运行数据库迁移
+## 4. 安装依赖 + 数据库迁移
 
 ```bash
 cd server/
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 alembic upgrade head
 ```
 
-## 6. 启动开发服务器
+## 5. 启动服务
 
 ```bash
-cd server/
-make dev
-# 或者: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 后端（两个终端窗口）
+cd server && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Web 前端
+cd web && npm install && npm run dev
 ```
 
-## 7. 运行测试
-
-```bash
-cd server/
-make test
-```
-
-## 8. API 文档
-
-启动后访问：
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- 前端: http://localhost:5173
+- 后端: http://localhost:8000
+- Swagger: http://localhost:8000/docs
 - 健康检查: http://localhost:8000/health
+
+Vite dev server 自动把 `/api/` 请求转发到后端 `localhost:8000`，不需要单独访问后端。
+
+## 6. 运行测试
+
+```bash
+# 后端
+cd server && make test
+
+# Web 前端
+cd web && npm test
+```
+
+## 7. 常见调试问题
+
+### 验证码怎么看？
+
+本地开发时 SMTP 未配置，发送验证码时会打印到 uvicorn 终端：
+```
+[DEV] 验证码 123456 应发送到 user@example.com
+```
+
+### 测试失败：注册返回 422
+
+测试里的注册请求缺少 `verification_code` 字段。schema 要求必填，即使测试也应该传 `"verification_code": "000000"`。
+
+### 验证码被消费但注册失败
+
+可能原因：RSA 密钥生成太慢导致超时（浏览器端 PBKDF2 100k 迭代 + RSA-4096 生成约 500ms-2s）。检查浏览器控制台和网络面板。
+
+### Web Crypto 跨平台兼容
+
+Web Crypto API 的 RSA-OAEP 分块大小必须与 Android `CryptoManager.kt` 一致（470 字节/块）。`web/src/__tests__/cross-platform.test.ts` 已验证字节级兼容。
+
+### 100k 次 PBKDF2 卡顿
+
+在浏览器中约 200-500ms，仅在登录/注册时执行一次。如需优化，可移到 Web Worker 避免阻塞主线程。
+
+## 8. API 调试
+
+Vite 配置了代理转发，所以前端 fetch `/api/v1/auth/...` 会自动到 `localhost:8000`。如果直接用 curl：
+
+```bash
+# 注册
+curl -X POST http://localhost:8000/api/v1/auth/register/email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","verification_code":"123456","password_hash":"h","password_salt":"s","password_wrapped":"w","recovery_wrapped":"r","encrypted_private":"e","rsa_public_key":"p"}'
+
+# 健康检查
+curl http://localhost:8000/health
+```
