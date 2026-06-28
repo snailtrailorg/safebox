@@ -15,3 +15,7 @@ export const RSA_CHUNK_SIZE = 446;
 export const RSA_DECRYPT_CHUNK = 512; // 解密分块
 
 export const DEVICE_KEY_ALIAS = "safebox_device_key";
+
+// Google OAuth — 在 Google Cloud Console 创建 Web 应用 OAuth 2.0 客户端 ID
+// https://console.cloud.google.com/apis/credentials
+export const GOOGLE_CLIENT_ID = "";  // 部署前填入
