@@ -4,8 +4,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
+import bcrypt
 from jose import jwt
-from passlib.hash import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,14 +17,13 @@ def hash_password(client_hash: str) -> str:
     """对客户端 PBKDF2 hash 做 bcrypt。
 
     客户端 PBKDF2 hash 是 32 字节 raw → base64 编码后 44 字符，远小于 bcrypt 72 字节限制。
-    注意：依赖 passlib 1.7.x + bcrypt 4.x，bcrypt 5.x 与 passlib 1.7.4 不兼容。
     """
-    return bcrypt.hash(client_hash)
+    return bcrypt.hashpw(client_hash.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(client_hash: str, stored_hash: str) -> bool:
     """验证客户端 hash 与服务端 bcrypt 是否匹配。"""
-    return bcrypt.verify(client_hash, stored_hash)
+    return bcrypt.checkpw(client_hash.encode(), stored_hash.encode())
 
 
 def create_access_token(user_id: UUID) -> str:
