@@ -46,7 +46,12 @@ export async function exportBackup(password: string): Promise<void> {
   const encrypted = await aesEncrypt(key, new TextEncoder().encode(plaintext));
 
   // 文件格式: salt(32字节) + base64(nonce+ciphertext)
-  const blob = new Blob([salt, encrypted!]);
+  const header = new Uint8Array(salt);
+  const body = new TextEncoder().encode(encrypted!);
+  const combined = new Uint8Array(header.length + body.length);
+  combined.set(header);
+  combined.set(body, header.length);
+  const blob = new Blob([combined], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
