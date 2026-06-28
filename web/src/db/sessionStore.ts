@@ -10,6 +10,7 @@ const EMPTY_SESSION: SessionData = {
   accessToken: "",
   refreshToken: "",
   serverUserId: "",
+  email: "",
   passwordSalt: "",
   passwordWrapped: "",
   recoveryWrapped: "",

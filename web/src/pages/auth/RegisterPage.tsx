@@ -54,6 +54,7 @@ export function RegisterPage() {
           device_wrapped: "web",
         });
         await saveSession({
+          email,
           passwordSalt: keys.passwordSalt,
           passwordWrapped: keys.passwordWrapped,
           recoveryWrapped: keys.recoveryWrapped,
@@ -73,6 +74,7 @@ export function RegisterPage() {
           rsa_public_key: keys.rsaPublicKey,
         } as any);
         await saveSession({
+          email: phone,
           passwordSalt: keys.passwordSalt,
           passwordWrapped: keys.passwordWrapped,
           recoveryWrapped: keys.recoveryWrapped,

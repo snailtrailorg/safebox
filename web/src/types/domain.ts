@@ -22,6 +22,7 @@ export interface SessionData {
   accessToken: string;
   refreshToken: string;
   serverUserId: string;
+  email: string;
   passwordSalt: string;
   passwordWrapped: string;
   recoveryWrapped: string;

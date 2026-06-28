@@ -72,6 +72,7 @@ export function LoginPage() {
 
       // 2. 保存密钥材料
       await saveSession({
+        email,
         passwordSalt: response.password_salt,
         passwordWrapped: response.password_wrapped ?? "",
         recoveryWrapped: response.recovery_wrapped,
