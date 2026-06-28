@@ -4,28 +4,17 @@ import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
 import { useAuth } from "../../context/AuthContext";
 import { useVault } from "../../context/VaultContext";
-import { keyManager } from "../../services/keyManager";
 
 export function SettingsPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { syncNow, isSyncing } = useVault();
-  const [showRecovery, setShowRecovery] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
   const handleLogout = async () => {
     if (!confirm("确定退出登录？密钥将从内存中清除。")) return;
     await logout();
     navigate("/login");
-  };
-
-  const handleViewRecovery = () => {
-    const code = keyManager.currentRecoveryCode;
-    if (code) {
-      setShowRecovery(true);
-    } else {
-      setToast({ message: "恢复码仅在注册时生成。请使用密码登录后在已注册设备上查看。", type: "info" });
-    }
   };
 
   return (
@@ -38,50 +27,16 @@ export function SettingsPage() {
         }}>
           <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>🔐 安全</h3>
 
-          <button
-            onClick={handleViewRecovery}
-            style={{
-              width: "100%", padding: "0.75rem", marginBottom: "0.5rem",
-              background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
-              cursor: "pointer", fontSize: "0.9rem", textAlign: "left",
-            }}
-          >
-            🔑 查看恢复码
-          </button>
-
-          {showRecovery && (
-            <div style={{
-              background: "#fff3cd", border: "1px solid #ffc107",
-              borderRadius: 8, padding: "1rem", marginBottom: "0.5rem",
-            }}>
-              <p style={{ fontSize: "0.8rem", color: "#856404", marginBottom: "0.5rem", fontWeight: 600 }}>
-                ⚠️ 请安全保存，不要分享给任何人
-              </p>
-              <div style={{
-                background: "#fff", border: "1px solid #ffc107",
-                borderRadius: 6, padding: "0.75rem",
-                fontFamily: "monospace", fontSize: "1rem", fontWeight: 700,
-                textAlign: "center", wordBreak: "break-word", color: "#333",
-              }}>
-                {keyManager.currentRecoveryCode}
-              </div>
-              <button
-                onClick={() => {
-                  if (keyManager.currentRecoveryCode) {
-                    navigator.clipboard.writeText(keyManager.currentRecoveryCode);
-                    setToast({ message: "已复制", type: "success" });
-                  }
-                }}
-                style={{
-                  width: "100%", padding: "0.4rem", marginTop: "0.5rem",
-                  background: "#ffc107", border: "none", borderRadius: 6,
-                  cursor: "pointer", fontSize: "0.85rem", color: "#333",
-                }}
-              >
-                📋 复制恢复码
-              </button>
-            </div>
-          )}
+          <div style={{
+            width: "100%", padding: "0.75rem", marginBottom: "0.5rem",
+            background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
+            fontSize: "0.85rem", color: "#666", lineHeight: 1.6,
+          }}>
+            <p style={{ margin: 0, fontWeight: 500, color: "#333" }}>🔑 恢复码</p>
+            <p style={{ margin: "0.25rem 0 0 0" }}>
+              恢复码仅在注册时显示一次，无法再次查看。如已丢失密码和恢复码，账号数据将永久无法恢复。
+            </p>
+          </div>
 
           <button
             onClick={() => setToast({ message: "自动锁定：5 分钟无操作", type: "info" })}

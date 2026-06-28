@@ -114,7 +114,10 @@ export function RegisterPage() {
           marginBottom: "1rem",
         }}>
           <p style={{ fontSize: "0.85rem", color: "#856404", marginBottom: "0.5rem", fontWeight: 600 }}>
-            ⚠️ 这是你恢复账号的唯一方式，请立即保存！
+            ⚠️ 恢复码仅在此时显示一次，关闭页面后无法再次查看！
+          </p>
+          <p style={{ fontSize: "0.8rem", color: "#856404", marginBottom: "0.75rem" }}>
+            请立即复制并保存在安全的地方（建议打印或手写）。丢失密码和恢复码将导致数据永久无法恢复。
           </p>
           <div style={{
             background: "#fff",
