@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
@@ -10,12 +10,14 @@ import { keyManager } from "../../services/keyManager";
 import { getSession, saveSession } from "../../db/sessionStore";
 import { deriveKeyHash, generateSalt, deriveKey } from "../../crypto/pbkdf2";
 import { aesEncrypt } from "../../crypto/aes";
+import { exportBackup, importBackup } from "../../utils/backup";
 
 export function SettingsPage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { syncNow, isSyncing } = useVault();
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 修改密码
   const [showChangePw, setShowChangePw] = useState(false);
@@ -111,6 +113,38 @@ export function SettingsPage() {
     } finally {
       setChanging(false);
     }
+  };
+
+  // ── 导出/导入 ────────────────────────────────────
+
+  const handleExport = async () => {
+    const pw = prompt("设置备份密码（用于加密备份文件）：");
+    if (!pw) return;
+    try {
+      await exportBackup(pw);
+      setToast({ message: "备份已下载", type: "success" });
+    } catch (e: any) {
+      setToast({ message: e.message || "导出失败", type: "error" });
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const pw = prompt("输入备份密码：");
+    if (!pw) return;
+    try {
+      const count = await importBackup(pw, file);
+      setToast({ message: `已导入 ${count} 条条目`, type: "success" });
+    } catch (e: any) {
+      setToast({ message: e.message || "导入失败", type: "error" });
+    }
+    // 重置 input 以允许重复导入同一文件
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -229,7 +263,7 @@ export function SettingsPage() {
           </button>
 
           <button
-            onClick={() => setToast({ message: "导出功能即将上线", type: "info" })}
+            onClick={handleExport}
             style={{
               width: "100%", padding: "0.75rem", marginBottom: "0.5rem",
               background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
@@ -239,8 +273,15 @@ export function SettingsPage() {
             📤 导出加密备份
           </button>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".safebox"
+            onChange={handleImportFile}
+            style={{ display: "none" }}
+          />
           <button
-            onClick={() => setToast({ message: "导入功能即将上线", type: "info" })}
+            onClick={handleImportClick}
             style={{
               width: "100%", padding: "0.75rem",
               background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
