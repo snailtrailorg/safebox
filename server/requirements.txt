@@ -6,7 +6,7 @@ alembic==1.14.0
 pydantic==2.10.3
 pydantic-settings==2.7.0
 python-jose[cryptography]==3.3.0
-# passlib[bcrypt]==1.7.4  # 已移除：客户端做 PBKDF2，服务端只做直接比对
+passlib[bcrypt]==1.7.4
 httpx==0.28.1
 google-auth==2.37.0
 google-api-python-client==2.154.0

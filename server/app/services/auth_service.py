@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from jose import jwt
+from passlib.hash import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,18 +13,18 @@ from app.config import settings
 from app.models import Item, User, UserDevice, UserKeys
 
 
-def hash_password(password: str) -> str:
-    """客户端已完成 PBKDF2 派生，服务端直接存储即可。
+def hash_password(client_hash: str) -> str:
+    """对客户端 PBKDF2 hash 再做 bcrypt。
 
-    安全模型：客户端传来的 password_hash 是 PBKDF2(password, client_salt, 100k) 的结果，
-    已经具备足够熵。服务端不需要再哈希——那样会破坏登录时的比对。
+    客户端已做 PBKDF2(password, client_salt, 100k) → client_hash。
+    服务端 bcrypt(client_hash) → 存数据库。两层哈希防止数据库泄露后离线暴力破解。
     """
-    return password
+    return bcrypt.hash(client_hash)
 
 
-def verify_password(password: str, stored_hash: str) -> bool:
-    """直接比对。客户端已做 PBKDF2 派生，服务端只做字符串比较。"""
-    return password == stored_hash
+def verify_password(client_hash: str, stored_bcrypt: str) -> bool:
+    """验证客户端 hash 与服务端 bcrypt 是否匹配。"""
+    return bcrypt.verify(client_hash, stored_bcrypt)
 
 
 def create_access_token(user_id: UUID) -> str:
@@ -96,8 +97,8 @@ async def create_user_with_keys(
     device_public_key: str,
     device_wrapped: str,
 ) -> User:
-    # 客户端已完成 PBKDF2 派生，服务端直接存储，不再二次哈希
-    password_hash = password
+    # 客户端 PBKDF2 hash → 服务端 bcrypt 再套一层
+    password_hash = hash_password(password)
 
     user = User(
         email=email,

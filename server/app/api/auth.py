@@ -37,6 +37,7 @@ from app.services.auth_service import (
     find_user_by_phone,
     get_user_devices,
     get_user_keys,
+    hash_password,
     verify_password,
 )
 from app.services.email_service import send_verification_email
@@ -274,7 +275,7 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
 
     # 更新密码哈希和 wrapped key
-    user.password_hash = req.new_password_hash
+    user.password_hash = hash_password(req.new_password_hash)
     user.password_salt = req.new_password_salt
 
     keys = await get_user_keys(db, user.id)
