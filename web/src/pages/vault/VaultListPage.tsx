@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
@@ -23,6 +23,10 @@ export function VaultListPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
+  const [swiping, setSwiping] = useState<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   // 点击 FAB 外部关闭菜单
   useEffect(() => {
@@ -35,6 +39,42 @@ export function VaultListPage() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
+
+  const handleTouchStart = (did: number, e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setSwiping(did);
+    setSwipeOffset(0);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (swiping === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    // 只响应横向滑动
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    setSwipeOffset(Math.min(0, dx));
+  };
+
+  const handleTouchEnd = useCallback(async (item: Item) => {
+    if (swipeOffset < -80) {
+      // 滑动超过 80px，触发删除
+      if (!item.did) return;
+      if (!confirm(`确定删除「${item.name}」？`)) {
+        setSwiping(null);
+        setSwipeOffset(0);
+        return;
+      }
+      try {
+        await deleteItem(item.did);
+        setToast({ message: "已删除", type: "success" });
+      } catch (e: any) {
+        setToast({ message: e.message || "删除失败", type: "error" });
+      }
+    }
+    setSwiping(null);
+    setSwipeOffset(0);
+  }, [swipeOffset, deleteItem]);
 
   const handleAdd = (type: ItemType) => {
     setMenuOpen(false);
@@ -69,49 +109,77 @@ export function VaultListPage() {
           {items.map((item) => (
             <div
               key={item.did}
-              onClick={() => navigate(`/item/${item.did}`)}
               style={{
-                background: "#fff",
+                position: "relative",
+                overflow: "hidden",
                 borderRadius: 10,
-                padding: "1rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                cursor: "pointer",
+                background: "#fff",
                 boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                transition: "box-shadow 0.2s",
               }}
-              onMouseOver={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)")}
-              onMouseOut={(e) => (e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)")}
             >
-              <span style={{ fontSize: "1.5rem" }}>{TYPE_ICONS[item.type] || "🔒"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {item.name}
-                </div>
-                {item.description && (
-                  <div style={{ fontSize: "0.8rem", color: "#999", marginTop: "0.15rem" }}>
-                    {item.description}
-                  </div>
-                )}
+              {/* 滑动删除背景 */}
+              <div style={{
+                position: "absolute",
+                top: 0, bottom: 0, right: 0, width: 80,
+                background: "#e74c3c",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontSize: "0.85rem", fontWeight: 500,
+                borderRadius: "0 10px 10px 0",
+              }}>
+                🗑️ 删除
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#aaa" }}>
-                {TYPE_LABELS[item.type]}
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(item);
+              <div
+                onClick={() => {
+                  if (swiping !== null) return;
+                  navigate(`/item/${item.did}`);
                 }}
+                onTouchStart={(e) => handleTouchStart(item.did!, e)}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={() => handleTouchEnd(item)}
                 style={{
-                  background: "none", border: "none", color: "#e74c3c",
-                  cursor: "pointer", fontSize: "0.85rem", padding: "0.25rem",
-                  opacity: 0.6,
+                  padding: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  cursor: "pointer",
+                  background: "#fff",
+                  borderRadius: 10,
+                  transform: swiping === item.did ? `translateX(${swipeOffset}px)` : "translateX(0)",
+                  transition: swiping === item.did ? "none" : "transform 0.2s",
+                  position: "relative",
+                  zIndex: 1,
+                  touchAction: "pan-y",
                 }}
-                title="删除"
               >
-                🗑️
-              </button>
+                <span style={{ fontSize: "1.5rem" }}>{TYPE_ICONS[item.type] || "🔒"}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.name}
+                  </div>
+                  {item.description && (
+                    <div style={{ fontSize: "0.8rem", color: "#999", marginTop: "0.15rem" }}>
+                      {item.description}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#aaa" }}>
+                  {TYPE_LABELS[item.type]}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(item);
+                  }}
+                  style={{
+                    background: "none", border: "none", color: "#e74c3c",
+                    cursor: "pointer", fontSize: "0.85rem", padding: "0.25rem",
+                    opacity: 0.6,
+                  }}
+                  title="删除"
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
           ))}
         </div>

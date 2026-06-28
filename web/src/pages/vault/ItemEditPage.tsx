@@ -235,14 +235,13 @@ export function ItemEditPage() {
                 />
               </div>
               <div style={{ marginBottom: "0.75rem" }}>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>密码</label>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <PasswordInput
-                    label=""
+                    label="密码"
                     value={dataFields.password || ""}
                     onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
                     placeholder="密码"
-                    style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
+                    style={{ flex: 1 }}
                   />
                   <button
                     onClick={() => handleGeneratePassword("password")}
