@@ -1,12 +1,11 @@
 """认证业务逻辑。"""
 
-import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from jose import jwt
-from passlib.hash import bcrypt_sha256
+from passlib.hash import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,20 +14,17 @@ from app.models import Item, User, UserDevice, UserKeys
 
 
 def hash_password(client_hash: str) -> str:
-    """对客户端 PBKDF2 hash 做 bcrypt_sha256。
+    """对客户端 PBKDF2 hash 做 bcrypt。
 
-    bcrypt_sha256 = SHA-256(client_hash) → bcrypt(sha256_result)。
-    好处：
-    - bcrypt 本身限制 72 字节，客户端 PBKDF2 hash 经 base64 编码后可能超过此限制
-    - SHA-256 先压缩到 32 字节，再 bcrypt，完全避开长度限制
-    - passlib 内置 bcrypt_sha256，与 bcrypt 5.x 兼容
+    客户端 PBKDF2 hash 是 32 字节 raw → base64 编码后 44 字符，远小于 bcrypt 72 字节限制。
+    注意：依赖 passlib 1.7.x + bcrypt 4.x，bcrypt 5.x 与 passlib 1.7.4 不兼容。
     """
-    return bcrypt_sha256.hash(client_hash)
+    return bcrypt.hash(client_hash)
 
 
 def verify_password(client_hash: str, stored_hash: str) -> bool:
-    """验证客户端 hash 与服务端 bcrypt_sha256 是否匹配。"""
-    return bcrypt_sha256.verify(client_hash, stored_hash)
+    """验证客户端 hash 与服务端 bcrypt 是否匹配。"""
+    return bcrypt.verify(client_hash, stored_hash)
 
 
 def create_access_token(user_id: UUID) -> str:
