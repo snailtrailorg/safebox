@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
-import { getItem, softDeleteItem } from "../../db/itemsStore";
+import { Toast } from "../../components/ui/Toast";
+import { getItem, softDeleteItem, getFileBlob } from "../../db/itemsStore";
 import { keyManager } from "../../services/keyManager";
 import type { Item } from "../../types/domain";
 
@@ -34,6 +35,12 @@ function SensitiveField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ItemDetailPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
@@ -42,6 +49,8 @@ export function ItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showSensitive, setShowSensitive] = useState(false);
   const [decryptedData, setDecryptedData] = useState<Record<string, string> | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
   const TYPE_LABELS: Record<string, string> = {
     android: t("vault.detail.typeAndroid"),
@@ -55,6 +64,13 @@ export function ItemDetailPage() {
       const found = await getItem(parseInt(did));
       setItem(found || null);
       setLoading(false);
+      // 文件类型：自动解密元数据
+      if (found?.type === "file" && found.data) {
+        try {
+          const plain = await keyManager.decryptItemData(found.data);
+          if (plain) setDecryptedData(JSON.parse(plain));
+        } catch { /* ignore */ }
+      }
     })();
   }, [did]);
 
@@ -83,6 +99,40 @@ export function ItemDetailPage() {
     if (!item?.did || !confirm(t("vault.detail.confirmDelete"))) return;
     await softDeleteItem(item.did);
     navigate("/");
+  };
+
+  const handleDownload = async () => {
+    if (!item?.did) return;
+    setDownloading(true);
+    try {
+      const blob = await getFileBlob(item.did);
+      if (!blob) {
+        setToast({ message: "文件数据不存在", type: "error" });
+        setDownloading(false);
+        return;
+      }
+      const decrypted = await keyManager.decryptFileBlob(blob.encryptedBlob);
+      if (!decrypted) {
+        setToast({ message: "文件解密失败", type: "error" });
+        setDownloading(false);
+        return;
+      }
+      const fileName = decryptedData?.fileName || "download";
+      const mimeType = decryptedData?.fileType || "application/octet-stream";
+      const downloadBlob = new Blob([decrypted], { type: mimeType });
+      const url = URL.createObjectURL(downloadBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setToast({ message: e.message || "下载失败", type: "error" });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (loading) {
@@ -139,7 +189,42 @@ export function ItemDetailPage() {
           </div>
         )}
 
-        {item.data && (
+        {/* 文件类型：文件信息 + 下载 */}
+        {item.type === "file" && decryptedData?.fileName && (
+          <div style={{
+            background: "#fff", borderRadius: 10, padding: "1.25rem",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          }}>
+            <div style={{ fontSize: "0.8rem", color: "#999", marginBottom: "0.5rem" }}>📁 {t("vault.detail.typeFile")}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "0.85rem", color: "#666" }}>{t("vault.detail.fileName")}</span>
+                <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#333" }}>{decryptedData.fileName}</span>
+              </div>
+              {decryptedData.fileSize && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#666" }}>{t("vault.detail.fileSize")}</span>
+                  <span style={{ fontSize: "0.9rem", color: "#555" }}>{formatFileSize(Number(decryptedData.fileSize))}</span>
+                </div>
+              )}
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                style={{
+                  width: "100%", padding: "0.6rem", marginTop: "0.25rem",
+                  background: downloading ? "#e0e0e0" : "#3498db", color: "#fff",
+                  border: "none", borderRadius: 6, fontSize: "0.9rem", fontWeight: 600,
+                  cursor: downloading ? "not-allowed" : "pointer",
+                }}
+              >
+                {downloading ? t("common.loading") : t("vault.detail.downloadFile")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 非文件类型：敏感数据 */}
+        {item.type !== "file" && item.data && (
           <div style={{
             background: "#fff", borderRadius: 10, padding: "1.25rem",
             boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
@@ -183,6 +268,7 @@ export function ItemDetailPage() {
           {t("vault.detail.deleteItem")}
         </button>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </AppLayout>
   );
 }

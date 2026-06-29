@@ -51,6 +51,8 @@ export async function softDeleteItem(did: number): Promise<void> {
       updatedAt: Date.now(),
     });
   }
+  // 级联删除关联的文件 blob
+  await deleteFileBlob(did);
 }
 
 /** 通过 serverId 软删除 */
@@ -89,6 +91,33 @@ export async function markSynced(
     });
   }
 }
+
+// ── 文件 Blob 操作 ────────────────────────────────
+
+/** 保存加密文件 blob */
+export async function saveFileBlob(
+  did: number,
+  encryptedBlob: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.put("fileBlobs", { did, encryptedBlob });
+}
+
+/** 获取加密文件 blob */
+export async function getFileBlob(
+  did: number,
+): Promise<{ encryptedBlob: string } | undefined> {
+  const db = await getDb();
+  return db.get("fileBlobs", did);
+}
+
+/** 删除文件 blob */
+export async function deleteFileBlob(did: number): Promise<void> {
+  const db = await getDb();
+  await db.delete("fileBlobs", did);
+}
+
+// ── 从服务器批量 upsert ────────────────────────────
 
 /** 从服务器批量 upsert */
 export async function upsertFromServer(

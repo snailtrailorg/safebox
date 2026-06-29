@@ -181,6 +181,25 @@ class KeyManager {
     return rsaDecrypt(this.rsaPrivateKey, encoded);
   }
 
+  // ── 文件加密/解密（AES-GCM，用于文件类型条目）─────
+
+  /** 加密文件内容，返回 Base64(nonce + ciphertext) */
+  async encryptFileBlob(plaintext: ArrayBuffer): Promise<string | null> {
+    if (!this.masterKey) return null;
+    return aesEncrypt(this.masterKey, new Uint8Array(plaintext));
+  }
+
+  /** 解密文件内容，返回原始 ArrayBuffer */
+  async decryptFileBlob(encoded: string): Promise<ArrayBuffer | null> {
+    if (!this.masterKey) return null;
+    const bytes = await aesDecrypt(this.masterKey, encoded);
+    if (!bytes) return null;
+    return (bytes.buffer as ArrayBuffer).slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    );
+  }
+
   // ── 锁定 ────────────────────────────────────────
 
   lock(): void {

@@ -10,12 +10,19 @@ export interface SafeBoxDB extends DBSchema {
     value: SessionData;
   };
   items: {
-    key: number;           // auto-increment (did)
+    key: number;
     value: Item;
     indexes: {
       "by-uid": number;
       "by-serverId": string;
       "by-dirty": number;
+    };
+  };
+  fileBlobs: {
+    key: number;
+    value: {
+      did: number;
+      encryptedBlob: string;  // Base64(nonce + ciphertext) from AES-GCM
     };
   };
 }
@@ -39,6 +46,10 @@ export async function getDb(): Promise<IDBPDatabase<SafeBoxDB>> {
         store.createIndex("by-uid", "uid");
         store.createIndex("by-serverId", "serverId");
         store.createIndex("by-dirty", "isDirty");
+      }
+      // File blobs store (AES-GCM encrypted file content)
+      if (!db.objectStoreNames.contains("fileBlobs")) {
+        db.createObjectStore("fileBlobs", { keyPath: "did" });
       }
     },
   });

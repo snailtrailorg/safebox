@@ -137,6 +137,9 @@
       "sensitive": "敏感信息",
       "holdToView": "👆 按住查看敏感信息",
       "deleteItem": "🗑️ 删除条目",
+      "fileName": "文件名",
+      "fileSize": "大小",
+      "downloadFile": "📥 下载文件",
       "confirmDelete": "确定删除？",
       "typeAndroid": "Android 应用",
       "typeAccount": "通用账户",
@@ -168,7 +171,10 @@
       "url": "网址",
       "urlPlaceholder": "https://example.com",
       "filePath": "文件路径",
-      "filePathPlaceholder": "/path/to/file"
+      "filePathPlaceholder": "/path/to/file",
+      "chooseFile": "选择文件…",
+      "fileSelected": "已选择: {name} ({size})",
+      "noFile": "请选择文件"
     }
   },
 
