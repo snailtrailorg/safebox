@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -28,8 +29,8 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "返回") } }
+                title = { Text(stringResource(R.string.settings_title)) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, stringResource(R.string.common_back)) } }
             )
         }
     ) { padding ->
@@ -39,51 +40,51 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
 
             // 安全
-            Text("安全", style = MaterialTheme.typography.labelMedium,
+            Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
 
             var showChangePassword by remember { mutableStateOf(false) }
             ListItem(
-                headlineContent = { Text("修改密码") },
+                headlineContent = { Text(stringResource(R.string.settings_item_change_password)) },
                 leadingContent = { Icon(Icons.Default.Lock, null) },
                 modifier = Modifier.clickable(onClick = { showChangePassword = true }),
             )
 
             ListItem(
-                headlineContent = { Text("查看恢复码") },
-                supportingContent = { Text("保存您的 12 词恢复码") },
+                headlineContent = { Text(stringResource(R.string.settings_item_view_recovery_code)) },
+                supportingContent = { Text(stringResource(R.string.settings_item_recovery_code_hint)) },
                 leadingContent = { Icon(Icons.Default.Key, null) },
             )
 
             var autoLockMinutes by remember { mutableIntStateOf(5) }
             ListItem(
-                headlineContent = { Text("自动锁定") },
-                supportingContent = { Text("${autoLockMinutes} 分钟无操作后自动锁定") },
+                headlineContent = { Text(stringResource(R.string.settings_item_auto_lock)) },
+                supportingContent = { Text(stringResource(R.string.settings_item_auto_lock_detail, autoLockMinutes)) },
                 leadingContent = { Icon(Icons.Default.Timer, null) },
             )
 
             Divider()
 
             // 数据
-            Text("数据", style = MaterialTheme.typography.labelMedium,
+            Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
 
             ListItem(
-                headlineContent = { Text("导出加密备份") },
+                headlineContent = { Text(stringResource(R.string.settings_item_export_backup)) },
                 leadingContent = { Icon(Icons.Default.Upload, null) },
             )
 
             ListItem(
-                headlineContent = { Text("导入备份") },
+                headlineContent = { Text(stringResource(R.string.settings_item_import_backup)) },
                 leadingContent = { Icon(Icons.Default.Download, null) },
             )
 
             ListItem(
-                headlineContent = { Text("立即同步") },
+                headlineContent = { Text(stringResource(R.string.settings_item_sync_now)) },
                 leadingContent = { Icon(Icons.Default.Sync, null) },
                 modifier = Modifier.clickable(onClick = { viewModel.syncNow() }),
             )
@@ -91,13 +92,13 @@ fun SettingsScreen(
             Divider()
 
             // 账户
-            Text("账户", style = MaterialTheme.typography.labelMedium,
+            Text(stringResource(R.string.settings_section_account), style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.primary,
             )
 
             ListItem(
-                headlineContent = { Text("退出登录") },
+                headlineContent = { Text(stringResource(R.string.settings_item_logout)) },
                 leadingContent = { Icon(Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.error) },
                 modifier = Modifier.clickable(onClick = { viewModel.logout() }),
             )

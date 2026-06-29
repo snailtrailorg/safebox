@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,14 +32,14 @@ fun VaultListScreen(
             TopAppBar(
                 title = { Text("SafeBox") },
                 actions = {
-                    IconButton(onClick = { viewModel.sync() }) { Icon(Icons.Default.Sync, "同步") }
-                    IconButton(onClick = onNavigateToSettings) { Icon(Icons.Default.Settings, "设置") }
+                    IconButton(onClick = { viewModel.sync() }) { Icon(Icons.Default.Sync, stringResource(R.string.common_sync)) }
+                    IconButton(onClick = onNavigateToSettings) { Icon(Icons.Default.Settings, stringResource(R.string.common_settings)) }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddMenu = true }) {
-                Icon(Icons.Default.Add, "添加")
+                Icon(Icons.Default.Add, stringResource(R.string.common_add))
             }
         }
     ) { padding ->
@@ -50,9 +51,9 @@ fun VaultListScreen(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("保险箱是空的", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.vault_empty_title), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("点击 + 添加您的第一条密码", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.vault_empty_hint), style = MaterialTheme.typography.bodySmall)
                 }
             } else {
                 LazyColumn(
@@ -87,17 +88,17 @@ fun VaultListScreen(
             // 下拉菜单选择添加类型
             DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Android 应用") },
+                    text = { Text(stringResource(R.string.vault_type_android)) },
                     onClick = { showAddMenu = false; onAddItem("android") },
                     leadingIcon = { Icon(Icons.Default.Android, null) },
                 )
                 DropdownMenuItem(
-                    text = { Text("通用账户") },
+                    text = { Text(stringResource(R.string.vault_type_account)) },
                     onClick = { showAddMenu = false; onAddItem("account") },
                     leadingIcon = { Icon(Icons.Default.AccountCircle, null) },
                 )
                 DropdownMenuItem(
-                    text = { Text("本地文件") },
+                    text = { Text(stringResource(R.string.vault_type_file)) },
                     onClick = { showAddMenu = false; onAddItem("file") },
                     leadingIcon = { Icon(Icons.Default.InsertDriveFile, null) },
                 )

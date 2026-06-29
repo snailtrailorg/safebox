@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -33,8 +34,8 @@ fun RegisterScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("注册") },
-                navigationIcon = { IconButton(onClick = onNavigateToLogin) { Icon(Icons.Default.ArrowBack, "返回") } }
+                title = { Text(stringResource(R.string.auth_register_title)) },
+                navigationIcon = { IconButton(onClick = onNavigateToLogin) { Icon(Icons.Default.ArrowBack, stringResource(R.string.common_back)) } }
             )
         }
     ) { padding ->
@@ -46,8 +47,8 @@ fun RegisterScreen(
 
             var selectedTab by remember { mutableIntStateOf(0) }
             TabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("邮箱") })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("手机号") })
+                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.auth_tab_email)) })
+                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.auth_tab_phone)) })
                 Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Google") })
             }
 
@@ -64,7 +65,7 @@ fun RegisterScreen(
                 0 -> {
                     OutlinedTextField(
                         value = email, onValueChange = { email = it },
-                        label = { Text("邮箱地址") },
+                        label = { Text(stringResource(R.string.auth_field_email_address)) },
                         leadingIcon = { Icon(Icons.Default.Email, null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -73,7 +74,7 @@ fun RegisterScreen(
                 1 -> {
                     OutlinedTextField(
                         value = phone, onValueChange = { phone = it },
-                        label = { Text("手机号") },
+                        label = { Text(stringResource(R.string.auth_field_phone)) },
                         leadingIcon = { Icon(Icons.Default.Phone, null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -82,14 +83,14 @@ fun RegisterScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = code, onValueChange = { code = it },
-                            label = { Text("验证码") },
+                            label = { Text(stringResource(R.string.auth_field_verification_code)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true, modifier = Modifier.weight(1f),
                         )
                         Button(
                             onClick = { viewModel.sendCode("phone", phone) },
                             enabled = phone.isNotBlank() && !state.isSendingCode,
-                        ) { Text(if (state.isSendingCode) "..." else "发送") }
+                        ) { Text(if (state.isSendingCode) "..." else stringResource(R.string.auth_button_send_code)) }
                     }
                 }
                 2 -> {
@@ -97,7 +98,7 @@ fun RegisterScreen(
                     OutlinedButton(
                         onClick = { viewModel.registerWithGoogle() },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
-                    ) { Text("使用 Google 账号注册") }
+                    ) { Text(stringResource(R.string.auth_button_google_register)) }
                 }
             }
 
@@ -105,7 +106,7 @@ fun RegisterScreen(
 
             OutlinedTextField(
                 value = password, onValueChange = { password = it },
-                label = { Text("设置密码") },
+                label = { Text(stringResource(R.string.auth_field_set_password)) },
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
                     IconButton(onClick = { showPassword = !showPassword }) {
@@ -115,19 +116,19 @@ fun RegisterScreen(
                 visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
-                supportingText = { Text("至少 8 位，包含数字和大写字母") },
+                supportingText = { Text(stringResource(R.string.auth_register_password_hint)) },
             )
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = confirmPassword, onValueChange = { confirmPassword = it },
-                label = { Text("确认密码") },
+                label = { Text(stringResource(R.string.auth_field_confirm_password)) },
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
                 isError = confirmPassword.isNotEmpty() && password != confirmPassword,
                 supportingText = {
-                    if (confirmPassword.isNotEmpty() && password != confirmPassword) Text("两次密码不一致")
+                    if (confirmPassword.isNotEmpty() && password != confirmPassword) Text(stringResource(R.string.auth_error_password_mismatch))
                 },
             )
 
@@ -153,7 +154,7 @@ fun RegisterScreen(
                 },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 enabled = canRegister && !state.isLoading,
-            ) { Text("注册") }
+            ) { Text(stringResource(R.string.auth_button_register)) }
 
             if (state.isLoading) {
                 Spacer(Modifier.height(8.dp))
@@ -167,7 +168,7 @@ fun RegisterScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            TextButton(onClick = onNavigateToLogin) { Text("已有账号？立即登录") }
+            TextButton(onClick = onNavigateToLogin) { Text(stringResource(R.string.auth_button_already_have_account)) }
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -179,17 +180,17 @@ fun RecoveryCodeCard(code: String, onAcknowledged: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text("⚠️ 恢复码", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.auth_recovery_code_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Text(
-                "这是您唯一的恢复凭证。如果忘记密码且丢失手机，这是找回数据的唯一方式。请立即抄写或截图保存。",
+                stringResource(R.string.auth_recovery_code_warning),
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(12.dp))
             Text(code, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(16.dp))
             Button(onClick = onAcknowledged, modifier = Modifier.fillMaxWidth()) {
-                Text("我已安全保存恢复码")
+                Text(stringResource(R.string.auth_button_recovery_code_saved))
             }
         }
     }

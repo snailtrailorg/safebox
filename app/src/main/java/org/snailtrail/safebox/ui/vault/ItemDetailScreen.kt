@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -27,10 +28,10 @@ fun ItemDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.item?.name ?: "条目详情") },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "返回") } },
+                title = { Text(state.item?.name ?: stringResource(R.string.detail_title_fallback)) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, stringResource(R.string.common_back)) } },
                 actions = {
-                    IconButton(onClick = onEditItem) { Icon(Icons.Default.Edit, "编辑") }
+                    IconButton(onClick = onEditItem) { Icon(Icons.Default.Edit, stringResource(R.string.common_edit)) }
                 }
             )
         }
@@ -41,7 +42,7 @@ fun ItemDetailScreen(
             }
         } else if (state.item == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("条目不存在或已被删除")
+                Text(stringResource(R.string.detail_error_not_found))
             }
         } else {
             val item = state.item!!
@@ -56,9 +57,9 @@ fun ItemDetailScreen(
                     label = {
                         Text(
                             when (item.type) {
-                                "android" -> "Android 应用"
-                                "account" -> "通用账户"
-                                "file" -> "本地文件"
+                                "android" -> stringResource(R.string.vault_type_android)
+                                "account" -> stringResource(R.string.vault_type_account)
+                                "file" -> stringResource(R.string.vault_type_file)
                                 else -> item.type
                             }
                         )
@@ -80,7 +81,7 @@ fun ItemDetailScreen(
 
                 OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("名称", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.detail_label_name), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(4.dp))
                         Text(item.name, style = MaterialTheme.typography.bodyLarge)
                     }
@@ -90,7 +91,7 @@ fun ItemDetailScreen(
                     Spacer(Modifier.height(12.dp))
                     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("描述", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.detail_label_description), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(4.dp))
                             Text(item.description!!, style = MaterialTheme.typography.bodyLarge)
                         }
@@ -103,8 +104,8 @@ fun ItemDetailScreen(
                     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("敏感信息", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                TextButton(onClick = { viewModel.hideData() }) { Text("隐藏") }
+                                Text(stringResource(R.string.detail_label_sensitive_data), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { viewModel.hideData() }) { Text(stringResource(R.string.detail_button_hide)) }
                             }
                             Spacer(Modifier.height(4.dp))
                             Text(state.decryptedData!!, style = MaterialTheme.typography.bodyLarge)
@@ -115,7 +116,7 @@ fun ItemDetailScreen(
                     Button(
                         onClick = { viewModel.showData() },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("按住查看敏感信息") }
+                    ) { Text(stringResource(R.string.detail_button_reveal)) }
                 }
 
                 Spacer(Modifier.height(24.dp))

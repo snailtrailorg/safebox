@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
@@ -13,62 +14,66 @@ import { aesEncrypt } from "../../crypto/aes";
 import { exportBackup, importBackup } from "../../utils/backup";
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { syncNow, isSyncing } = useVault();
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 修改密码
   const [showChangePw, setShowChangePw] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const handleLogout = async () => {
-    if (!confirm("确定退出登录？密钥将从内存中清除。")) return;
+    if (!confirm(t("settings.logoutConfirm"))) return;
     await logout();
     navigate("/login");
   };
 
   const handleSendVerifyCode = async () => {
     if (!currentPassword) {
-      setToast({ message: "请先输入当前密码", type: "error" });
+      setToast({ message: t("settings.enterCurrentPassword"), type: "error" });
       return;
     }
+    setSendingCode(true);
     try {
       const session = await getSession();
 
-      // 验证当前密码
       const ok = await keyManager.unlockWithPassword(currentPassword, session.passwordSalt, session.passwordWrapped);
       if (!ok) {
-        setToast({ message: "当前密码错误", type: "error" });
+        setToast({ message: t("settings.wrongPassword"), type: "error" });
         return;
       }
 
-      // 获取用户邮箱发送验证码
       const email = session.email || "";
       if (!email) {
-        setToast({ message: "无法获取邮箱", type: "error" });
+        setToast({ message: t("settings.noEmail"), type: "error" });
         return;
       }
       await apiClient.sendCode({ target: "email", value: email });
       setCodeSent(true);
-      setToast({ message: "验证码已发送到邮箱", type: "success" });
+      setToast({ message: t("settings.codeSent"), type: "success" });
     } catch (e: any) {
-      setToast({ message: e.message || "发送失败", type: "error" });
+      setToast({ message: e.message || t("settings.sendFailed"), type: "error" });
+    } finally {
+      setSendingCode(false);
     }
   };
 
   const handleChangePassword = async () => {
     if (!newPassword || !verifyCode) {
-      setToast({ message: "请输入新密码和验证码", type: "error" });
+      setToast({ message: t("settings.enterNewPwAndCode"), type: "error" });
       return;
     }
     if (newPassword.length < 8) {
-      setToast({ message: "密码至少 8 位", type: "error" });
+      setToast({ message: t("settings.passwordMinLength"), type: "error" });
       return;
     }
     setChanging(true);
@@ -76,17 +81,14 @@ export function SettingsPage() {
       const session = await getSession();
       const email = session.email || "";
 
-      // 重新派生密钥
       const newSalt = generateSalt();
       const newDerivedKey = await deriveKey(newPassword, newSalt);
       const newPasswordHash = await deriveKeyHash(newPassword, newSalt);
 
-      // 用新密钥重新包裹 masterKey
       const masterRaw = await crypto.subtle.exportKey("raw", (keyManager as any).masterKey);
       const newPasswordWrapped = await aesEncrypt(newDerivedKey, new Uint8Array(masterRaw));
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      // 调用 API
       await apiClient.resetPassword({
         target: "email",
         value: email,
@@ -96,35 +98,35 @@ export function SettingsPage() {
         new_password_wrapped: newPasswordWrapped,
       });
 
-      // 更新本地 session
       await saveSession({
         passwordSalt: saltBase64,
         passwordWrapped: newPasswordWrapped,
       });
 
-      setToast({ message: "密码已修改", type: "success" });
+      setToast({ message: t("settings.passwordChanged"), type: "success" });
       setShowChangePw(false);
       setCurrentPassword("");
       setNewPassword("");
       setVerifyCode("");
       setCodeSent(false);
     } catch (e: any) {
-      setToast({ message: e.message || "修改失败", type: "error" });
+      setToast({ message: e.message || t("settings.changeFailed"), type: "error" });
     } finally {
       setChanging(false);
     }
   };
 
-  // ── 导出/导入 ────────────────────────────────────
-
   const handleExport = async () => {
-    const pw = prompt("设置备份密码（用于加密备份文件）：");
+    const pw = prompt(t("settings.backupPasswordPrompt"));
     if (!pw) return;
+    setExporting(true);
     try {
       await exportBackup(pw);
-      setToast({ message: "备份已下载", type: "success" });
+      setToast({ message: t("settings.backupDownloaded"), type: "success" });
     } catch (e: any) {
-      setToast({ message: e.message || "导出失败", type: "error" });
+      setToast({ message: e.message || t("settings.exportFailed"), type: "error" });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -135,36 +137,37 @@ export function SettingsPage() {
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const pw = prompt("输入备份密码：");
+    const pw = prompt(t("settings.importPasswordPrompt"));
     if (!pw) return;
+    setImporting(true);
     try {
       const count = await importBackup(pw, file);
-      setToast({ message: `已导入 ${count} 条条目`, type: "success" });
+      setToast({ message: t("settings.imported", { count }), type: "success" });
     } catch (e: any) {
-      setToast({ message: e.message || "导入失败", type: "error" });
+      setToast({ message: e.message || t("settings.importFailed"), type: "error" });
+    } finally {
+      setImporting(false);
     }
-    // 重置 input 以允许重复导入同一文件
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
-    <AppLayout title="设置">
+    <AppLayout title={t("settings.title")}>
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {/* 安全 */}
         <section style={{
           background: "#fff", borderRadius: 10, padding: "1.25rem",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
-          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>🔐 安全</h3>
+          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>{t("settings.security")}</h3>
 
           <div style={{
             width: "100%", padding: "0.75rem", marginBottom: "0.5rem",
             background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
             fontSize: "0.85rem", color: "#666", lineHeight: 1.6,
           }}>
-            <p style={{ margin: 0, fontWeight: 500, color: "#333" }}>🔑 恢复码</p>
+            <p style={{ margin: 0, fontWeight: 500, color: "#333" }}>{t("settings.recoveryCode")}</p>
             <p style={{ margin: "0.25rem 0 0 0" }}>
-              恢复码仅在注册时显示一次，无法再次查看。如已丢失密码和恢复码，账号数据将永久无法恢复。
+              {t("settings.recoveryCodeNote")}
             </p>
           </div>
 
@@ -176,43 +179,43 @@ export function SettingsPage() {
               cursor: "pointer", fontSize: "0.9rem", textAlign: "left",
             }}
           >
-            🔒 修改密码
+            {t("settings.changePassword")}
           </button>
 
           {showChangePw && (
             <div style={{ marginBottom: "0.5rem" }}>
               <PasswordInput
-                label="当前密码"
+                label={t("settings.currentPassword")}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="输入当前密码"
+                placeholder={t("settings.currentPasswordPlaceholder")}
               />
               <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
                 <input
                   type="text"
                   value={verifyCode}
                   onChange={(e) => setVerifyCode(e.target.value)}
-                  placeholder="邮箱验证码"
+                  placeholder={t("settings.emailCodePlaceholder")}
                   maxLength={6}
                   style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
                 <button
                   onClick={handleSendVerifyCode}
-                  disabled={codeSent}
+                  disabled={sendingCode || codeSent}
                   style={{
                     padding: "0.5rem 0.75rem", background: codeSent ? "#27ae60" : "#3498db",
                     color: "#fff", border: "none", borderRadius: 6, cursor: "pointer",
                     fontSize: "0.85rem", whiteSpace: "nowrap",
                   }}
                 >
-                  {codeSent ? "已发送" : "发送验证码"}
+                  {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.login.sendCode")}
                 </button>
               </div>
               <PasswordInput
-                label="新密码"
+                label={t("settings.newPassword")}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="至少 8 位"
+                placeholder={t("settings.newPasswordPlaceholder")}
               />
               <button
                 onClick={handleChangePassword}
@@ -224,29 +227,28 @@ export function SettingsPage() {
                   cursor: changing ? "not-allowed" : "pointer",
                 }}
               >
-                {changing ? "修改中…" : "确认修改"}
+                {changing ? t("common.changing") : t("settings.confirmChange")}
               </button>
             </div>
           )}
 
           <button
-            onClick={() => setToast({ message: "自动锁定：5 分钟无操作", type: "info" })}
+            onClick={() => setToast({ message: t("settings.autoLockInfo"), type: "info" })}
             style={{
               width: "100%", padding: "0.75rem",
               background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
               cursor: "pointer", fontSize: "0.9rem", textAlign: "left",
             }}
           >
-            ⏱️ 自动锁定（5 分钟）
+            {t("settings.autoLock")}
           </button>
         </section>
 
-        {/* 数据 */}
         <section style={{
           background: "#fff", borderRadius: 10, padding: "1.25rem",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
-          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>💾 数据管理</h3>
+          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>{t("settings.dataManagement")}</h3>
 
           <button
             onClick={syncNow}
@@ -259,18 +261,19 @@ export function SettingsPage() {
               fontSize: "0.9rem", textAlign: "left",
             }}
           >
-            {isSyncing ? "⏳ 同步中…" : "🔄 立即同步"}
+            {isSyncing ? t("common.syncing") : t("settings.syncNow")}
           </button>
 
           <button
             onClick={handleExport}
+            disabled={exporting}
             style={{
               width: "100%", padding: "0.75rem", marginBottom: "0.5rem",
               background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
-              cursor: "pointer", fontSize: "0.9rem", textAlign: "left",
+              cursor: exporting ? "not-allowed" : "pointer", fontSize: "0.9rem", textAlign: "left",
             }}
           >
-            📤 导出加密备份
+            {exporting ? t("common.exporting") : t("settings.exportBackup")}
           </button>
 
           <input
@@ -282,22 +285,22 @@ export function SettingsPage() {
           />
           <button
             onClick={handleImportClick}
+            disabled={importing}
             style={{
               width: "100%", padding: "0.75rem",
               background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8,
-              cursor: "pointer", fontSize: "0.9rem", textAlign: "left",
+              cursor: importing ? "not-allowed" : "pointer", fontSize: "0.9rem", textAlign: "left",
             }}
           >
-            📥 导入备份
+            {importing ? t("common.importing") : t("settings.importBackup")}
           </button>
         </section>
 
-        {/* 账号 */}
         <section style={{
           background: "#fff", borderRadius: 10, padding: "1.25rem",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
-          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>👤 账号</h3>
+          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "#333", marginBottom: "1rem" }}>{t("settings.account")}</h3>
 
           <button
             onClick={handleLogout}
@@ -307,7 +310,7 @@ export function SettingsPage() {
               color: "#e74c3c", cursor: "pointer", fontSize: "0.9rem",
             }}
           >
-            🚪 退出登录
+            {t("settings.logout")}
           </button>
         </section>
       </div>

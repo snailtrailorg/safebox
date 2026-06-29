@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AuthLayout } from "../../components/layout/AuthLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
@@ -11,6 +12,7 @@ import { generateSalt, deriveKeyHash, deriveKey } from "../../crypto/pbkdf2";
 import { aesEncrypt } from "../../crypto/aes";
 
 export function RecoveryPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { login } = useAuth();
   const [recoveryCode, setRecoveryCode] = useState("");
@@ -20,35 +22,32 @@ export function RecoveryPage() {
 
   const handleRecover = async () => {
     if (!recoveryCode.trim()) {
-      setToast({ message: "请输入恢复码", type: "error" });
+      setToast({ message: t("auth.recovery.enterRecoveryCode"), type: "error" });
       return;
     }
     setLoading(true);
     try {
-      // 从 IndexedDB 读取 recoveryWrapped
       const session = await getSession();
       if (!session.recoveryWrapped) {
-        setToast({ message: "本地无密钥材料，请先在已注册设备上登录", type: "error" });
+        setToast({ message: t("auth.recovery.noLocalKeys"), type: "error" });
         setLoading(false);
         return;
       }
 
       const ok = await keyManager.unlockWithRecoveryCode(recoveryCode, session.recoveryWrapped);
       if (!ok) {
-        setToast({ message: "恢复码无效", type: "error" });
+        setToast({ message: t("auth.recovery.invalidCode"), type: "error" });
         setLoading(false);
         return;
       }
 
-      // 加载 RSA 密钥
       const rsaLoaded = await keyManager.loadRsaKeys(session.encryptedPrivate, session.rsaPublicKey);
       if (!rsaLoaded) {
-        setToast({ message: "密钥恢复失败", type: "error" });
+        setToast({ message: t("auth.recovery.recoveryFailed"), type: "error" });
         setLoading(false);
         return;
       }
 
-      // 如果有新密码，重新生成密钥材料并更新
       if (newPassword && session.accessToken) {
         const newSalt = generateSalt();
         const newDerivedKey = await deriveKey(newPassword, newSalt);
@@ -71,20 +70,20 @@ export function RecoveryPage() {
       await login(session.accessToken, session.refreshToken, session.serverUserId);
       navigate("/");
     } catch (e: any) {
-      setToast({ message: e.message || "恢复失败", type: "error" });
+      setToast({ message: e.message || t("auth.recovery.recoverFailed"), type: "error" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="恢复账号" subtitle="输入 12 词恢复码">
+    <AuthLayout title={t("auth.recovery.title")} subtitle={t("app.recoverAccount")}>
       <div style={{ marginBottom: "1rem" }}>
-        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>恢复码</label>
+        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.recovery.recoveryCodeLabel")}</label>
         <textarea
           value={recoveryCode}
           onChange={(e) => setRecoveryCode(e.target.value)}
-          placeholder="输入 12 个英文单词，用空格分隔"
+          placeholder={t("auth.recovery.recoveryCodePlaceholder")}
           rows={3}
           style={{
             width: "100%", padding: "0.6rem 0.75rem",
@@ -96,10 +95,10 @@ export function RecoveryPage() {
       </div>
 
       <PasswordInput
-        label="新密码（可选）"
+        label={t("auth.recovery.newPasswordLabel")}
         value={newPassword}
         onChange={(e) => setNewPassword(e.target.value)}
-        placeholder="留空则不修改密码"
+        placeholder={t("auth.recovery.newPasswordPlaceholder")}
       />
 
       <button
@@ -112,7 +111,7 @@ export function RecoveryPage() {
           cursor: loading ? "not-allowed" : "pointer",
         }}
       >
-        {loading ? "恢复中…" : "恢复账号"}
+        {loading ? t("common.recovering") : t("auth.recovery.submitBtn")}
       </button>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

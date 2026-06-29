@@ -29,6 +29,10 @@ import { getAccessToken, getRefreshToken, updateTokens, clearSession } from "../
 
 const API_BASE = "/api/v1";
 
+function getLang(): string {
+  return navigator.language.startsWith("zh") ? "zh" : "en";
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -54,6 +58,7 @@ class ApiClient {
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "Accept-Language": getLang(),
     };
 
     if (!skipAuth || path.startsWith("/auth/register-device")) {

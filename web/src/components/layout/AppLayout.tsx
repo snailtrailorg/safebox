@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { useVault } from "../../context/VaultContext";
 import type { ReactNode } from "react";
@@ -11,6 +12,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ title, children, actions }: AppLayoutProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
@@ -40,7 +42,7 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
           background: "#e74c3c", color: "#fff", textAlign: "center",
           padding: "0.4rem", fontSize: "0.8rem", fontWeight: 500,
         }}>
-          ⚠️ 网络已断开 — 数据将在恢复连接后自动同步
+          {t("appLayout.offline")}
         </div>
       )}
       {/* 顶栏 */}
@@ -101,7 +103,7 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
                 fontSize: "0.85rem",
               }}
             >
-              {isSyncing ? "同步中…" : "🔄 同步"}
+              {isSyncing ? t("common.syncing") : t("appLayout.sync")}
             </button>
           )}
           <button

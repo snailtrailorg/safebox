@@ -1,158 +1,118 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_bar_scrolling_view_behavior" translatable="false">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
+    <!-- App identity -->
     <string name="app_name">SafeBox</string>
-    <string name="navigation_drawer_open">Open navigation drawer</string>
-    <string name="navigation_drawer_close">Close navigation drawer</string>
-    <string name="nav_header_title">SafeBox Account Manager</string>
-    <string name="nav_header_subtitle">Powered by SnailTrail.ORG, 1984</string>
-    <string name="nav_header_desc">Navigation header</string>
 
-    <string name="menu_item_android_app">Android app</string>
-    <string name="menu_item_general_account">General account</string>
-    <string name="menu_item_local_file">Local file</string>
+    <!-- Common -->
+    <string name="common_back">Back</string>
+    <string name="common_save">Save</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_loading">Loading…</string>
+    <string name="common_syncing">Syncing…</string>
+    <string name="common_settings">Settings</string>
+    <string name="common_sync">Sync</string>
+    <string name="common_add">Add</string>
+    <string name="common_generate_password">Generate Password</string>
 
-    <string name="error_dialog_title">Error</string>
-    <string name="error_dialog_button_ok">OK</string>
-    <string name="error_dialog_button_cancel">Cancel</string>
+    <!-- Auth - Login -->
+    <string name="auth_login_subtitle">Encrypted Password Manager</string>
+    <string name="auth_tab_email">Email</string>
+    <string name="auth_tab_phone">Phone</string>
+    <string name="auth_tab_google">Google</string>
+    <string name="auth_field_email_address">Email Address</string>
+    <string name="auth_field_phone">Phone Number</string>
+    <string name="auth_field_password">Password</string>
+    <string name="auth_field_verification_code">Verification Code</string>
+    <string name="auth_field_set_password">Set Password</string>
+    <string name="auth_field_confirm_password">Confirm Password</string>
+    <string name="auth_field_recovery_code">Recovery Phrase</string>
+    <string name="auth_field_new_password">Set New Password</string>
+    <string name="auth_button_login">Sign In</string>
+    <string name="auth_button_register">Sign Up</string>
+    <string name="auth_button_send_code">Send</string>
+    <string name="auth_button_forgot_password">Forgot Password? Use Recovery Phrase</string>
+    <string name="auth_button_already_have_account">Already have an account? Sign In</string>
+    <string name="auth_button_google_login">Sign in with Google</string>
+    <string name="auth_button_google_register">Sign up with Google</string>
+    <string name="auth_button_recover_set_password">Recover &amp; Set New Password</string>
+    <string name="auth_button_recovery_code_saved">I Have Safely Saved the Recovery Phrase</string>
+    <string name="auth_register_title">Sign Up</string>
+    <string name="auth_register_password_hint">At least 8 characters, include a digit and uppercase letter</string>
+    <string name="auth_error_password_mismatch">Passwords do not match</string>
+    <string name="auth_recovery_title">Account Recovery</string>
+    <string name="auth_recovery_instructions_title">Enter Your 12 Recovery Words</string>
+    <string name="auth_recovery_instructions_detail">The recovery phrase consists of 12 English words generated during registration. Please enter them in order, separated by spaces.</string>
+    <string name="auth_recovery_code_title">⚠️ Recovery Phrase</string>
+    <string name="auth_recovery_code_warning">This is your only recovery credential. If you forget your password and lose your phone, this is the only way to recover your data. Please write it down or take a screenshot immediately.</string>
 
-    <string name="permission_dialog_title">Permission Required</string>
-    <string name="permission_dialog_message">We need permissions to do stuff.\n Please allow.</string>
-    <string name="permission_dialog_cancel_button">Cancel</string>
-    <string name="permission_dialog_setting_button">Setting</string>
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_security">Security</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_item_change_password">Change Password</string>
+    <string name="settings_item_view_recovery_code">View Recovery Phrase</string>
+    <string name="settings_item_recovery_code_hint">Save your 12-word recovery phrase</string>
+    <string name="settings_item_auto_lock">Auto-Lock</string>
+    <string name="settings_item_auto_lock_detail">Auto-lock after %d min of inactivity</string>
+    <string name="settings_item_export_backup">Export Encrypted Backup</string>
+    <string name="settings_item_import_backup">Import Backup</string>
+    <string name="settings_item_sync_now">Sync Now</string>
+    <string name="settings_item_logout">Sign Out</string>
 
-    <string name="safe_list_item_icon_content_description">Icon</string>
-    <string name="safe_list_item_more_content_description">More</string>
-    <string name="safe_list_item_modify_content_description">Modify</string>
-    <string name="safe_list_item_delete_content_description">Delete</string>
-    <string name="safe_list_item_name">Name…</string>
-    <string name="safe_list_item_description">Description…</string>
+    <!-- Vault -->
+    <string name="vault_empty_title">Vault is empty</string>
+    <string name="vault_empty_hint">Tap + to add your first password</string>
+    <string name="vault_type_android">Android App</string>
+    <string name="vault_type_account">Account</string>
+    <string name="vault_type_file">File</string>
 
-    <string name="sign_in_form_title">Sign in</string>
-    <string name="sign_in_prompt_email">Email address:</string>
-    <string name="sign_in_prompt_password">Password:</string>
-    <string name="sign_in_prompt_switch_sign_up">Sign up a new account</string>
-    <string name="sign_in_prompt_sign_in">Sign in</string>
-    <string name="sign_in_progress_title">Sign in processing…</string>
-    <string name="sign_in_progress_processing_message">Processing, please wait…</string>
+    <!-- Item Detail -->
+    <string name="detail_title_fallback">Item Details</string>
+    <string name="detail_error_not_found">Item does not exist or has been deleted</string>
+    <string name="detail_label_name">Name</string>
+    <string name="detail_label_description">Description</string>
+    <string name="detail_label_sensitive_data">Sensitive Data</string>
+    <string name="detail_button_hide">Hide</string>
+    <string name="detail_button_reveal">Hold to Reveal</string>
 
-    <string name="sign_in_progress_start">Start sign in, please wait…</string>
-    <string name="sign_in_progress_load_user_info">Loading user information…</string>
-    <string name="sign_in_progress_check_email">Checking email usability…</string>
-    <string name="sign_in_progress_check_password">Checking password…</string>
-    <string name="sign_in_progress_load_rsa_key">Loading rsa key pair…</string>
-    <string name="sign_in_progress_finish">Sign in finished.</string>
+    <!-- Item Edit -->
+    <string name="edit_title_edit">Edit Item</string>
+    <string name="edit_title_new">New Item</string>
+    <string name="edit_label_type">Type</string>
+    <string name="edit_type_chip_android">Android</string>
+    <string name="edit_type_chip_account">Account</string>
+    <string name="edit_type_chip_file">File</string>
+    <string name="edit_field_name">Name</string>
+    <string name="edit_field_description">Description</string>
+    <string name="edit_field_package_name">Package Name</string>
+    <string name="edit_field_username">Username</string>
+    <string name="edit_field_password">Password</string>
+    <string name="edit_field_username_email">Username/Email</string>
+    <string name="edit_field_url">URL (Optional)</string>
+    <string name="edit_field_file_path">File Path</string>
+    <string name="edit_button_save">Save</string>
 
-    <string name="sign_in_result_error_email_does_not_exist">The email saveress does not exist.</string>
-    <string name="sign_in_result_error_password_incorrect">Password incorrect, please check it and retry.</string>
-    <string name="sign_in_result_error_load_rsa_key_failed">Load rsa key failed unpredictably.</string>
-    <string name="sign_in_result_success">Sign in success.</string>
-
-    <string name="sign_up_form_title">Sign up</string>
-    <string name="sign_up_prompt_email">Your frequently used email:</string>
-    <string name="sign_up_prompt_password">Set your password:</string>
-    <string name="sign_up_prompt_retype_password">Retype your password:</string>
-    <string name="sign_up_prompt_switch_sign_in">Sign in an exist account</string>
-    <string name="sign_up_prompt_sign_up">Sign up</string>
-    <string name="sign_up_progress_title">Sign up processing…</string>
-    <string name="sign_up_progress_processing_message">Processing, please wait…</string>
-
-    <string name="sign_up_progress_start">Starting sign up, please wait…</string>
-    <string name="sign_up_progress_check_email">Checking email usability…</string>
-    <string name="sign_up_progress_calculate_digest">Calculating password digest…</string>
-    <string name="sign_up_progress_generate_rsa_key">Generating rsa key pair…</string>
-    <string name="sign_up_progress_create_account">Creating account…</string>
-    <string name="sign_up_progress_finish">Sign up finished.</string>
-
-    <string name="sign_up_result_error_invalid_email">Invalid email saveress, please check and correct it.</string>
-    <string name="sign_up_result_error_email_conflicted">The email saveress conflicted with an exist one, please use another and try again.</string>
-    <string name="sign_up_result_error_password_too_weak">The password you\'ve input is too weak, we strongly recommend that you should make it as strong as possible.\nYou should know that all your items stored in the safebox app and safebox cloud is based on this password, that is, if this password was leaked, all your items were leaked.</string>
-    <string name="sign_up_result_error_password_inconsistent">The passwords you\'ve entered are inconsistent, please make sure they are consistent.</string>
-    <string name="sign_up_result_error_calculate_digest_failed">Calculate digest failed unpredictably, it would be very appreciated to report this bug to the author.</string>
-    <string name="sign_up_result_error_generate_rsa_key_failed">Generate RSA key failed unpredictably, it would be very appreciated to report this bug to the author.</string>
-    <string name="sign_up_result_error_email_does_not_exist">Email saveress does not exist in account database, please check and correct it.</string>
-    <string name="sign_up_result_success">Sign up success.</string>
-
-    <string name="android_app_form_title">Android app</string>
-    <string name="general_account_form_title">General account</string>
-    <string name="local_file_form_title">Local file</string>
-
-    <string name="save_item_prompt_icon">Icon</string>
-    <string name="save_item_prompt_name">Name(plaintext):</string>
-    <string name="save_item_prompt_description">Description(plaintext):</string>
-
-    <string name="android_app_prompt_username">Username:</string>
-    <string name="android_app_prompt_password">Password:</string>
-    <string name="android_app_prompt_remarks">Remarks:</string>
-
-    <string name="general_account_prompt_website">Website(optional):</string>
-    <string name="general_account_prompt_username">Username/Card No.:</string>
-    <string name="general_account_prompt_password">Password/PIN:</string>
-    <string name="general_account_prompt_remarks">Remarks/Hint:</string>
-
-    <string name="local_file_prompt_pathname">Choose a File…</string>
-    <string name="local_file_prompt_browse">Browse…</string>
-    <string name="local_file_prompt_filename">File Name:</string>
-
-    <string name="save_item_prompt_save">Save…</string>
-    <string name="save_item_prompt_cancel">Cancel</string>
-
-    <string name="view_item_prompt_cancel">Cancel</string>
-    <string name="view_item_prompt_view">View</string>
-    <string name="view_item_prompt_download">Download</string>
-    <string name="view_item_prompt_download_ok">File download success.</string>
-    <string name="view_item_prompt_download_failed">File download failed.</string>
-
-    <string name="save_item_progress_title">Processing, please wait…</string>
-    <string name="save_item_progress_processing_message">Processing, please wait…</string>
-
-    <string name="save_item_progress_start">Starting process, please wait…</string>
-    <string name="save_item_progress_encrypt_data">Encrypting item data…</string>
-    <string name="save_item_progress_save_item">Saving item…</string>
-    <string name="save_item_progress_upload_item">Uploading item…</string>
-    <string name="save_item_progress_finish">Save item finished.</string>
-
-    <string name="save_item_result_error_encrypt_data_failed">Encrypt item data failed.</string>
-    <string name="save_item_result_error_save_item_failed">Save item failed.</string>
-    <string name="save_item_result_error_upload_item_failed">Upload item failed.</string>
-    <string name="save_item_result_success">Save item success.</string>
-
-    <string name="icon_list_dialog_title">Choose an icon</string>
-    <string name="android_app_icon_list_dialog_title">Choose an App</string>
-    <string name="icon_list_dialog_button_cancel">Cancel</string>
-
-    <string name="modify_item_failed_cannot_find_item">Cannot find item, modification failed.</string>
-    <string name="delete_item_failed_cannot_find_item">Cannot find item, deletion failed.</string>
-    <string name="delete_item_confirm_dialog_title">Delete this item?</string>
-    <string name="delete_item_confirm_dialog_button_ok">OK</string>
-    <string name="delete_item_confirm_dialog_button_cancel">Cancel</string>
-
-    <string name="choose_file_dialog_open_title">Open File</string>
-    <string name="choose_file_dialog_save_title">Save File</string>
-    <string name="choose_file_dialog_cancel_button">Cancel</string>
-    <string name="choose_file_dialog_open_button">Open</string>
-    <string name="choose_file_dialog_save_button">Save</string>
-    <string name="choose_file_dialog_initial_folder">\/sdcard</string>
-    <string name="choose_file_dialog_filename_prompt">File Name…</string>
-
-    <string name="choose_open_file_error">File doesn\'t exist, or is directory, or can\'t read.</string>
-    <string name="choose_save_file_error_folder_cannot_write">Folder can not write.</string>
-    <string name="choose_save_file_error_empty_filename">File name is empty.</string>
-    <string name="choose_save_file_error_file_exist">File exist, overwrite?</string>
-    <string name="choose_save_file_error_create_file">Create file error.</string>
-    <string name="choose_save_file_error_file_too_large">Selected file is larger than %d byte.</string>
-
-    <string name="icon_list_item_icon_content_description">Icon</string>
-
-    <string name="drawer_menu_group_title_database">Database Operation</string>
-    <string name="drawer_menu_item_synchronize">Sync with cloud</string>
-    <string name="drawer_menu_item_backup">Backup to file</string>
-    <string name="drawer_menu_item_restore">Restore from file</string>
-    <string name="drawer_menu_group_title_system">System Settings</string>
-    <string name="drawer_menu_item_change_password">Change password</string>
-    <string name="drawer_menu_item_about">About SafeBox</string>
-    <string name="backup_database_success">Backup database success.</string>
-    <string name="restore_database_success_and_sign_in">Restore success, please sign in</string>
-
+    <!-- Error Messages (AuthRepository + ViewModels) -->
+    <string name="error_send_code_failed">Failed to send verification code</string>
+    <string name="error_device_key_gen_failed">Failed to generate device key</string>
+    <string name="error_register_failed">Registration failed</string>
+    <string name="error_no_local_key_material_full">Local key material not found. Please use recovery phrase to sign in on a new device.</string>
+    <string name="error_no_local_key_material">Local key material not found</string>
+    <string name="error_device_key_unavailable">Device key unavailable</string>
+    <string name="error_device_key_not_found">Device key not found</string>
+    <string name="error_device_key_decrypt_failed">Device key decryption failed</string>
+    <string name="error_rsa_key_load_failed">Failed to load RSA keys</string>
+    <string name="error_google_login_failed">Google sign-in failed</string>
+    <string name="error_recovery_key_material_not_found">Recovery key material not found</string>
+    <string name="error_invalid_recovery_code">Invalid recovery phrase</string>
+    <string name="error_encrypted_private_key_not_found">Encrypted private key not found</string>
+    <string name="error_public_key_not_found">Public key not found</string>
+    <string name="error_server_no_key_material">Server did not return key material</string>
+    <string name="error_wrong_password">Incorrect password</string>
+    <string name="error_login_failed">Sign-in failed</string>
+    <string name="error_google_play_services">Google Sign-In requires Google Play Services</string>
+    <string name="error_phone_registration_todo">Phone registration not yet implemented</string>
 </resources>
-

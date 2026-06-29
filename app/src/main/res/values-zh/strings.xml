@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity -->
+    <string name="app_name">SafeBox</string>
+
+    <!-- Common -->
+    <string name="common_back">返回</string>
+    <string name="common_save">保存</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_delete">删除</string>
+    <string name="common_edit">编辑</string>
+    <string name="common_loading">加载中…</string>
+    <string name="common_syncing">同步中…</string>
+    <string name="common_settings">设置</string>
+    <string name="common_sync">同步</string>
+    <string name="common_add">添加</string>
+    <string name="common_generate_password">生成密码</string>
+
+    <!-- Auth - Login -->
+    <string name="auth_login_subtitle">加密密码管理器</string>
+    <string name="auth_tab_email">邮箱</string>
+    <string name="auth_tab_phone">手机号</string>
+    <string name="auth_tab_google">Google</string>
+    <string name="auth_field_email_address">邮箱地址</string>
+    <string name="auth_field_phone">手机号</string>
+    <string name="auth_field_password">密码</string>
+    <string name="auth_field_verification_code">验证码</string>
+    <string name="auth_field_set_password">设置密码</string>
+    <string name="auth_field_confirm_password">确认密码</string>
+    <string name="auth_field_recovery_code">恢复码</string>
+    <string name="auth_field_new_password">设置新密码</string>
+    <string name="auth_button_login">登录</string>
+    <string name="auth_button_register">注册</string>
+    <string name="auth_button_send_code">发送</string>
+    <string name="auth_button_forgot_password">忘记密码？使用恢复码</string>
+    <string name="auth_button_already_have_account">已有账号？立即登录</string>
+    <string name="auth_button_google_login">使用 Google 账号登录</string>
+    <string name="auth_button_google_register">使用 Google 账号注册</string>
+    <string name="auth_button_recover_set_password">恢复并设置新密码</string>
+    <string name="auth_button_recovery_code_saved">我已安全保存恢复码</string>
+    <string name="auth_register_title">注册</string>
+    <string name="auth_register_password_hint">至少 8 位，包含数字和大写字母</string>
+    <string name="auth_error_password_mismatch">两次密码不一致</string>
+    <string name="auth_recovery_title">恢复码找回</string>
+    <string name="auth_recovery_instructions_title">输入您保存的 12 个恢复词</string>
+    <string name="auth_recovery_instructions_detail">恢复码由注册时生成的 12 个英文单词组成，请按顺序输入，单词之间用空格分隔。</string>
+    <string name="auth_recovery_code_title">⚠️ 恢复码</string>
+    <string name="auth_recovery_code_warning">这是您唯一的恢复凭证。如果忘记密码且丢失手机，这是找回数据的唯一方式。请立即抄写或截图保存。</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_security">安全</string>
+    <string name="settings_section_data">数据</string>
+    <string name="settings_section_account">账户</string>
+    <string name="settings_item_change_password">修改密码</string>
+    <string name="settings_item_view_recovery_code">查看恢复码</string>
+    <string name="settings_item_recovery_code_hint">保存您的 12 词恢复码</string>
+    <string name="settings_item_auto_lock">自动锁定</string>
+    <string name="settings_item_auto_lock_detail">%d 分钟无操作后自动锁定</string>
+    <string name="settings_item_export_backup">导出加密备份</string>
+    <string name="settings_item_import_backup">导入备份</string>
+    <string name="settings_item_sync_now">立即同步</string>
+    <string name="settings_item_logout">退出登录</string>
+
+    <!-- Vault -->
+    <string name="vault_empty_title">保险箱是空的</string>
+    <string name="vault_empty_hint">点击 + 添加您的第一条密码</string>
+    <string name="vault_type_android">Android 应用</string>
+    <string name="vault_type_account">通用账户</string>
+    <string name="vault_type_file">文件</string>
+
+    <!-- Item Detail -->
+    <string name="detail_title_fallback">条目详情</string>
+    <string name="detail_error_not_found">条目不存在或已被删除</string>
+    <string name="detail_label_name">名称</string>
+    <string name="detail_label_description">描述</string>
+    <string name="detail_label_sensitive_data">敏感信息</string>
+    <string name="detail_button_hide">隐藏</string>
+    <string name="detail_button_reveal">按住查看敏感信息</string>
+
+    <!-- Item Edit -->
+    <string name="edit_title_edit">编辑条目</string>
+    <string name="edit_title_new">新建条目</string>
+    <string name="edit_label_type">类型</string>
+    <string name="edit_type_chip_android">Android</string>
+    <string name="edit_type_chip_account">账户</string>
+    <string name="edit_type_chip_file">文件</string>
+    <string name="edit_field_name">名称</string>
+    <string name="edit_field_description">描述</string>
+    <string name="edit_field_package_name">应用包名</string>
+    <string name="edit_field_username">用户名</string>
+    <string name="edit_field_password">密码</string>
+    <string name="edit_field_username_email">用户名/邮箱</string>
+    <string name="edit_field_url">网址 (可选)</string>
+    <string name="edit_field_file_path">文件路径</string>
+    <string name="edit_button_save">保存</string>
+
+    <!-- Error Messages (AuthRepository + ViewModels) -->
+    <string name="error_send_code_failed">发送验证码失败</string>
+    <string name="error_device_key_gen_failed">生成设备密钥失败</string>
+    <string name="error_register_failed">注册失败</string>
+    <string name="error_no_local_key_material_full">未找到本地密钥材料，请在新设备上使用恢复码登录</string>
+    <string name="error_no_local_key_material">未找到本地密钥材料</string>
+    <string name="error_device_key_unavailable">设备密钥不可用</string>
+    <string name="error_device_key_not_found">未找到设备密钥</string>
+    <string name="error_device_key_decrypt_failed">设备密钥解密失败</string>
+    <string name="error_rsa_key_load_failed">加载 RSA 密钥失败</string>
+    <string name="error_google_login_failed">Google 登录失败</string>
+    <string name="error_recovery_key_material_not_found">未找到恢复密钥材料</string>
+    <string name="error_invalid_recovery_code">恢复码无效</string>
+    <string name="error_encrypted_private_key_not_found">未找到加密私钥</string>
+    <string name="error_public_key_not_found">未找到公钥</string>
+    <string name="error_server_no_key_material">服务端未返回密钥材料</string>
+    <string name="error_wrong_password">密码错误</string>
+    <string name="error_login_failed">登录失败</string>
+    <string name="error_google_play_services">Google 登录需要 Google Play Services</string>
+    <string name="error_phone_registration_todo">手机号注册暂未实现</string>
+</resources>

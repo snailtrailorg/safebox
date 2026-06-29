@@ -1,9 +1,11 @@
 import { BrowserRouter } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { VaultProvider } from "./context/VaultContext";
 import { AppRoutes } from "./routes";
 
 function IndexedDBWarning() {
+  const { t } = useTranslation();
   const { dbUnavailable } = useAuth();
   if (!dbUnavailable) return null;
   return (
@@ -12,7 +14,7 @@ function IndexedDBWarning() {
       background: "#e74c3c", color: "#fff", textAlign: "center",
       padding: "0.75rem 1rem", fontSize: "0.9rem", fontWeight: 500,
     }}>
-      ⚠️ 此浏览器不支持本地存储（可能处于无痕模式），无法使用 SafeBox。
+      {t("app.indexeddbWarning")}
     </div>
   );
 }

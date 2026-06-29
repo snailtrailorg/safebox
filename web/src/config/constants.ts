@@ -18,4 +18,4 @@ export const DEVICE_KEY_ALIAS = "safebox_device_key";
 
 // Google OAuth — 在 Google Cloud Console 创建 Web 应用 OAuth 2.0 客户端 ID
 // https://console.cloud.google.com/apis/credentials
-export const GOOGLE_CLIENT_ID = "";  // 部署前填入
+export const GOOGLE_CLIENT_ID = "1081355276099-7vt4a4rbvshbf48ga4nj9vpitc6ap2tp.apps.googleusercontent.com";

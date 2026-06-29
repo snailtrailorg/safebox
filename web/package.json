@@ -11,9 +11,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "i18next": "^26.3.3",
     "idb": "^8.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-i18next": "^17.0.8",
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {

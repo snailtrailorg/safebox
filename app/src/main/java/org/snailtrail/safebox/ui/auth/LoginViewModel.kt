@@ -50,7 +50,7 @@ class LoginViewModel @Inject constructor(
             _state.value = _state.value.copy(isLoading = true, error = null)
             // Google OAuth 需要在 Activity 层启动 Google Sign-In intent
             // 这里先放占位
-            _state.value = _state.value.copy(error = "Google 登录需要 Google Play Services", isLoading = false)
+            _state.value = _state.value.copy(error = "Google Sign-In requires Google Play Services", isLoading = false)
         }
     }
 

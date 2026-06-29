@@ -50,7 +50,7 @@ class RegisterViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             // TODO: 实现手机号注册
-            _state.value = _state.value.copy(error = "手机号注册暂未实现", isLoading = false)
+            _state.value = _state.value.copy(error = "Phone registration not yet implemented", isLoading = false)
         }
     }
 

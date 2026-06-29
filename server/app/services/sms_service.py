@@ -2,12 +2,18 @@
 
 import httpx
 from app.config import settings
+from app.i18n import get_text
 
 TWILIO_URL = "https://api.twilio.com/2010-04-01/Accounts"
 
 
-async def send_sms(phone: str, code: str) -> bool:
+async def send_sms(phone: str, code: str, lang: str = "en") -> bool:
     """发送短信验证码。
+
+    Args:
+        phone: 收件人手机号
+        code: 验证码
+        lang: 语言代码 (zh/en)
 
     Returns:
         True 如果发送成功。
@@ -20,12 +26,13 @@ async def send_sms(phone: str, code: str) -> bool:
     if not phone.startswith("+"):
         phone = f"+{phone}"
 
+    minutes = settings.verification_code_expire_seconds // 60
     url = f"{TWILIO_URL}/{settings.twilio_account_sid}/Messages.json"
     auth = (settings.twilio_account_sid, settings.twilio_auth_token)
     body = {
         "From": settings.twilio_phone_number,
         "To": phone,
-        "Body": f"[SafeBox] 您的验证码为 {code}，{settings.verification_code_expire_seconds // 60} 分钟内有效。",
+        "Body": get_text("sms_body", lang, code=code, minutes=minutes),
     }
 
     async with httpx.AsyncClient() as client:

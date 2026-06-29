@@ -5,10 +5,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from app.config import settings
+from app.i18n import get_text
 
 
-async def send_verification_email(email: str, code: str) -> bool:
+async def send_verification_email(email: str, code: str, lang: str = "en") -> bool:
     """发送邮件验证码。
+
+    Args:
+        email: 收件人邮箱
+        code: 验证码
+        lang: 语言代码 (zh/en)
 
     Returns:
         True 如果发送成功。
@@ -17,24 +23,25 @@ async def send_verification_email(email: str, code: str) -> bool:
         print(f"[DEV] 邮件未配置，验证码 {code} 应发送到 {email}")
         return True
 
+    minutes = settings.verification_code_expire_seconds // 60
     msg = MIMEMultipart()
     msg["From"] = settings.smtp_from
     msg["To"] = email
-    msg["Subject"] = "SafeBox 验证码"
+    msg["Subject"] = get_text("email_subject", lang)
 
     body = f"""
     <html>
     <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2>SafeBox 验证码</h2>
-        <p>您的验证码是：</p>
+        <h2>{get_text("email_heading", lang)}</h2>
+        <p>{get_text("email_body_code", lang)}</p>
         <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px;
                     text-align: center; padding: 20px; background: #f0f0f0;
                     border-radius: 8px; margin: 20px 0;">
             {code}
         </div>
         <p style="color: #666; font-size: 14px;">
-            验证码 {settings.verification_code_expire_seconds // 60} 分钟内有效。
-            如果您没有请求此验证码，请忽略此邮件。
+            {get_text("email_body_expiry", lang, minutes=minutes)}
+            {get_text("email_body_ignore", lang)}
         </p>
     </body>
     </html>

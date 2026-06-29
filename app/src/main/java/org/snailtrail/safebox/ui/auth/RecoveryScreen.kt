@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,8 +29,8 @@ fun RecoveryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("恢复码找回") },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "返回") } }
+                title = { Text(stringResource(R.string.auth_recovery_title)) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, stringResource(R.string.common_back)) } }
             )
         }
     ) { padding ->
@@ -40,12 +41,12 @@ fun RecoveryScreen(
             Spacer(Modifier.height(48.dp))
 
             Text(
-                "输入您保存的 12 个恢复词",
+                stringResource(R.string.auth_recovery_instructions_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "恢复码由注册时生成的 12 个英文单词组成，请按顺序输入，单词之间用空格分隔。",
+                stringResource(R.string.auth_recovery_instructions_detail),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -54,7 +55,7 @@ fun RecoveryScreen(
             var recoveryCode by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = recoveryCode, onValueChange = { recoveryCode = it },
-                label = { Text("恢复码") },
+                label = { Text(stringResource(R.string.auth_field_recovery_code)) },
                 placeholder = { Text("word1 word2 word3 ...") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                 singleLine = false, minLines = 3, maxLines = 5,
@@ -65,7 +66,7 @@ fun RecoveryScreen(
             var newPassword by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = newPassword, onValueChange = { newPassword = it },
-                label = { Text("设置新密码") },
+                label = { Text(stringResource(R.string.auth_field_new_password)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
@@ -80,7 +81,7 @@ fun RecoveryScreen(
                 onClick = { viewModel.recover(recoveryCode, newPassword) },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 enabled = recoveryCode.isNotBlank() && newPassword.length >= 8 && !state.isLoading,
-            ) { Text("恢复并设置新密码") }
+            ) { Text(stringResource(R.string.auth_button_recover_set_password)) }
 
             if (state.isLoading) {
                 Spacer(Modifier.height(8.dp))

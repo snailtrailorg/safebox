@@ -2,11 +2,12 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.i18n import get_lang, get_text
 from app.middleware import get_current_user_id
 from app.schemas.auth import (
     DeviceInfo,
@@ -53,6 +54,12 @@ from app.services.verification_service import (
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
+async def get_i18n(request: Request):
+    """FastAPI 依赖：从 Accept-Language header 解析语言，返回 gettext 风格的翻译函数。"""
+    lang = get_lang(request.headers.get("Accept-Language"))
+    return lambda key, **kw: get_text(key, lang, **kw)
+
+
 # ── 预登录 ──────────────────────────────────────────
 
 @router.get("/salt")
@@ -77,13 +84,14 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
 # ── 验证码 ──────────────────────────────────────────
 
 @router.post("/send-code", response_model=SendCodeResponse)
-async def send_code(req: SendCodeRequest, db: AsyncSession = Depends(get_db)):
+async def send_code(req: SendCodeRequest, request: Request, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """发送验证码（phone 或 email）。60 秒内同一目标只能发一次。"""
+    lang = get_lang(request.headers.get("Accept-Language"))
     # 频率限制
     if not await check_rate_limit(req.target, req.value):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"验证码发送太频繁，请 {settings.verification_code_rate_limit_seconds} 秒后再试",
+            detail=_("verification_code_rate_limited", seconds=settings.verification_code_rate_limit_seconds),
         )
 
     # 生成验证码
@@ -91,9 +99,9 @@ async def send_code(req: SendCodeRequest, db: AsyncSession = Depends(get_db)):
 
     # 实际发送验证码
     if req.target == "phone":
-        await send_sms(req.value, code)
+        await send_sms(req.value, code, lang)
     else:
-        await send_verification_email(req.value, code)
+        await send_verification_email(req.value, code, lang)
 
     await store_code(req.target, req.value, code)
 
@@ -103,14 +111,14 @@ async def send_code(req: SendCodeRequest, db: AsyncSession = Depends(get_db)):
 # ── 注册 ──────────────────────────────────────────
 
 @router.post("/register/email", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register_email(req: RegisterEmailRequest, db: AsyncSession = Depends(get_db)):
+async def register_email(req: RegisterEmailRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """邮箱注册。"""
     if not await verify_and_consume("email", req.email, req.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="验证码无效或已过期")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 
     existing = await find_user_by_email(db, req.email)
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该邮箱已注册")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_("email_already_registered"))
 
     user = await create_user_with_keys(
         db=db,
@@ -134,14 +142,14 @@ async def register_email(req: RegisterEmailRequest, db: AsyncSession = Depends(g
 
 
 @router.post("/register/phone", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register_phone(req: RegisterPhoneRequest, db: AsyncSession = Depends(get_db)):
+async def register_phone(req: RegisterPhoneRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """手机号注册。"""
     if not await verify_and_consume("phone", req.phone, req.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="验证码无效或已过期")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 
     existing = await find_user_by_phone(db, req.phone)
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该手机号已注册")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_("phone_already_registered"))
 
     user = await create_user_with_keys(
         db=db, email=None, phone=req.phone, google_id=None,
@@ -162,15 +170,15 @@ async def register_phone(req: RegisterPhoneRequest, db: AsyncSession = Depends(g
 
 
 @router.post("/register/google", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends(get_db)):
+async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """Google OAuth 注册。"""
     google_id = await verify_google_id_token(req.google_id_token)
     if not google_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google ID Token 验证失败")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("google_token_invalid"))
 
     existing = await find_user_by_google_id(db, google_id)
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该 Google 账号已注册")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_("google_already_registered"))
 
     user = await create_user_with_keys(
         db=db, email=None, phone=None, google_id=google_id,
@@ -216,44 +224,44 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
 
 
 @router.post("/login/email", response_model=LoginResponse)
-async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db)):
+async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """邮箱 + 密码登录。"""
     user = await find_user_by_email(db, req.email)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱或密码错误")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
 
     if not verify_password(req.password_hash, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱或密码错误")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
 
     return await _build_login_response(db, user)
 
 
 @router.post("/login/phone", response_model=LoginResponse)
-async def login_phone(req: LoginPhoneRequest, db: AsyncSession = Depends(get_db)):
+async def login_phone(req: LoginPhoneRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """手机号 + 验证码 + 密码登录。"""
     if not await verify_and_consume("phone", req.phone, req.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="验证码无效或已过期")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 
     user = await find_user_by_phone(db, req.phone)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="手机号或密码错误")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("phone_or_password_wrong"))
 
     if not verify_password(req.password_hash, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="手机号或密码错误")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("phone_or_password_wrong"))
 
     return await _build_login_response(db, user)
 
 
 @router.post("/login/google", response_model=LoginResponse)
-async def login_google(req: LoginGoogleRequest, db: AsyncSession = Depends(get_db)):
+async def login_google(req: LoginGoogleRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """Google OAuth 登录。"""
     google_id = await verify_google_id_token(req.google_id_token)
     if not google_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google ID Token 验证失败")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("google_token_invalid"))
 
     user = await find_user_by_google_id(db, google_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="该 Google 账号未注册")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("google_not_registered"))
 
     return await _build_login_response(db, user)
 
@@ -261,10 +269,10 @@ async def login_google(req: LoginGoogleRequest, db: AsyncSession = Depends(get_d
 # ── 密码重置 ───────────────────────────────────────
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)
-async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """验证码验证后重置密码。"""
     if not await verify_and_consume(req.target, req.value, req.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="验证码无效或已过期")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 
     if req.target == "phone":
         user = await find_user_by_phone(db, req.value)
@@ -272,7 +280,7 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
         user = await find_user_by_email(db, req.value)
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_("user_not_found"))
 
     # 更新密码哈希和 wrapped key
     user.password_hash = hash_password(req.new_password_hash)
@@ -289,11 +297,11 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
 # ── Token 刷新 ─────────────────────────────────────
 
 @router.post("/refresh-token", response_model=RefreshTokenResponse)
-async def refresh_token(req: RefreshTokenRequest):
+async def refresh_token(req: RefreshTokenRequest, _ = Depends(get_i18n)):
     """用 refresh_token 换取新的 access_token + refresh_token。"""
     user_id = decode_refresh_token(req.refresh_token)
     if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh_token 无效或已过期")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("refresh_token_invalid"))
 
     return RefreshTokenResponse(
         access_token=create_access_token(user_id),

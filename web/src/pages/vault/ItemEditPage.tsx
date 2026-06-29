@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
@@ -11,17 +12,18 @@ import type { Item, ItemType } from "../../types/domain";
 
 const ITEM_TYPES: ItemType[] = ["android", "account", "file"];
 
-const TYPE_LABELS: Record<ItemType, string> = {
-  android: "Android 应用",
-  account: "通用账户",
-  file: "本地文件",
-};
-
 export function ItemEditPage() {
+  const { t } = useTranslation();
   const { did, type } = useParams<{ did?: string; type?: string }>();
   const navigate = useNavigate();
   const { saveItem } = useVault();
   const isEdit = did && did !== "0";
+
+  const TYPE_LABELS: Record<ItemType, string> = {
+    android: t("vault.edit.typeAndroid"),
+    account: t("vault.edit.typeAccount"),
+    file: t("vault.edit.typeFile"),
+  };
 
   const [itemType, setItemType] = useState<ItemType>((type as ItemType) || "account");
   const [name, setName] = useState("");
@@ -31,7 +33,6 @@ export function ItemEditPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
-  // 加载已有条目
   useEffect(() => {
     if (isEdit && did) {
       setLoading(true);
@@ -40,7 +41,6 @@ export function ItemEditPage() {
           setItemType(item.type);
           setName(item.name);
           setDescription(item.description || "");
-          // 尝试解密 data
           if (item.data) {
             try {
               const plain = await keyManager.decryptItemData(item.data);
@@ -65,7 +65,7 @@ export function ItemEditPage() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setToast({ message: "请输入名称", type: "error" });
+      setToast({ message: t("vault.edit.enterName"), type: "error" });
       return;
     }
     setSaving(true);
@@ -75,7 +75,7 @@ export function ItemEditPage() {
 
       const item: Item = {
         did: isEdit && did ? parseInt(did) : 0,
-        uid: 1, // TODO
+        uid: 1,
         type: itemType,
         icon: null,
         name: name.trim(),
@@ -90,10 +90,10 @@ export function ItemEditPage() {
       };
 
       const savedDid = await saveItem(item);
-      setToast({ message: "已保存", type: "success" });
+      setToast({ message: t("vault.edit.saved"), type: "success" });
       setTimeout(() => navigate(`/item/${savedDid}`), 500);
     } catch (e: any) {
-      setToast({ message: e.message || "保存失败", type: "error" });
+      setToast({ message: e.message || t("vault.edit.saveFailed"), type: "error" });
     } finally {
       setSaving(false);
     }
@@ -104,47 +104,45 @@ export function ItemEditPage() {
   };
 
   if (loading) {
-    return <AppLayout title="加载中…"><p style={{ textAlign: "center", padding: "3rem", color: "#666" }}>加载中…</p></AppLayout>;
+    return <AppLayout title={t("common.loading")}><p style={{ textAlign: "center", padding: "3rem", color: "#666" }}>{t("common.loading")}</p></AppLayout>;
   }
 
   return (
-    <AppLayout title={isEdit ? "编辑条目" : "新建条目"}>
+    <AppLayout title={isEdit ? t("vault.edit.titleEdit") : t("vault.edit.titleNew")}>
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {/* 类型选择（新建时） */}
         {!isEdit && (
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            {ITEM_TYPES.map((t) => (
+            {ITEM_TYPES.map((tp) => (
               <button
-                key={t}
-                onClick={() => setItemType(t)}
+                key={tp}
+                onClick={() => setItemType(tp)}
                 style={{
                   padding: "0.5rem 1rem",
                   borderRadius: 20,
-                  border: itemType === t ? "2px solid #0f3460" : "1px solid #ddd",
-                  background: itemType === t ? "#0f3460" : "#fff",
-                  color: itemType === t ? "#fff" : "#333",
+                  border: itemType === tp ? "2px solid #0f3460" : "1px solid #ddd",
+                  background: itemType === tp ? "#0f3460" : "#fff",
+                  color: itemType === tp ? "#fff" : "#333",
                   cursor: "pointer",
                   fontSize: "0.85rem",
                   fontWeight: 500,
                 }}
               >
-                {TYPE_LABELS[t]}
+                {TYPE_LABELS[tp]}
               </button>
             ))}
           </div>
         )}
 
-        {/* 名称 */}
         <div style={{
           background: "#fff", borderRadius: 10, padding: "1.25rem",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
-          <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>名称 *</label>
+          <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.name")}</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="输入条目名称"
+            placeholder={t("vault.edit.namePlaceholder")}
             style={{
               width: "100%", padding: "0.6rem 0",
               border: "none", borderBottom: "1px solid #eee",
@@ -154,17 +152,16 @@ export function ItemEditPage() {
           />
         </div>
 
-        {/* 备注 */}
         <div style={{
           background: "#fff", borderRadius: 10, padding: "1.25rem",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
-          <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>备注</label>
+          <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.notes")}</label>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="可选备注"
+            placeholder={t("vault.edit.notesPlaceholder")}
             style={{
               width: "100%", padding: "0.6rem 0",
               border: "none", borderBottom: "1px solid #eee",
@@ -174,7 +171,6 @@ export function ItemEditPage() {
           />
         </div>
 
-        {/* 类型特定字段 */}
         <div style={{
           background: "#fff", borderRadius: 10, padding: "1.25rem",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
@@ -182,31 +178,31 @@ export function ItemEditPage() {
           {itemType === "android" && (
             <>
               <div style={{ marginBottom: "0.75rem" }}>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>包名</label>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.packageName")}</label>
                 <input
                   type="text"
                   value={dataFields.package || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, package: e.target.value }))}
-                  placeholder="com.example.app"
+                  placeholder={t("vault.edit.packagePlaceholder")}
                   style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
               <div style={{ marginBottom: "0.75rem" }}>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>用户名</label>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.username")}</label>
                 <input
                   type="text"
                   value={dataFields.username || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, username: e.target.value }))}
-                  placeholder="用户名"
+                  placeholder={t("vault.edit.usernamePlaceholder")}
                   style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
               <div>
                 <PasswordInput
-                  label="密码"
+                  label={t("vault.edit.password")}
                   value={dataFields.password || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
-                  placeholder="密码"
+                  placeholder={t("vault.edit.passwordPlaceholder")}
                   style={{ flex: 1 }}
                 />
                 <button
@@ -216,7 +212,7 @@ export function ItemEditPage() {
                     border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap",
                   }}
                 >
-                  🎲 生成
+                  {t("vault.edit.generate")}
                 </button>
               </div>
             </>
@@ -225,22 +221,22 @@ export function ItemEditPage() {
           {itemType === "account" && (
             <>
               <div style={{ marginBottom: "0.75rem" }}>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>用户名/邮箱</label>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.usernameEmail")}</label>
                 <input
                   type="text"
                   value={dataFields.username || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, username: e.target.value }))}
-                  placeholder="user@email.com"
+                  placeholder={t("vault.edit.usernameEmailPlaceholder")}
                   style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
               <div style={{ marginBottom: "0.75rem" }}>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <PasswordInput
-                    label="密码"
+                    label={t("vault.edit.password")}
                     value={dataFields.password || ""}
                     onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
-                    placeholder="密码"
+                    placeholder={t("vault.edit.passwordPlaceholder")}
                     style={{ flex: 1 }}
                   />
                   <button
@@ -250,17 +246,17 @@ export function ItemEditPage() {
                       border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap",
                     }}
                   >
-                    🎲 生成
+                    {t("vault.edit.generate")}
                   </button>
                 </div>
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>网址</label>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.url")}</label>
                 <input
                   type="url"
                   value={dataFields.url || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, url: e.target.value }))}
-                  placeholder="https://example.com"
+                  placeholder={t("vault.edit.urlPlaceholder")}
                   style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
@@ -269,19 +265,18 @@ export function ItemEditPage() {
 
           {itemType === "file" && (
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>文件路径</label>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.filePath")}</label>
               <input
                 type="text"
                 value={dataFields.path || ""}
                 onChange={(e) => setDataFields((p) => ({ ...p, path: e.target.value }))}
-                placeholder="/path/to/file"
+                placeholder={t("vault.edit.filePathPlaceholder")}
                 style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
               />
             </div>
           )}
         </div>
 
-        {/* 保存 */}
         <button
           onClick={handleSave}
           disabled={saving}
@@ -292,7 +287,7 @@ export function ItemEditPage() {
             cursor: saving ? "not-allowed" : "pointer",
           }}
         >
-          {saving ? "保存中…" : "💾 保存"}
+          {saving ? t("common.saving") : t("vault.edit.save")}
         </button>
       </div>
 

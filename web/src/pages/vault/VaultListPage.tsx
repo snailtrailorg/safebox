@@ -1,15 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
 import { useVault } from "../../context/VaultContext";
 import type { Item, ItemType } from "../../types/domain";
-
-const TYPE_LABELS: Record<ItemType, string> = {
-  android: "Android 应用",
-  account: "通用账户",
-  file: "本地文件",
-};
 
 const TYPE_ICONS: Record<ItemType, string> = {
   android: "🤖",
@@ -18,17 +13,24 @@ const TYPE_ICONS: Record<ItemType, string> = {
 };
 
 export function VaultListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { items, isLoading, error, deleteItem, clearError, syncNow, isSyncing } = useVault();
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
   const [swiping, setSwiping] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  // 点击 FAB 外部关闭菜单
+  const TYPE_LABELS: Record<ItemType, string> = {
+    android: t("vault.list.typeAndroid"),
+    account: t("vault.list.typeAccount"),
+    file: t("vault.list.typeFile"),
+  };
+
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
@@ -51,30 +53,31 @@ export function VaultListPage() {
     if (swiping === null) return;
     const dx = e.touches[0].clientX - touchStartX.current;
     const dy = e.touches[0].clientY - touchStartY.current;
-    // 只响应横向滑动
     if (Math.abs(dy) > Math.abs(dx)) return;
     setSwipeOffset(Math.min(0, dx));
   };
 
+  const performDelete = async (item: Item) => {
+    if (!item.did) return;
+    if (!confirm(t("vault.list.confirmDelete", { name: item.name }))) return;
+    setDeleting(item.did);
+    try {
+      await deleteItem(item.did);
+      setToast({ message: t("vault.list.deleted"), type: "success" });
+    } catch (e: any) {
+      setToast({ message: e.message || t("vault.list.deleteFailed"), type: "error" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const handleTouchEnd = useCallback(async (item: Item) => {
     if (swipeOffset < -80) {
-      // 滑动超过 80px，触发删除
-      if (!item.did) return;
-      if (!confirm(`确定删除「${item.name}」？`)) {
-        setSwiping(null);
-        setSwipeOffset(0);
-        return;
-      }
-      try {
-        await deleteItem(item.did);
-        setToast({ message: "已删除", type: "success" });
-      } catch (e: any) {
-        setToast({ message: e.message || "删除失败", type: "error" });
-      }
+      await performDelete(item);
     }
     setSwiping(null);
     setSwipeOffset(0);
-  }, [swipeOffset, deleteItem]);
+  }, [swipeOffset, performDelete]);
 
   const handleAdd = (type: ItemType) => {
     setMenuOpen(false);
@@ -82,27 +85,20 @@ export function VaultListPage() {
   };
 
   const handleDelete = async (item: Item) => {
-    if (!item.did) return;
-    if (!confirm(`确定删除「${item.name}」？`)) return;
-    try {
-      await deleteItem(item.did);
-      setToast({ message: "已删除", type: "success" });
-    } catch (e: any) {
-      setToast({ message: e.message || "删除失败", type: "error" });
-    }
+    await performDelete(item);
   };
 
   return (
-    <AppLayout title="密码库">
+    <AppLayout title={t("vault.list.title")}>
       {isLoading && items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "3rem 0", color: "#666" }}>
-          <p>加载中…</p>
+          <p>{t("common.loading")}</p>
         </div>
       ) : items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "3rem 0", color: "#666" }}>
           <p style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>🔒</p>
-          <p style={{ fontSize: "1.1rem", fontWeight: 500, marginBottom: "0.25rem" }}>密码库为空</p>
-          <p style={{ fontSize: "0.85rem" }}>点击右下角 + 添加第一条密码</p>
+          <p style={{ fontSize: "1.1rem", fontWeight: 500, marginBottom: "0.25rem" }}>{t("vault.list.emptyTitle")}</p>
+          <p style={{ fontSize: "0.85rem" }}>{t("vault.list.emptySubtitle")}</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -117,7 +113,6 @@ export function VaultListPage() {
                 boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
               }}
             >
-              {/* 滑动删除背景 */}
               <div style={{
                 position: "absolute",
                 top: 0, bottom: 0, right: 0, width: 80,
@@ -126,7 +121,7 @@ export function VaultListPage() {
                 color: "#fff", fontSize: "0.85rem", fontWeight: 500,
                 borderRadius: "0 10px 10px 0",
               }}>
-                🗑️ 删除
+                {t("vault.list.deleteSwipe")}
               </div>
               <div
                 onClick={() => {
@@ -170,14 +165,15 @@ export function VaultListPage() {
                     e.stopPropagation();
                     handleDelete(item);
                   }}
+                  disabled={deleting === item.did}
                   style={{
                     background: "none", border: "none", color: "#e74c3c",
-                    cursor: "pointer", fontSize: "0.85rem", padding: "0.25rem",
-                    opacity: 0.6,
+                    cursor: deleting === item.did ? "not-allowed" : "pointer", fontSize: "0.85rem", padding: "0.25rem",
+                    opacity: deleting === item.did ? 0.3 : 0.6,
                   }}
-                  title="删除"
+                  title={t("common.delete")}
                 >
-                  🗑️
+                  {deleting === item.did ? "⏳" : "🗑️"}
                 </button>
               </div>
             </div>
@@ -185,7 +181,6 @@ export function VaultListPage() {
         </div>
       )}
 
-      {/* FAB */}
       <div ref={fabRef} style={{ position: "fixed", bottom: 24, right: 24, zIndex: 50 }}>
         {menuOpen && (
           <div style={{

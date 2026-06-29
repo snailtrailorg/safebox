@@ -22,7 +22,7 @@ class AuthRepository @Inject constructor(
         return try {
             val resp = apiService.sendCode(SendCodeRequest(target, value))
             if (resp.isSuccessful) Result.success(Unit)
-            else Result.failure(Exception(resp.errorBody()?.string() ?: "发送验证码失败"))
+            else Result.failure(Exception(resp.errorBody()?.string() ?: "Failed to send verification code"))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -37,7 +37,7 @@ class AuthRepository @Inject constructor(
 
         keyManager.generateDeviceKeyPair()
         val devicePubKey = keyManager.getDevicePublicKey()
-            ?: return Result.failure(Exception("生成设备密钥失败"))
+            ?: return Result.failure(Exception("Failed to generate device key"))
         val devicePubEncoded = android.util.Base64.encodeToString(
             devicePubKey.encoded, android.util.Base64.NO_WRAP
         )
@@ -73,13 +73,13 @@ class AuthRepository @Inject constructor(
             keyManager.loadRsaKeys(keys.encryptedPrivate, keys.rsaPublicKey)
             return Result.success(Unit)
         } else {
-            return Result.failure(Exception(resp.errorBody()?.string() ?: "注册失败"))
+            return Result.failure(Exception(resp.errorBody()?.string() ?: "Registration failed"))
         }
     }
 
     suspend fun loginWithEmail(email: String, password: String): Result<Unit> {
         val saltStr = sessionManager.getPasswordSalt()
-            ?: return Result.failure(Exception("未找到本地密钥材料，请在新设备上使用恢复码登录"))
+            ?: return Result.failure(Exception("Local key material not found. Please use recovery phrase to sign in on a new device."))
 
         val salt = Base64.decode(saltStr, Base64.NO_WRAP)
         val passwordHash = Base64.encodeToString(
@@ -97,7 +97,7 @@ class AuthRepository @Inject constructor(
         password: String,
     ): Result<Unit> {
         val saltStr = sessionManager.getPasswordSalt()
-            ?: return Result.failure(Exception("未找到本地密钥材料"))
+            ?: return Result.failure(Exception("Local key material not found"))
 
         val salt = Base64.decode(saltStr, Base64.NO_WRAP)
         val passwordHash = Base64.encodeToString(
@@ -114,40 +114,40 @@ class AuthRepository @Inject constructor(
         if (resp.isSuccessful) {
             val body = resp.body()!!
             val devicePrivateKey = keyManager.getDevicePrivateKey()
-                ?: return Result.failure(Exception("设备密钥不可用"))
+                ?: return Result.failure(Exception("Device key unavailable"))
 
             val currentDevice = body.devices.firstOrNull()
-                ?: return Result.failure(Exception("未找到设备密钥"))
+                ?: return Result.failure(Exception("Device key not found"))
 
             if (!keyManager.unlockWithDevice(devicePrivateKey, currentDevice.deviceWrapped)) {
-                return Result.failure(Exception("设备密钥解密失败"))
+                return Result.failure(Exception("Device key decryption failed"))
             }
             if (!keyManager.loadRsaKeys(body.encryptedPrivate, body.rsaPublicKey)) {
-                return Result.failure(Exception("加载 RSA 密钥失败"))
+                return Result.failure(Exception("Failed to load RSA keys"))
             }
 
             sessionManager.updateTokens(body.accessToken, body.refreshToken)
             return Result.success(Unit)
         } else {
-            return Result.failure(Exception("Google 登录失败"))
+            return Result.failure(Exception("Google sign-in failed"))
         }
     }
 
     suspend fun recoverWithRecoveryCode(recoveryCode: String): Result<Unit> {
         val recoveryWrapped = sessionManager.getRecoveryWrapped()
-            ?: return Result.failure(Exception("未找到恢复密钥材料"))
+            ?: return Result.failure(Exception("Recovery key material not found"))
 
         if (!keyManager.unlockWithRecoveryCode(recoveryCode, recoveryWrapped)) {
-            return Result.failure(Exception("恢复码无效"))
+            return Result.failure(Exception("Invalid recovery phrase"))
         }
 
         val encryptedPrivate = sessionManager.getEncryptedPrivate()
-            ?: return Result.failure(Exception("未找到加密私钥"))
+            ?: return Result.failure(Exception("Encrypted private key not found"))
         val rsaPublicKey = sessionManager.getRsaPublicKey()
-            ?: return Result.failure(Exception("未找到公钥"))
+            ?: return Result.failure(Exception("Public key not found"))
 
         if (!keyManager.loadRsaKeys(encryptedPrivate, rsaPublicKey)) {
-            return Result.failure(Exception("加载 RSA 密钥失败"))
+            return Result.failure(Exception("Failed to load RSA keys"))
         }
 
         return Result.success(Unit)
@@ -166,19 +166,19 @@ class AuthRepository @Inject constructor(
         if (resp.isSuccessful) {
             val body = resp.body()!!
             val pwWrapped = body.passwordWrapped
-                ?: return Result.failure(Exception("服务端未返回密钥材料"))
+                ?: return Result.failure(Exception("Server did not return key material"))
 
             if (!keyManager.unlockWithPassword(password, salt, pwWrapped)) {
-                return Result.failure(Exception("密码错误"))
+                return Result.failure(Exception("Incorrect password"))
             }
             if (!keyManager.loadRsaKeys(body.encryptedPrivate, body.rsaPublicKey)) {
-                return Result.failure(Exception("加载 RSA 密钥失败"))
+                return Result.failure(Exception("Failed to load RSA keys"))
             }
 
             sessionManager.updateTokens(body.accessToken, body.refreshToken)
             return Result.success(Unit)
         } else {
-            return Result.failure(Exception(resp.errorBody()?.string() ?: "登录失败"))
+            return Result.failure(Exception(resp.errorBody()?.string() ?: "Sign-in failed"))
         }
     }
 }

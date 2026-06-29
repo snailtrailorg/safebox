@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -37,13 +38,13 @@ fun ItemEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (did > 0) "编辑条目" else "新建条目") },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "返回") } },
+                title = { Text(if (did > 0) stringResource(R.string.edit_title_edit) else stringResource(R.string.edit_title_new)) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, stringResource(R.string.common_back)) } },
                 actions = {
                     IconButton(
                         onClick = { viewModel.save() },
                         enabled = !state.isSaving && state.name.isNotBlank(),
-                    ) { Icon(Icons.Default.Save, "保存") }
+                    ) { Icon(Icons.Default.Save, stringResource(R.string.common_save)) }
                 }
             )
         }
@@ -63,25 +64,25 @@ fun ItemEditScreen(
                 Spacer(Modifier.height(16.dp))
 
                 // 类型选择
-                Text("类型", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.edit_label_type), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = state.type == "android",
                         onClick = { viewModel.setType("android") },
-                        label = { Text("Android") },
+                        label = { Text(stringResource(R.string.edit_type_chip_android)) },
                         leadingIcon = { Icon(Icons.Default.Android, null, Modifier.size(18.dp)) },
                     )
                     FilterChip(
                         selected = state.type == "account",
                         onClick = { viewModel.setType("account") },
-                        label = { Text("账户") },
+                        label = { Text(stringResource(R.string.edit_type_chip_account)) },
                         leadingIcon = { Icon(Icons.Default.AccountCircle, null, Modifier.size(18.dp)) },
                     )
                     FilterChip(
                         selected = state.type == "file",
                         onClick = { viewModel.setType("file") },
-                        label = { Text("文件") },
+                        label = { Text(stringResource(R.string.edit_type_chip_file)) },
                         leadingIcon = { Icon(Icons.Default.InsertDriveFile, null, Modifier.size(18.dp)) },
                     )
                 }
@@ -90,14 +91,14 @@ fun ItemEditScreen(
 
                 OutlinedTextField(
                     value = state.name, onValueChange = { viewModel.updateName(it) },
-                    label = { Text("名称") },
+                    label = { Text(stringResource(R.string.edit_field_name)) },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = state.description, onValueChange = { viewModel.updateDescription(it) },
-                    label = { Text("描述") },
+                    label = { Text(stringResource(R.string.edit_field_description)) },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
@@ -108,24 +109,24 @@ fun ItemEditScreen(
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.packageName, onValueChange = { viewModel.updatePackageName(it) },
-                            label = { Text("应用包名") },
+                            label = { Text(stringResource(R.string.edit_field_package_name)) },
                             placeholder = { Text("com.example.app") },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.username, onValueChange = { viewModel.updateUsername(it) },
-                            label = { Text("用户名") },
+                            label = { Text(stringResource(R.string.edit_field_username)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.password, onValueChange = { viewModel.updatePassword(it) },
-                            label = { Text("密码") },
+                            label = { Text(stringResource(R.string.edit_field_password)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
                                 IconButton(onClick = { viewModel.generatePassword() }) {
-                                    Icon(Icons.Default.AutoAwesome, "生成密码")
+                                    Icon(Icons.Default.AutoAwesome, stringResource(R.string.common_generate_password))
                                 }
                             },
                         )
@@ -134,24 +135,24 @@ fun ItemEditScreen(
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.username, onValueChange = { viewModel.updateUsername(it) },
-                            label = { Text("用户名/邮箱") },
+                            label = { Text(stringResource(R.string.edit_field_username_email)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.password, onValueChange = { viewModel.updatePassword(it) },
-                            label = { Text("密码") },
+                            label = { Text(stringResource(R.string.edit_field_password)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
                                 IconButton(onClick = { viewModel.generatePassword() }) {
-                                    Icon(Icons.Default.AutoAwesome, "生成密码")
+                                    Icon(Icons.Default.AutoAwesome, stringResource(R.string.common_generate_password))
                                 }
                             },
                         )
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.url, onValueChange = { viewModel.updateUrl(it) },
-                            label = { Text("网址 (可选)") },
+                            label = { Text(stringResource(R.string.edit_field_url)) },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
@@ -160,7 +161,7 @@ fun ItemEditScreen(
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = state.filePath, onValueChange = { viewModel.updateFilePath(it) },
-                            label = { Text("文件路径") },
+                            label = { Text(stringResource(R.string.edit_field_file_path)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -176,7 +177,7 @@ fun ItemEditScreen(
                     onClick = { viewModel.save() },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     enabled = state.name.isNotBlank() && !state.isSaving,
-                ) { Text("保存") }
+                ) { Text(stringResource(R.string.common_save)) }
 
                 if (state.isSaving) {
                     Spacer(Modifier.height(8.dp))

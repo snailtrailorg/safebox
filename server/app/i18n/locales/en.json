@@ -1,0 +1,20 @@
+{
+  "verification_code_rate_limited": "Code sent too frequently. Please try again in {seconds} seconds.",
+  "verification_code_invalid": "Invalid or expired verification code.",
+  "email_already_registered": "This email is already registered.",
+  "phone_already_registered": "This phone number is already registered.",
+  "google_token_invalid": "Google ID Token verification failed.",
+  "google_already_registered": "This Google account is already registered.",
+  "email_or_password_wrong": "Incorrect email or password.",
+  "phone_or_password_wrong": "Incorrect phone number or password.",
+  "google_not_registered": "This Google account is not registered.",
+  "user_not_found": "User not found.",
+  "refresh_token_invalid": "Invalid or expired refresh token.",
+  "invalid_token": "Invalid token.",
+  "email_subject": "SafeBox Verification Code",
+  "email_heading": "SafeBox Verification Code",
+  "email_body_code": "Your verification code is:",
+  "email_body_expiry": "This code is valid for {minutes} minutes.",
+  "email_body_ignore": "If you did not request this code, please ignore this email.",
+  "sms_body": "[SafeBox] Your verification code is {code}, valid for {minutes} minutes."
+}
