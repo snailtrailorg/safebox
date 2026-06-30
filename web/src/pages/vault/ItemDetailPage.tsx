@@ -107,13 +107,13 @@ export function ItemDetailPage() {
     try {
       const blob = await getFileBlob(item.did);
       if (!blob) {
-        setToast({ message: "文件数据不存在", type: "error" });
+        setToast({ message: t("vault.detail.fileNotFound"), type: "error" });
         setDownloading(false);
         return;
       }
       const decrypted = await keyManager.decryptFileBlob(blob.encryptedBlob);
       if (!decrypted) {
-        setToast({ message: "文件解密失败", type: "error" });
+        setToast({ message: t("vault.detail.decryptFailed"), type: "error" });
         setDownloading(false);
         return;
       }
@@ -129,7 +129,7 @@ export function ItemDetailPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setToast({ message: e.message || "下载失败", type: "error" });
+      setToast({ message: e.message || t("vault.detail.downloadFailed"), type: "error" });
     } finally {
       setDownloading(false);
     }

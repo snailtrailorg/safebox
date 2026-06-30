@@ -98,7 +98,9 @@
       "recoveryWarningDetail": "请立即复制并保存在安全的地方（建议打印或手写）。丢失密码和恢复码将导致数据永久无法恢复。",
       "copyRecoveryCode": "📋 复制恢复码",
       "copied": "已复制到剪贴板",
-      "savedAndEnter": "我已保存，进入 SafeBox"
+      "savedAndEnter": "我已保存，进入 SafeBox",
+      "noRecoveryCode": "没有待保存的恢复码，请先完成注册。",
+      "goToRegister": "前往注册"
     },
     "recovery": {
       "title": "恢复账号",
@@ -140,6 +142,9 @@
       "fileName": "文件名",
       "fileSize": "大小",
       "downloadFile": "📥 下载文件",
+      "fileNotFound": "文件数据不存在",
+      "decryptFailed": "文件解密失败",
+      "downloadFailed": "下载失败",
       "confirmDelete": "确定删除？",
       "typeAndroid": "Android 应用",
       "typeAccount": "通用账户",
@@ -218,7 +223,9 @@
 
   "appLayout": {
     "offline": "⚠️ 网络已断开 — 数据将在恢复连接后自动同步",
-    "sync": "🔄 同步"
+    "sync": "🔄 同步",
+    "home": "回到主页",
+    "discardEdit": "正在编辑中，离开将丢失未保存的修改。确定离开？"
   },
 
   "toast": {

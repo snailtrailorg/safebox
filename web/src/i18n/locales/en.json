@@ -98,7 +98,9 @@
       "recoveryWarningDetail": "Copy and save it in a secure place now (print or write it down). Losing both your password and recovery phrase will make your data permanently unrecoverable.",
       "copyRecoveryCode": "📋 Copy Recovery Phrase",
       "copied": "Copied to clipboard.",
-      "savedAndEnter": "I've Saved It — Enter SafeBox"
+      "savedAndEnter": "I've Saved It — Enter SafeBox",
+      "noRecoveryCode": "No recovery phrase to save. Please complete registration first.",
+      "goToRegister": "Go to Registration"
     },
     "recovery": {
       "title": "Recover Account",
@@ -140,6 +142,9 @@
       "fileName": "File Name",
       "fileSize": "Size",
       "downloadFile": "📥 Download File",
+      "fileNotFound": "File data not found",
+      "decryptFailed": "File decryption failed",
+      "downloadFailed": "Download failed",
       "confirmDelete": "Confirm delete?",
       "typeAndroid": "Android App",
       "typeAccount": "Account",
@@ -218,7 +223,9 @@
 
   "appLayout": {
     "offline": "⚠️ Offline — data will sync automatically when reconnected",
-    "sync": "🔄 Sync"
+    "sync": "🔄 Sync",
+    "home": "Home",
+    "discardEdit": "You have unsaved changes. Leave without saving?"
   },
 
   "toast": {

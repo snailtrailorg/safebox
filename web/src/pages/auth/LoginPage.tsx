@@ -34,17 +34,14 @@ export function LoginPage() {
   const { login } = useAuth();
   const [tab, setTab] = useState<LoginTab>("email");
 
-  // Email
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Phone
   const [phone, setPhone] = useState("");
   const [phonePassword, setPhonePassword] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
 
-  // Google
   const [googlePassword, setGooglePassword] = useState("");
   const [googleIdToken, setGoogleIdToken] = useState("");
   const [googleAuthed, setGoogleAuthed] = useState(false);
@@ -57,7 +54,7 @@ export function LoginPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
-  // ── Google SDK 初始化 ────────────────────────────
+  // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
   useEffect(() => {
     if (googleInitRef.current || !GOOGLE_CLIENT_ID) return;
     const timer = setInterval(() => {
@@ -79,9 +76,9 @@ export function LoginPage() {
     return () => { clearInterval(timer); clearTimeout(timeout); };
   }, []);
 
-  // 切到 Google tab 或 SDK 就绪时渲染按钮
+  // SDK 就绪 + 面板可见时渲染按钮
   useEffect(() => {
-    if (tab === "google" && googleBtnRef.current && googleReady) {
+    if (googleBtnRef.current && googleReady) {
       window.google?.accounts.id.renderButton(googleBtnRef.current, {
         type: "standard",
         theme: "outline",
@@ -91,7 +88,7 @@ export function LoginPage() {
         width: 300,
       });
     }
-  }, [tab, googleReady]);
+  }, [googleReady]);
 
   // ── 通用登录响应处理 ─────────────────────────────
   const handleLoginResponse = async (response: LoginResponse, pw: string) => {
@@ -113,8 +110,6 @@ export function LoginPage() {
     navigate("/");
   };
 
-  // ── Email 登录 ──────────────────────────────────
-
   const handleEmailLogin = async () => {
     if (!email || !password) {
       setToast({ message: t("auth.login.fillEmailAndPassword"), type: "error" });
@@ -126,7 +121,6 @@ export function LoginPage() {
       const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
       const passwordHash = await deriveKeyHash(password, saltBytes);
       const response = await apiClient.loginEmail({ email, password_hash: passwordHash });
-
       await saveSession({
         email,
         passwordSalt: response.password_salt,
@@ -135,7 +129,6 @@ export function LoginPage() {
         encryptedPrivate: response.encrypted_private,
         rsaPublicKey: response.rsa_public_key,
       });
-
       await handleLoginResponse(response, password);
     } catch (e: any) {
       setToast({ message: e.message || t("auth.login.loginFailed"), type: "error" });
@@ -143,8 +136,6 @@ export function LoginPage() {
       setLoading(false);
     }
   };
-
-  // ── 手机登录 ─────────────────────────────────────
 
   const handleSendCode = async () => {
     if (!phone) return;
@@ -187,8 +178,6 @@ export function LoginPage() {
     }
   };
 
-  // ── Google 登录 ──────────────────────────────────
-
   const handleGooglePasswordLogin = async () => {
     if (!googlePassword) {
       setToast({ message: t("auth.login.enterPassword"), type: "error" });
@@ -197,8 +186,6 @@ export function LoginPage() {
     setLoading(true);
     try {
       const response = await apiClient.loginGoogle({ google_id_token: googleIdToken });
-      // Google 登录不传 password_hash 到后端，后端只验证 id_token
-      // 但客户端仍需要用密码解锁 masterKey
       await saveSession({
         email: "google",
         passwordSalt: response.password_salt,
@@ -215,7 +202,6 @@ export function LoginPage() {
     }
   };
 
-  // ── Tab 标签 ─────────────────────────────────────
   const tabs: { key: LoginTab; label: string }[] = [
     { key: "email", label: t("auth.login.emailTab") },
     { key: "phone", label: t("auth.login.phoneTab") },
@@ -241,75 +227,76 @@ export function LoginPage() {
         ))}
       </div>
 
-      {tab === "email" ? (
-        <>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.login.emailLabel")}</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.login.emailPlaceholder")}
-              style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+      {/* Email tab */}
+      <div style={{ display: tab === "email" ? "block" : "none" }}>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.login.emailLabel")}</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.login.emailPlaceholder")}
+            style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+        </div>
+        <PasswordInput label={t("auth.login.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.login.passwordPlaceholder")} />
+        <button onClick={handleEmailLogin} disabled={loading} style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+          {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
+        </button>
+      </div>
+
+      {/* Phone tab */}
+      <div style={{ display: tab === "phone" ? "block" : "none" }}>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.login.phoneLabel")}</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.login.phonePlaceholder")}
+              style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+            <button onClick={handleSendCode} disabled={sendingCode || !phone}
+              style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+              {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.login.sendCode")}
+            </button>
           </div>
-          <PasswordInput label={t("auth.login.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.login.passwordPlaceholder")} />
-          <button onClick={handleEmailLogin} disabled={loading} style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-            {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
-          </button>
-        </>
-      ) : tab === "phone" ? (
-        <>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.login.phoneLabel")}</label>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.login.phonePlaceholder")}
-                style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-              <button onClick={handleSendCode} disabled={sendingCode || !phone}
-                style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.login.sendCode")}
-              </button>
-            </div>
-          </div>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.login.codeLabel")}</label>
-            <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("auth.login.codePlaceholder")} maxLength={6}
-              style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-          </div>
-          <PasswordInput label={t("auth.login.passwordLabel")} value={phonePassword} onChange={(e) => setPhonePassword(e.target.value)} placeholder={t("auth.login.passwordPlaceholder")} />
-          <button onClick={handlePhoneLogin} disabled={loading} style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-            {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
-          </button>
-        </>
-      ) : (
-        <>
-          {!googleAuthed ? (
-            <div style={{ textAlign: "center", padding: "1rem 0" }}>
-              <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "1rem" }}>
-                {t("auth.login.googleDesc")}
-              </p>
-              {!googleReady ? (
-                <div style={{ padding: "0.75rem", color: "#999", fontSize: "0.85rem" }}>
-                  {googleTimeout ? t("auth.login.googleTimeout") : t("auth.login.googleLoading")}
-                </div>
-              ) : (
-                <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
-              )}
-              {!GOOGLE_CLIENT_ID && (
-                <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginTop: "0.75rem" }}>
-                  {t("auth.login.googleNotConfigured")}
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
-                {t("auth.login.googleVerified")}
+        </div>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.login.codeLabel")}</label>
+          <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("auth.login.codePlaceholder")} maxLength={6}
+            style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+        </div>
+        <PasswordInput label={t("auth.login.passwordLabel")} value={phonePassword} onChange={(e) => setPhonePassword(e.target.value)} placeholder={t("auth.login.passwordPlaceholder")} />
+        <button onClick={handlePhoneLogin} disabled={loading} style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+          {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
+        </button>
+      </div>
+
+      {/* Google tab — 始终在 DOM 中，只隐藏不销毁 */}
+      <div style={{ display: tab === "google" ? "block" : "none" }}>
+        {!googleAuthed ? (
+          <div style={{ textAlign: "center", padding: "1rem 0" }}>
+            <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "1rem" }}>
+              {t("auth.login.googleDesc")}
+            </p>
+            {!googleReady ? (
+              <div style={{ padding: "0.75rem", color: "#999", fontSize: "0.85rem" }}>
+                {googleTimeout ? t("auth.login.googleTimeout") : t("auth.login.googleLoading")}
               </div>
-              <PasswordInput label={t("auth.login.passwordLabel")} value={googlePassword} onChange={(e) => setGooglePassword(e.target.value)} placeholder={t("auth.login.googlePasswordPlaceholder")} />
-              <button onClick={handleGooglePasswordLogin} disabled={loading}
-                style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-                {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
-              </button>
-            </>
-          )}
-        </>
-      )}
+            ) : (
+              <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
+            )}
+            {!GOOGLE_CLIENT_ID && (
+              <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginTop: "0.75rem" }}>
+                {t("auth.login.googleNotConfigured")}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
+              {t("auth.login.googleVerified")}
+            </div>
+            <PasswordInput label={t("auth.login.passwordLabel")} value={googlePassword} onChange={(e) => setGooglePassword(e.target.value)} placeholder={t("auth.login.googlePasswordPlaceholder")} />
+            <button onClick={handleGooglePasswordLogin} disabled={loading}
+              style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+              {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
+            </button>
+          </>
+        )}
+      </div>
 
       <div style={{ marginTop: "1.5rem", textAlign: "center", fontSize: "0.85rem", color: "#666" }}>
         <Link to="/register" style={{ color: "#0f3460", textDecoration: "none", fontWeight: 500 }}>{t("auth.login.registerLink")}</Link>

@@ -6,7 +6,6 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
 import { keyManager } from "../../services/keyManager";
-import { useAuth } from "../../context/AuthContext";
 import { saveSession } from "../../db/sessionStore";
 import { GOOGLE_CLIENT_ID } from "../../config/constants";
 
@@ -29,7 +28,6 @@ declare global {
 export function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [tab, setTab] = useState<RegisterTab>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,15 +38,14 @@ export function RegisterPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
-  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
 
-  // Google
   const [googleIdToken, setGoogleIdToken] = useState("");
   const [googleAuthed, setGoogleAuthed] = useState(false);
   const googleInitRef = useRef(false);
   const [googleReady, setGoogleReady] = useState(false);
   const [googleTimeout, setGoogleTimeout] = useState(false);
 
+  // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
   useEffect(() => {
     if (googleInitRef.current || !GOOGLE_CLIENT_ID) return;
     const timer = setInterval(() => {
@@ -70,9 +67,9 @@ export function RegisterPage() {
     return () => { clearInterval(timer); clearTimeout(timeout); };
   }, []);
 
-  // 切到 Google tab 或 SDK 就绪时渲染按钮
+  // SDK 就绪时渲染按钮（面板始终在 DOM 中）
   useEffect(() => {
-    if (tab === "google" && googleBtnRef.current && googleReady) {
+    if (googleBtnRef.current && googleReady) {
       window.google?.accounts.id.renderButton(googleBtnRef.current, {
         type: "standard",
         theme: "outline",
@@ -82,7 +79,7 @@ export function RegisterPage() {
         width: 300,
       });
     }
-  }, [tab, googleReady]);
+  }, [googleReady]);
 
   const handleRegister = async () => {
     if (tab === "email" && (!email || !code || !password)) {
@@ -115,7 +112,6 @@ export function RegisterPage() {
           recoveryWrapped: keys.recoveryWrapped, encryptedPrivate: keys.encryptedPrivate,
           rsaPublicKey: keys.rsaPublicKey,
         });
-        await login(response.access_token, response.refresh_token, response.user_id);
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
@@ -128,7 +124,6 @@ export function RegisterPage() {
           recoveryWrapped: keys.recoveryWrapped, encryptedPrivate: keys.encryptedPrivate,
           rsaPublicKey: keys.rsaPublicKey,
         });
-        await login(response.access_token, response.refresh_token, response.user_id);
       } else {
         const response = await apiClient.registerGoogle({
           google_id_token: googleIdToken,
@@ -142,10 +137,9 @@ export function RegisterPage() {
           recoveryWrapped: keys.recoveryWrapped, encryptedPrivate: keys.encryptedPrivate,
           rsaPublicKey: keys.rsaPublicKey,
         });
-        await login(response.access_token, response.refresh_token, response.user_id);
       }
 
-      setRecoveryCode(keys.recoveryCode);
+      navigate("/register/recovery");
     } catch (e: any) {
       setToast({ message: e.message || t("auth.register.registerFailed"), type: "error" });
       setLoading(false);
@@ -167,33 +161,6 @@ export function RegisterPage() {
     }
   };
 
-  if (recoveryCode) {
-    return (
-      <AuthLayout title={t("auth.register.successTitle")} subtitle={t("auth.register.successSubtitle")}>
-        <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 8, padding: "1rem", marginBottom: "1rem" }}>
-          <p style={{ fontSize: "0.85rem", color: "#856404", marginBottom: "0.5rem", fontWeight: 600 }}>
-            {t("auth.register.recoveryWarning")}
-          </p>
-          <p style={{ fontSize: "0.8rem", color: "#856404", marginBottom: "0.75rem" }}>
-            {t("auth.register.recoveryWarningDetail")}
-          </p>
-          <div style={{ background: "#fff", border: "1px solid #ffc107", borderRadius: 6, padding: "0.75rem", fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 700, textAlign: "center", wordBreak: "break-word", color: "#333" }}>
-            {recoveryCode}
-          </div>
-        </div>
-        <button onClick={() => { navigator.clipboard.writeText(recoveryCode); setToast({ message: t("auth.register.copied"), type: "success" }); }}
-          style={{ width: "100%", padding: "0.5rem", marginBottom: "0.75rem", background: "#f5f5f5", border: "1px solid #ddd", borderRadius: 8, cursor: "pointer", fontSize: "0.9rem" }}>
-          {t("auth.register.copyRecoveryCode")}
-        </button>
-        <button onClick={() => navigate("/")}
-          style={{ width: "100%", padding: "0.75rem", background: "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: "pointer" }}>
-          {t("auth.register.savedAndEnter")}
-        </button>
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      </AuthLayout>
-    );
-  }
-
   const tabs: { key: RegisterTab; label: string }[] = [
     { key: "email", label: t("auth.register.emailTab") },
     { key: "phone", label: t("auth.register.phoneTab") },
@@ -211,76 +178,77 @@ export function RegisterPage() {
         ))}
       </div>
 
-      {tab === "email" ? (
-        <>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.emailLabel")}</label>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.register.emailPlaceholder")}
-                style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-              <button onClick={() => handleSendCode("email")} disabled={sendingCode || !email}
-                style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.register.sendCode")}
-              </button>
-            </div>
+      {/* Email tab */}
+      <div style={{ display: tab === "email" ? "block" : "none" }}>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.emailLabel")}</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.register.emailPlaceholder")}
+              style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+            <button onClick={() => handleSendCode("email")} disabled={sendingCode || !email}
+              style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+              {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.register.sendCode")}
+            </button>
           </div>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.codeLabel")}</label>
-            <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("auth.register.codePlaceholder")} maxLength={6}
-              style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+        </div>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.codeLabel")}</label>
+          <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("auth.register.codePlaceholder")} maxLength={6}
+            style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+        </div>
+        <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
+      </div>
+
+      {/* Phone tab */}
+      <div style={{ display: tab === "phone" ? "block" : "none" }}>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.phoneLabel")}</label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.register.phonePlaceholder")}
+              style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+            <button onClick={() => handleSendCode("phone")} disabled={sendingCode || !phone}
+              style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+              {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.register.sendCode")}
+            </button>
           </div>
-          <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
-        </>
-      ) : tab === "phone" ? (
-        <>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.phoneLabel")}</label>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.register.phonePlaceholder")}
-                style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-              <button onClick={() => handleSendCode("phone")} disabled={sendingCode || !phone}
-                style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.register.sendCode")}
-              </button>
-            </div>
-          </div>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.codeLabel")}</label>
-            <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("auth.register.codePlaceholder")} maxLength={6}
-              style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-          </div>
-          <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
-        </>
-      ) : (
-        <>
-          {!googleAuthed ? (
-            <div style={{ textAlign: "center", padding: "1rem 0" }}>
-              <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "1rem" }}>
-                {t("auth.register.googleDesc")}
-              </p>
-              {!googleReady ? (
-                <div style={{ padding: "0.75rem", color: "#999", fontSize: "0.85rem" }}>
-                  {googleTimeout ? t("auth.login.googleTimeout") : t("auth.login.googleLoading")}
-                </div>
-              ) : (
-                <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
-              )}
-              {!GOOGLE_CLIENT_ID && (
-                <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginTop: "0.75rem" }}>
-                  {t("auth.register.googleNotConfigured")}
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
-                {t("auth.register.googleVerified")}
+        </div>
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.register.codeLabel")}</label>
+          <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("auth.register.codePlaceholder")} maxLength={6}
+            style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+        </div>
+        <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
+      </div>
+
+      {/* Google tab — 始终在 DOM 中，只隐藏不销毁 */}
+      <div style={{ display: tab === "google" ? "block" : "none" }}>
+        {!googleAuthed ? (
+          <div style={{ textAlign: "center", padding: "1rem 0" }}>
+            <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "1rem" }}>
+              {t("auth.register.googleDesc")}
+            </p>
+            {!googleReady ? (
+              <div style={{ padding: "0.75rem", color: "#999", fontSize: "0.85rem" }}>
+                {googleTimeout ? t("auth.login.googleTimeout") : t("auth.login.googleLoading")}
               </div>
-              <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
-            </>
-          )}
-        </>
-      )}
+            ) : (
+              <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
+            )}
+            {!GOOGLE_CLIENT_ID && (
+              <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginTop: "0.75rem" }}>
+                {t("auth.register.googleNotConfigured")}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
+              {t("auth.register.googleVerified")}
+            </div>
+            <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
+          </>
+        )}
+      </div>
 
       <button onClick={handleRegister} disabled={loading}
         style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
