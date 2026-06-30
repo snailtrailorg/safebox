@@ -115,7 +115,7 @@ class KeyManager {
         "raw",
         masterRaw as BufferSource,
         "AES-GCM",
-        false,
+        true,
         ["encrypt", "decrypt"],
       );
       return true;
@@ -137,7 +137,7 @@ class KeyManager {
         "raw",
         masterRaw as BufferSource,
         "AES-GCM",
-        false,
+        true,
         ["encrypt", "decrypt"],
       );
       return true;
