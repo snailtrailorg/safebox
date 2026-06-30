@@ -3,6 +3,7 @@
  * 对应 Android ItemDao.kt
  */
 import { getDb } from "./database";
+import { getCurrentUserId } from "./sessionStore";
 import type { Item, ItemType } from "../types/domain";
 
 /** 获取用户的所有未删除条目（按更新时间倒序） */
@@ -162,8 +163,9 @@ export async function upsertFromServer(
       });
     } else {
       // 新增
+      const uid = await getCurrentUserId();
       await db.add("items", {
-        uid: 1, // TODO: 从 session 获取
+        uid,
         type: remote.type as ItemType,
         icon: remote.icon,
         name: remote.name,

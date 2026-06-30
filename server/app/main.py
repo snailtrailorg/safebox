@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
+from app.config import settings
 from app.database import Base, get_engine
 
 
@@ -24,10 +25,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS（开发阶段允许所有来源）
+# CORS — 通过 SAFEBOX_CORS_ORIGINS 环境变量配置，默认开发模式允许所有
+cors_origins = settings.cors_origins.split(",") if settings.cors_origins != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

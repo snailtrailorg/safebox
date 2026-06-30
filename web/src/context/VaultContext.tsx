@@ -4,6 +4,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { Item, ItemType } from "../types/domain";
 import { getUserItems, upsertItem, softDeleteItem, getItem } from "../db/itemsStore";
+import { getCurrentUserId } from "../db/sessionStore";
 import { sync } from "../services/sync";
 import { useAuth } from "./AuthContext";
 
@@ -65,10 +66,9 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, isSyncing: true, error: null }));
     try {
       const result = await sync();
-      // 重新加载
-      const items = await getUserItems(1); // TODO: use real uid
+      const uid = await getCurrentUserId();
+      const items = await getUserItems(uid);
       setState((s) => ({ ...s, items, isSyncing: false }));
-      console.log(`Synced: pushed ${result.pushed}, pulled ${result.pulled}`);
     } catch (e) {
       setState((s) => ({
         ...s,
@@ -85,7 +85,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   // 登录后自动加载
   useEffect(() => {
     if (isLoggedIn) {
-      loadItems(1); // TODO: use real uid
+      getCurrentUserId().then((uid) => loadItems(uid));
     }
   }, [isLoggedIn, loadItems]);
 

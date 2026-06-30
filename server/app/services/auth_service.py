@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import bcrypt
-from jose import jwt
+import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,7 +50,9 @@ def decode_refresh_token(token: str) -> UUID | None:
         if payload.get("type") != "refresh":
             return None
         return UUID(payload["sub"])
-    except Exception:
+    except (jwt.InvalidTokenError, KeyError, ValueError) as e:
+        import logging
+        logging.getLogger("safebox").warning(f"Refresh token decode failed: {e}")
         return None
 
 

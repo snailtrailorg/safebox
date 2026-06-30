@@ -6,6 +6,7 @@
 import { deriveKey, generateSalt } from "../crypto/pbkdf2";
 import { aesEncrypt, aesDecrypt } from "../crypto/aes";
 import { getUserItems, upsertItem } from "../db/itemsStore";
+import { getCurrentUserId } from "../db/sessionStore";
 import type { Item } from "../types/domain";
 
 const BACKUP_EXTENSION = ".safebox";
@@ -25,7 +26,8 @@ interface BackupPayload {
 
 /** 导出加密备份 */
 export async function exportBackup(password: string): Promise<void> {
-  const items = await getUserItems(1);
+  const uid = await getCurrentUserId();
+  const items = await getUserItems(uid);
   const payload: BackupPayload = {
     version: 1,
     items: items.map((i) => ({
@@ -77,10 +79,11 @@ export async function importBackup(password: string, file: File): Promise<number
   const payload: BackupPayload = JSON.parse(new TextDecoder().decode(plainBytes));
   if (payload.version !== 1) throw new Error(`不支持的备份版本: ${payload.version}`);
 
+  const uid = await getCurrentUserId();
   let count = 0;
   for (const item of payload.items) {
     await upsertItem({
-      uid: 1,
+      uid,
       type: item.type as Item["type"],
       icon: item.icon,
       name: item.name,

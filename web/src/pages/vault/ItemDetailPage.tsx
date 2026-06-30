@@ -69,7 +69,9 @@ export function ItemDetailPage() {
         try {
           const plain = await keyManager.decryptItemData(found.data);
           if (plain) setDecryptedData(JSON.parse(plain));
-        } catch { /* ignore */ }
+        } catch {
+          console.warn("Failed to decrypt file type item data, using raw data");
+        }
       }
     })();
   }, [did]);

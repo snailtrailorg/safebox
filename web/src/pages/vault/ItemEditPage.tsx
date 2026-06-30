@@ -6,6 +6,7 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { useVault } from "../../context/VaultContext";
 import { getItem, saveFileBlob } from "../../db/itemsStore";
+import { getCurrentUserId } from "../../db/sessionStore";
 import { keyManager } from "../../services/keyManager";
 import { generatePassword } from "../../utils/password";
 import type { Item, ItemType } from "../../types/domain";
@@ -101,9 +102,10 @@ export function ItemEditPage() {
       const dataJson = JSON.stringify(dataFields);
       const encrypted = await keyManager.encryptItemData(dataJson);
 
+      const uid = await getCurrentUserId();
       const item: Item = {
         did: isEdit && did ? parseInt(did) : 0,
-        uid: 1,
+        uid,
         type: itemType,
         icon: null,
         name: name.trim(),

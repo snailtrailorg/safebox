@@ -67,3 +67,15 @@ export async function hasSession(): Promise<boolean> {
   const session = await getSession();
   return !!session.accessToken;
 }
+
+/** 获取当前用户 ID（从 serverUserId 派生稳定数字，用于 IndexedDB 索引） */
+export async function getCurrentUserId(): Promise<number> {
+  const session = await getSession();
+  if (!session.serverUserId) return 1;
+  // djb2 hash — 相同 UUID 总是产生相同数字
+  let hash = 5381;
+  for (let i = 0; i < session.serverUserId.length; i++) {
+    hash = ((hash << 5) + hash) + session.serverUserId.charCodeAt(i);
+  }
+  return Math.abs(hash) || 1;
+}

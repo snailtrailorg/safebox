@@ -16,6 +16,7 @@ async def verify_google_id_token(token: str) -> str | None:
     try:
         from google.oauth2 import id_token
         from google.auth.transport import requests as google_requests
+        from google.auth.exceptions import GoogleAuthError
 
         import asyncio
         loop = asyncio.get_running_loop()
@@ -29,6 +30,7 @@ async def verify_google_id_token(token: str) -> str | None:
             return idinfo.get("sub")
 
         return await loop.run_in_executor(None, _verify)
-    except Exception as e:
-        print(f"[GOOGLE AUTH ERROR] {e}")
+    except (GoogleAuthError, ValueError) as e:
+        import logging
+        logging.getLogger("safebox").warning(f"Google ID token verification failed: {e}")
         return None
