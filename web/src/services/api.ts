@@ -143,7 +143,7 @@ class ApiClient {
     return this.request("POST", "/auth/register/google", req, true);
   }
 
-  async getSalt(email?: string, phone?: string): Promise<{ password_salt: string }> {
+  async getSalt(email?: string, phone?: string): Promise<{ password_salt: string; recovery_wrapped?: string; encrypted_private?: string; rsa_public_key?: string }> {
     const params = new URLSearchParams();
     if (email) params.set("email", email);
     if (phone) params.set("phone", phone);

@@ -75,7 +75,13 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
         user = await find_user_by_phone(db, phone)
 
     if user:
-        return {"password_salt": user.password_salt}
+        keys = await get_user_keys(db, user.id)
+        return {
+            "password_salt": user.password_salt,
+            "recovery_wrapped": keys.recovery_wrapped if keys else "",
+            "encrypted_private": keys.encrypted_private if keys else "",
+            "rsa_public_key": keys.rsa_public_key if keys else "",
+        }
     # 用户不存在时返回随机 salt，防止枚举
     import secrets
     return {"password_salt": secrets.token_hex(16)}

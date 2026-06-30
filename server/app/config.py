@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Google OAuth
     google_client_id: str = ""
 
+    # CORS
+    cors_origins: str = "*"
+
     # 同步
     sync_batch_limit: int = 100
 
