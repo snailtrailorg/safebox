@@ -31,28 +31,24 @@ let dbInstance: IDBPDatabase<SafeBoxDB> | null = null;
 
 export async function getDb(): Promise<IDBPDatabase<SafeBoxDB>> {
   if (dbInstance) return dbInstance;
+
   dbInstance = await openDB<SafeBoxDB>("safebox", 1, {
     upgrade(db) {
-      // Session store
       if (!db.objectStoreNames.contains("session")) {
         db.createObjectStore("session", { keyPath: "key" });
       }
-      // Items store
       if (!db.objectStoreNames.contains("items")) {
-        const store = db.createObjectStore("items", {
-          keyPath: "did",
-          autoIncrement: true,
-        });
+        const store = db.createObjectStore("items", { keyPath: "did", autoIncrement: true });
         store.createIndex("by-uid", "uid");
         store.createIndex("by-serverId", "serverId");
         store.createIndex("by-dirty", "isDirty");
       }
-      // File blobs store (AES-GCM encrypted file content)
       if (!db.objectStoreNames.contains("fileBlobs")) {
         db.createObjectStore("fileBlobs", { keyPath: "did" });
       }
     },
   });
+
   return dbInstance;
 }
 
@@ -60,7 +56,6 @@ export async function getDb(): Promise<IDBPDatabase<SafeBoxDB>> {
 export function isIndexedDBAvailable(): boolean {
   try {
     if (typeof indexedDB === "undefined") return false;
-    // 某些浏览器在无痕模式下会拒绝 open
     const test = indexedDB.open("__test__", 1);
     test.onblocked = () => {};
     return true;

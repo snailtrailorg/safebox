@@ -123,7 +123,7 @@
       "emptyTitle": "Vault is Empty",
       "emptySubtitle": "Tap + to add your first password",
       "deleteSwipe": "🗑️ Delete",
-      "confirmDelete": "Delete \"{name}\"?",
+      "confirmDelete": "Delete \"{{name}}\"?",
       "deleted": "Deleted.",
       "deleteFailed": "Delete failed.",
       "typeAndroid": "Android App",
@@ -178,7 +178,7 @@
       "filePath": "File Path",
       "filePathPlaceholder": "/path/to/file",
       "chooseFile": "Choose File…",
-      "fileSelected": "Selected: {name} ({size})",
+      "fileSelected": "Selected: {{name}} ({{size}})",
       "noFile": "Please select a file"
     }
   },
@@ -217,7 +217,7 @@
     "backupDownloaded": "Backup downloaded.",
     "exportFailed": "Export failed.",
     "importPasswordPrompt": "Enter backup password:",
-    "imported": "Imported {count} item(s).",
+    "imported": "Imported {{count}} item(s).",
     "importFailed": "Import failed."
   },
 

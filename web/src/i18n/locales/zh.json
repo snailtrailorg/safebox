@@ -123,7 +123,7 @@
       "emptyTitle": "密码库为空",
       "emptySubtitle": "点击右下角 + 添加第一条密码",
       "deleteSwipe": "🗑️ 删除",
-      "confirmDelete": "确定删除「{name}」？",
+      "confirmDelete": "确定删除「{{name}}」？",
       "deleted": "已删除",
       "deleteFailed": "删除失败",
       "typeAndroid": "Android 应用",
@@ -178,7 +178,7 @@
       "filePath": "文件路径",
       "filePathPlaceholder": "/path/to/file",
       "chooseFile": "选择文件…",
-      "fileSelected": "已选择: {name} ({size})",
+      "fileSelected": "已选择: {{name}} ({{size}})",
       "noFile": "请选择文件"
     }
   },
@@ -217,7 +217,7 @@
     "backupDownloaded": "备份已下载",
     "exportFailed": "导出失败",
     "importPasswordPrompt": "输入备份密码：",
-    "imported": "已导入 {count} 条条目",
+    "imported": "已导入 {{count}} 条条目",
     "importFailed": "导入失败"
   },
 
