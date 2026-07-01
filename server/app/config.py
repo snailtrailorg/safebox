@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # 数据库
     database_url: str = "postgresql+asyncpg://safebox:safebox@localhost:5432/safebox"
 
-    # JWT
+    # JWT — 生产环境必须覆盖此默认值
     jwt_secret_key: str = "change-me-in-production-use-openssl-rand-hex-32"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from: str = "noreply@safebox.example.com"
+
+    # Debug mode — 关闭时 Google OAuth 必须配置真实凭证
+    debug: bool = True
 
     # Google OAuth
     google_client_id: str = ""

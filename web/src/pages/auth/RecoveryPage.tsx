@@ -27,7 +27,7 @@ export function RecoveryPage() {
 
   const handleVerifyRecovery = async () => {
     if (!email.trim()) {
-      setToast({ message: "请输入邮箱", type: "error" });
+      setToast({ message: t("auth.recovery.enterEmail"), type: "error" });
       return;
     }
     if (!recoveryCode.trim()) {
@@ -36,10 +36,9 @@ export function RecoveryPage() {
     }
     setLoading(true);
     try {
-      // 从服务端获取密钥材料
       const keyData = await apiClient.getSalt(email);
       if (!keyData.recovery_wrapped) {
-        setToast({ message: "该邮箱未注册", type: "error" });
+        setToast({ message: t("auth.recovery.emailNotRegistered"), type: "error" });
         setLoading(false);
         return;
       }
@@ -62,7 +61,7 @@ export function RecoveryPage() {
       }
 
       setRecoveryVerified(true);
-      setToast({ message: "恢复码验证成功，请设置新密码", type: "success" });
+      setToast({ message: t("auth.recovery.codeVerified"), type: "success" });
     } catch (e: any) {
       setToast({ message: e.message || t("auth.recovery.recoverFailed"), type: "error" });
     } finally {
@@ -75,9 +74,9 @@ export function RecoveryPage() {
     try {
       await apiClient.sendCode({ target: "email", value: email });
       setCodeSent(true);
-      setToast({ message: "验证码已发送到邮箱", type: "success" });
+      setToast({ message: t("auth.recovery.codeSentToEmail"), type: "success" });
     } catch (e: any) {
-      setToast({ message: e.message || "发送失败", type: "error" });
+      setToast({ message: e.message || t("auth.recovery.sendFailed"), type: "error" });
     } finally {
       setSendingCode(false);
     }
@@ -85,11 +84,11 @@ export function RecoveryPage() {
 
   const handleResetPassword = async () => {
     if (!newPassword || !verifyCode) {
-      setToast({ message: "请输入新密码和验证码", type: "error" });
+      setToast({ message: t("auth.recovery.enterNewPwAndCode"), type: "error" });
       return;
     }
     if (newPassword.length < 8) {
-      setToast({ message: "密码至少 8 位", type: "error" });
+      setToast({ message: t("auth.recovery.passwordMinLength"), type: "error" });
       return;
     }
     setLoading(true);
@@ -113,7 +112,7 @@ export function RecoveryPage() {
       await login("", "", "");
       navigate("/");
     } catch (e: any) {
-      setToast({ message: e.message || "重置失败", type: "error" });
+      setToast({ message: e.message || t("auth.recovery.resetFailed"), type: "error" });
     } finally {
       setLoading(false);
     }
@@ -124,8 +123,8 @@ export function RecoveryPage() {
       {!recoveryVerified ? (
         <>
           <div style={{ marginBottom: "0.75rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>邮箱</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com"
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>{t("auth.recovery.emailLabel")}</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.recovery.emailPlaceholder")}
               style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: "1rem" }}>
@@ -136,17 +135,17 @@ export function RecoveryPage() {
           </div>
           <button onClick={handleVerifyRecovery} disabled={loading}
             style={{ width: "100%", padding: "0.75rem", background: loading ? "#95a5a6" : "#e74c3c", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-            {loading ? t("common.loading") : "验证恢复码"}
+            {loading ? t("common.loading") : t("auth.recovery.verifyBtn")}
           </button>
         </>
       ) : (
         <>
           <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
-            ✅ 恢复码验证成功
+            {t("auth.recovery.verified")}
           </div>
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
             <input type="text" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)}
-              placeholder="邮箱验证码" maxLength={6}
+              placeholder={t("auth.recovery.verifyCodePlaceholder")} maxLength={6}
               style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }} />
             <button onClick={handleSendCode} disabled={sendingCode || codeSent}
               style={{ padding: "0.5rem 0.75rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
@@ -154,10 +153,10 @@ export function RecoveryPage() {
             </button>
           </div>
           <PasswordInput label={t("auth.recovery.newPasswordLabel")} value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 8 位" />
+            onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.recovery.newPasswordPlaceholder")} />
           <button onClick={handleResetPassword} disabled={loading}
             style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#e74c3c", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-            {loading ? t("common.loading") : "重置密码并登录"}
+            {loading ? t("common.loading") : t("auth.recovery.resetAndLoginBtn")}
           </button>
         </>
       )}

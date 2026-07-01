@@ -35,7 +35,12 @@ async def send_sms(phone: str, code: str, lang: str = "en") -> bool:
         "Body": get_text("sms_body", lang, code=code, minutes=minutes),
     }
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, data=body, auth=auth)
-        data = resp.json()
-        return data.get("status") in ("queued", "sent", "delivered")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, data=body, auth=auth, timeout=10)
+            data = resp.json()
+            return data.get("status") in ("queued", "sent", "delivered")
+    except Exception as e:
+        import logging
+        logging.getLogger("safebox").error(f"SMS send failed: {e}")
+        return False

@@ -5,6 +5,8 @@ import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
 import { getItem, softDeleteItem, getFileBlob } from "../../db/itemsStore";
 import { keyManager } from "../../services/keyManager";
+import { formatFileSize } from "../../utils/format";
+import { ITEM_TYPES } from "../../config/itemTypes";
 import type { Item } from "../../types/domain";
 
 function SensitiveField({ label, value }: { label: string; value: string }) {
@@ -35,12 +37,6 @@ function SensitiveField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export function ItemDetailPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
@@ -59,21 +55,23 @@ export function ItemDetailPage() {
   };
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       if (!did) return;
       const found = await getItem(parseInt(did));
+      if (cancelled) return;
       setItem(found || null);
       setLoading(false);
-      // 文件类型：自动解密元数据
       if (found?.type === "file" && found.data) {
         try {
           const plain = await keyManager.decryptItemData(found.data);
-          if (plain) setDecryptedData(JSON.parse(plain));
+          if (!cancelled && plain) setDecryptedData(JSON.parse(plain));
         } catch {
           console.warn("Failed to decrypt file type item data, using raw data");
         }
       }
     })();
+    return () => { cancelled = true; };
   }, [did]);
 
   const handleShowSensitive = async () => {

@@ -104,16 +104,30 @@
     },
     "recovery": {
       "title": "恢复账号",
+      "emailLabel": "邮箱",
+      "emailPlaceholder": "your@email.com",
       "recoveryCodeLabel": "恢复码",
       "recoveryCodePlaceholder": "输入 12 个英文单词，用空格分隔",
-      "newPasswordLabel": "新密码（可选）",
-      "newPasswordPlaceholder": "留空则不修改密码",
+      "newPasswordLabel": "新密码",
+      "newPasswordPlaceholder": "至少 8 位",
       "submitBtn": "恢复账号",
       "enterRecoveryCode": "请输入恢复码",
+      "enterEmail": "请输入邮箱",
+      "emailNotRegistered": "该邮箱未注册",
       "noLocalKeys": "本地无密钥材料，请先在已注册设备上登录",
       "invalidCode": "恢复码无效",
       "recoveryFailed": "密钥恢复失败",
-      "recoverFailed": "恢复失败"
+      "recoverFailed": "恢复失败",
+      "codeVerified": "恢复码验证成功，请设置新密码",
+      "codeSentToEmail": "验证码已发送到邮箱",
+      "sendFailed": "发送失败",
+      "enterNewPwAndCode": "请输入新密码和验证码",
+      "passwordMinLength": "密码至少 8 位",
+      "resetFailed": "重置失败",
+      "verifyBtn": "验证恢复码",
+      "verified": "✅ 恢复码验证成功",
+      "verifyCodePlaceholder": "邮箱验证码",
+      "resetAndLoginBtn": "重置密码并登录"
     }
   },
 

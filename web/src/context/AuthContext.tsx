@@ -3,7 +3,7 @@
  */
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { keyManager } from "../services/keyManager";
-import { hasSession, clearSession, saveSession } from "../db/sessionStore";
+import { hasSession, clearSession, saveSession, getSession } from "../db/sessionStore";
 import { isIndexedDBAvailable } from "../db/database";
 import { apiClient } from "../services/api";
 
@@ -46,11 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const has = await hasSession();
+    const session = has ? await getSession() : null;
     setState({
       isLoggedIn: has && keyManager.isUnlocked,
       isUnlocked: keyManager.isUnlocked,
       isLoading: false,
-      userId: "",
+      userId: session?.serverUserId || "",
       dbUnavailable: false,
     });
   }, []);

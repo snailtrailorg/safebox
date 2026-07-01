@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -104,10 +104,17 @@ async def send_code(req: SendCodeRequest, request: Request, db: AsyncSession = D
     code = generate_code()
 
     # 实际发送验证码
+    sent = False
     if req.target == "phone":
-        await send_sms(req.value, code, lang)
+        sent = await send_sms(req.value, code, lang)
     else:
-        await send_verification_email(req.value, code, lang)
+        sent = await send_verification_email(req.value, code, lang)
+
+    if not sent and not settings.debug:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to send verification code",
+        )
 
     await store_code(req.target, req.value, code)
 
@@ -232,6 +239,11 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
 @router.post("/login/email", response_model=LoginResponse)
 async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """邮箱 + 密码登录。"""
+    if not await check_rate_limit("email", req.email):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=_("verification_code_rate_limited", seconds=settings.verification_code_rate_limit_seconds),
+        )
     user = await find_user_by_email(db, req.email)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
@@ -245,6 +257,11 @@ async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db)
 @router.post("/login/phone", response_model=LoginResponse)
 async def login_phone(req: LoginPhoneRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """手机号 + 验证码 + 密码登录。"""
+    if not await check_rate_limit("phone", req.phone):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=_("verification_code_rate_limited", seconds=settings.verification_code_rate_limit_seconds),
+        )
     if not await verify_and_consume("phone", req.phone, req.verification_code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 

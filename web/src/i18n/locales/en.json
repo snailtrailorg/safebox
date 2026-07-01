@@ -104,16 +104,30 @@
     },
     "recovery": {
       "title": "Recover Account",
+      "emailLabel": "Email",
+      "emailPlaceholder": "your@email.com",
       "recoveryCodeLabel": "Recovery Phrase",
       "recoveryCodePlaceholder": "Enter 12 English words separated by spaces",
-      "newPasswordLabel": "New Password (optional)",
-      "newPasswordPlaceholder": "Leave blank to keep current password",
+      "newPasswordLabel": "New Password",
+      "newPasswordPlaceholder": "At least 8 characters",
       "submitBtn": "Recover Account",
       "enterRecoveryCode": "Please enter recovery phrase.",
+      "enterEmail": "Please enter your email.",
+      "emailNotRegistered": "This email is not registered.",
       "noLocalKeys": "No local key material found. Please sign in on a registered device first.",
       "invalidCode": "Invalid recovery phrase.",
       "recoveryFailed": "Key recovery failed.",
-      "recoverFailed": "Recovery failed."
+      "recoverFailed": "Recovery failed.",
+      "codeVerified": "Recovery phrase verified. Please set a new password.",
+      "codeSentToEmail": "Verification code sent to your email.",
+      "sendFailed": "Failed to send code.",
+      "enterNewPwAndCode": "Please enter new password and verification code.",
+      "passwordMinLength": "Password must be at least 8 characters.",
+      "resetFailed": "Reset failed.",
+      "verifyBtn": "Verify Recovery Phrase",
+      "verified": "✅ Recovery Phrase Verified",
+      "verifyCodePlaceholder": "Email verification code",
+      "resetAndLoginBtn": "Reset Password & Sign In"
     }
   },
 

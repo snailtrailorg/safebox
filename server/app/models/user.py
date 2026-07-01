@@ -95,9 +95,9 @@ class Item(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    client_did: Mapped[int | None] = mapped_column(nullable=True)
+    client_did: Mapped[int | None] = mapped_column(nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(20))
     icon: Mapped[str | None] = mapped_column(Text, nullable=True)
     name: Mapped[str] = mapped_column(Text)       # RSA 加密 + Base64

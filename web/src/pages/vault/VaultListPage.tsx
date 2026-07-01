@@ -4,13 +4,8 @@ import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
 import { useVault } from "../../context/VaultContext";
+import { ITEM_TYPES, TYPE_ICONS } from "../../config/itemTypes";
 import type { Item, ItemType } from "../../types/domain";
-
-const TYPE_ICONS: Record<ItemType, string> = {
-  android: "🤖",
-  account: "🔑",
-  file: "📁",
-};
 
 export function VaultListPage() {
   const { t } = useTranslation();
@@ -189,7 +184,7 @@ export function VaultListPage() {
             boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
             overflow: "hidden", minWidth: 180,
           }}>
-            {(["android", "account", "file"] as ItemType[]).map((type) => (
+            {ITEM_TYPES.map((type) => (
               <button
                 key={type}
                 onClick={() => handleAdd(type)}

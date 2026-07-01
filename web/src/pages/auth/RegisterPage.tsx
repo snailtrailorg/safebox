@@ -63,7 +63,10 @@ export function RegisterPage() {
         });
       }
     }, 200);
-    const timeout = setTimeout(() => setGoogleTimeout(true), 15000);
+    const timeout = setTimeout(() => {
+      setGoogleTimeout(true);
+      clearInterval(timer);
+    }, 15000);
     return () => { clearInterval(timer); clearTimeout(timeout); };
   }, []);
 
@@ -142,6 +145,7 @@ export function RegisterPage() {
       navigate("/register/recovery");
     } catch (e: any) {
       setToast({ message: e.message || t("auth.register.registerFailed"), type: "error" });
+    } finally {
       setLoading(false);
     }
   };

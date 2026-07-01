@@ -39,22 +39,28 @@ async def store_code(target: str, value: str, code: str) -> None:
 
 
 async def verify_and_consume(target: str, value: str, code: str) -> bool:
-    """验证验证码，验证成功后删除。"""
+    """验证验证码，验证成功后删除。使用 GETDEL 避免 TOCTOU 竞态。"""
     r = await _get_redis()
     key = _redis_key(target, value)
-    stored = await r.get(key)
-    if stored is not None and stored == code:
-        await r.delete(key)
-        return True
-    return False
+    # GETDEL: 原子读取+删除（Redis 6.2+），回退到 get+delete 用于旧版本
+    try:
+        stored = await r.getdel(key)
+    except AttributeError:
+        stored = await r.get(key)
+        if stored is not None and stored == code:
+            await r.delete(key)
+            return True
+        return False
+    return stored is not None and stored == code
 
 
 async def check_rate_limit(target: str, value: str) -> bool:
-    """检查发送频率限制。返回 True 表示可以发送。"""
+    """检查发送频率限制。返回 True 表示可以发送。使用 SET NX 避免 TOCTOU。"""
     r = await _get_redis()
     key = _rate_limit_key(target, value)
-    exists = await r.exists(key)
-    if exists:
+    # SET key value NX EX seconds: 原子设置，key 不存在时成功
+    ok = await r.set(key, "1", nx=True, ex=settings.verification_code_rate_limit_seconds)
+    return bool(ok)
         return False
     await r.setex(key, timedelta(seconds=settings.verification_code_rate_limit_seconds), "1")
     return True

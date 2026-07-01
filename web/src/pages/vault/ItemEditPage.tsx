@@ -9,15 +9,9 @@ import { getItem, saveFileBlob } from "../../db/itemsStore";
 import { getCurrentUserId } from "../../db/sessionStore";
 import { keyManager } from "../../services/keyManager";
 import { generatePassword } from "../../utils/password";
+import { formatFileSize } from "../../utils/format";
+import { ITEM_TYPES } from "../../config/itemTypes";
 import type { Item, ItemType } from "../../types/domain";
-
-const ITEM_TYPES: ItemType[] = ["android", "account", "file"];
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function ItemEditPage() {
   const { t } = useTranslation();
