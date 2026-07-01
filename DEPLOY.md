@@ -5,16 +5,18 @@
 > 部署路径：`/data/websites/snailtrail.org/safebox/`
 > 数据库路径：`/data/databases/pgsql/`
 > SSH 用户：`michael`（有 sudo 权限，不能直接写 `/data/`）
-> 最后更新：2026-06-27
+> 最后更新：2026-07-01
 
 ## 目标架构
 
 ```
-Internet → Apache (TLS + 反代) ─┬─ /api/* → Uvicorn (127.0.0.1:8000) → FastAPI → PostgreSQL + Redis
-                                └─ /*     → 静态文件 (web/dist/)
+Internet → Nginx (TLS + 反代) ─┬─ /api/* → Uvicorn (127.0.0.1:8000) → FastAPI → PostgreSQL + Redis
+                               └─ /*     → 静态文件 (web/dist/)
 ```
 
-Apache 同时承担：TLS 终止、API 反代、Web 客户端静态文件服务。后端以独立 `safebox` 用户运行（安全隔离）。
+Nginx 同时承担：TLS 终止、API 反代、Web 客户端静态文件服务。后端以独立 `safebox` 用户运行（安全隔离）。
+
+> 备选方案：Nginx 为首选推荐。如果团队更熟悉 Apache，可参考 [附录：Apache 配置](#apache-配置)。
 
 ---
 
@@ -225,59 +227,65 @@ sudo systemctl status safebox
 
 如果遇到 "Too many levels of symbolic links" 错误，检查 `/etc/systemd/system/safebox.service` 是否链到了不存在的文件，删除重建即可。
 
-### 1.11 Apache 配置
+### 1.11 Nginx 配置
 
-创建 `/etc/httpd/conf.d/safebox.conf`（Amazon Linux 2023 自动加载 `conf.d/*.conf`）：
+创建 `/etc/nginx/conf.d/safebox.conf`：
 
-```apache
-<VirtualHost *:443>
-    ServerName safebox.snailtrail.org
+```nginx
+server {
+    listen 80;
+    server_name safebox.snailtrail.org;
+    return 301 https://$host$request_uri;
+}
 
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/snailtrail.org/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/snailtrail.org/privkey.pem
+server {
+    listen 443 ssl http2;
+    server_name safebox.snailtrail.org;
 
-    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-Frame-Options "DENY"
+    # TLS 证书（Let's Encrypt）
+    ssl_certificate     /etc/letsencrypt/live/snailtrail.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/snailtrail.org/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
 
-    # API 反代（放在 DocumentRoot 之前）
-    ProxyPreserveHost On
-    ProxyPass /api/ http://127.0.0.1:8000/api/
-    ProxyPassReverse /api/ http://127.0.0.1:8000/api/
-    ProxyPass /health http://127.0.0.1:8000/health
-    ProxyPassReverse /health http://127.0.0.1:8000/health
+    # 安全头
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+
+    # 最大上传 5MB
+    client_max_body_size 5M;
+
+    # API 反代
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8000/api/;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    location /health {
+        proxy_pass         http://127.0.0.1:8000/health;
+        proxy_set_header   Host $host;
+    }
 
     # 静态文件（Web 客户端 SPA）
-    DocumentRoot /data/websites/snailtrail.org/safebox/web
-    <Directory /data/websites/snailtrail.org/safebox/web>
-        Options -Indexes
-        AllowOverride None
-        Require all granted
-        FallbackResource /index.html
-    </Directory>
-
-    LimitRequestBody 5242880
-    ProxyTimeout 60
-
-    ErrorLog  /var/log/httpd/safebox-error.log
-    CustomLog /var/log/httpd/safebox-access.log combined
-</VirtualHost>
-
-# HTTP → HTTPS 重定向
-<VirtualHost *:80>
-    ServerName safebox.snailtrail.org
-    Redirect permanent / https://safebox.snailtrail.org/
-</VirtualHost>
+    location / {
+        root  /data/websites/snailtrail.org/safebox/web;
+        try_files $uri $uri/ /index.html;
+    }
+}
 ```
 
-重载 Apache：
+重载 Nginx：
 
 ```bash
-sudo systemctl reload httpd
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-**注意**：修改 Apache 配置后必须 reload，否则 HTTPS 会返回 404。
+**注意**：修改 Nginx 配置后必须 reload，否则 HTTPS 或 SPA 路由可能不生效。
 
 ### 1.12 防火墙
 
@@ -302,7 +310,20 @@ curl https://safebox.snailtrail.org/health
 # 浏览器: https://safebox.snailtrail.org/docs
 ```
 
----
+### 1.14 配置 HTTPS（Let's Encrypt）
+
+```bash
+# 安装 certbot
+sudo dnf install -y certbot python3-certbot-nginx
+
+# 获取证书（Nginx 模式自动配置）
+sudo certbot --nginx -d safebox.snailtrail.org
+
+# 自动续期（certbot 通常已安装 systemd timer）
+sudo systemctl enable --now certbot.timer
+```
+
+验证续期：`sudo certbot renew --dry-run`
 
 ## 二、日常部署（重复操作）
 
@@ -460,3 +481,72 @@ spe ./deploy.sh michael@snailtrail.org --web
 # 如有 schema 变更，额外执行：
 ssh michael@snailtrail.org "cd /data/websites/snailtrail.org/safebox/server && source venv/bin/activate && alembic upgrade head && sudo systemctl restart safebox"
 ```
+
+---
+
+## 附录：Apache 配置（备选）
+
+如果你更熟悉 Apache 而非 Nginx，可以用 Apache 替代上面的 Nginx 步骤。
+
+### 安装与基本配置
+
+```bash
+# Amazon Linux 2023 可能需要单独安装 mod_ssl
+sudo dnf install -y httpd mod_ssl
+
+sudo systemctl enable --now httpd
+```
+
+### 创建 `/etc/httpd/conf.d/safebox.conf`
+
+```apache
+<VirtualHost *:443>
+    ServerName safebox.snailtrail.org
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/snailtrail.org/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/snailtrail.org/privkey.pem
+
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+
+    # API 反代
+    ProxyPreserveHost On
+    ProxyPass /api/ http://127.0.0.1:8000/api/
+    ProxyPassReverse /api/ http://127.0.0.1:8000/api/
+    ProxyPass /health http://127.0.0.1:8000/health
+    ProxyPassReverse /health http://127.0.0.1:8000/health
+
+    # 静态文件（Web 客户端 SPA）
+    DocumentRoot /data/websites/snailtrail.org/safebox/web
+    <Directory /data/websites/snailtrail.org/safebox/web>
+        Options -Indexes
+        AllowOverride None
+        Require all granted
+        FallbackResource /index.html
+    </Directory>
+
+    LimitRequestBody 5242880
+    ProxyTimeout 60
+
+    ErrorLog  /var/log/httpd/safebox-error.log
+    CustomLog /var/log/httpd/safebox-access.log combined
+</VirtualHost>
+
+# HTTP → HTTPS 重定向
+<VirtualHost *:80>
+    ServerName safebox.snailtrail.org
+    Redirect permanent / https://safebox.snailtrail.org/
+</VirtualHost>
+```
+
+### Let's Encrypt（Apache 模式）
+
+```bash
+sudo dnf install -y certbot python3-certbot-apache
+sudo certbot --apache -d safebox.snailtrail.org
+sudo systemctl reload httpd
+```
+
+> ⚠️ `safebox.conf` 包含证书路径等敏感信息，不要提交到 git。
