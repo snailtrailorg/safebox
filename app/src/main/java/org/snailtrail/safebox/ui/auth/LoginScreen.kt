@@ -56,7 +56,7 @@ fun LoginScreen(
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.auth_tab_email)) })
                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.auth_tab_phone)) })
-                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Google") })
+                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(stringResource(R.string.auth_tab_google)) })
             }
 
             Spacer(Modifier.height(24.dp))
