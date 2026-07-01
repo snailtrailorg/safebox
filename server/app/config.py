@@ -33,9 +33,6 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "noreply@safebox.example.com"
 
-    # Debug mode — 关闭时 Google OAuth 必须配置真实凭证
-    debug: bool = True
-
     # Google OAuth
     google_client_id: str = ""
 

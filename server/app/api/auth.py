@@ -45,8 +45,11 @@ from app.services.email_service import send_verification_email
 from app.services.google_auth_service import verify_google_id_token
 from app.services.sms_service import send_sms
 from app.services.verification_service import (
+    check_login_rate_limit,
     check_rate_limit,
+    clear_login_failures,
     generate_code,
+    record_login_failure,
     store_code,
     verify_and_consume,
 )
@@ -110,7 +113,7 @@ async def send_code(req: SendCodeRequest, request: Request, db: AsyncSession = D
     else:
         sent = await send_verification_email(req.value, code, lang)
 
-    if not sent and not settings.debug:
+    if not sent:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to send verification code",
@@ -238,39 +241,48 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
 
 @router.post("/login/email", response_model=LoginResponse)
 async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
-    """邮箱 + 密码登录。"""
-    if not await check_rate_limit("email", req.email):
+    """邮箱 + 密码登录。指数退避限流。"""
+    wait = await check_login_rate_limit("email", req.email)
+    if wait > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=_("verification_code_rate_limited", seconds=settings.verification_code_rate_limit_seconds),
+            detail=_("verification_code_rate_limited", seconds=wait),
         )
     user = await find_user_by_email(db, req.email)
     if not user:
+        await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
 
     if not verify_password(req.password_hash, user.password_hash):
+        await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
 
+    await clear_login_failures("email", req.email)
     return await _build_login_response(db, user)
 
 
 @router.post("/login/phone", response_model=LoginResponse)
 async def login_phone(req: LoginPhoneRequest, db: AsyncSession = Depends(get_db), _ = Depends(get_i18n)):
     """手机号 + 验证码 + 密码登录。"""
-    if not await check_rate_limit("phone", req.phone):
+    wait = await check_login_rate_limit("phone", req.phone)
+    if wait > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=_("verification_code_rate_limited", seconds=settings.verification_code_rate_limit_seconds),
+            detail=_("verification_code_rate_limited", seconds=wait),
         )
     if not await verify_and_consume("phone", req.phone, req.verification_code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 
     user = await find_user_by_phone(db, req.phone)
     if not user:
+        await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("phone_or_password_wrong"))
 
     if not verify_password(req.password_hash, user.password_hash):
+        await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("phone_or_password_wrong"))
+
+    await clear_login_failures("phone", req.phone)
 
     return await _build_login_response(db, user)
 

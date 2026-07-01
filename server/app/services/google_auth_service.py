@@ -10,9 +10,6 @@ async def verify_google_id_token(token: str) -> str | None:
         Google 用户 ID (sub) 如果验证通过，否则 None。
     """
     if not settings.google_client_id:
-        if settings.debug:
-            print(f"[DEV] Google OAuth 未配置，使用占位验证")
-            return f"google:{token[:32]}"
         raise RuntimeError("Google OAuth is not configured")
 
     try:

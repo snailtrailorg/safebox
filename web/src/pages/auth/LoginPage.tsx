@@ -72,10 +72,7 @@ export function LoginPage() {
         });
       }
     }, 200);
-    const timeout = setTimeout(() => {
-      setGoogleTimeout(true);
-      clearInterval(timer);
-    }, 15000);
+    const timeout = setTimeout(() => setGoogleTimeout(true), 15000);
     return () => { clearInterval(timer); clearTimeout(timeout); };
   }, []);
 

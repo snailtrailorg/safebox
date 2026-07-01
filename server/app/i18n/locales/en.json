@@ -1,5 +1,6 @@
 {
   "verification_code_rate_limited": "Code sent too frequently. Please try again in {seconds} seconds.",
+  "login_rate_limited": "Too many login attempts. Please try again in {seconds} seconds.",
   "verification_code_invalid": "Invalid or expired verification code.",
   "email_already_registered": "This email is already registered.",
   "phone_already_registered": "This phone number is already registered.",
