@@ -29,6 +29,18 @@ export interface SafeBoxDB extends DBSchema {
 
 let dbInstance: IDBPDatabase<SafeBoxDB> | null = null;
 
+/** 检测 IndexedDB 是否可用 */
+export function isIndexedDBAvailable(): boolean {
+  try {
+    if (typeof indexedDB === "undefined") return false;
+    const test = indexedDB.open("__test__", 1);
+    test.onblocked = () => {};
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getDb(): Promise<IDBPDatabase<SafeBoxDB>> {
   if (dbInstance) return dbInstance;
 
@@ -50,16 +62,4 @@ export async function getDb(): Promise<IDBPDatabase<SafeBoxDB>> {
   });
 
   return dbInstance;
-}
-
-/** 检测 IndexedDB 是否可用 */
-export function isIndexedDBAvailable(): boolean {
-  try {
-    if (typeof indexedDB === "undefined") return false;
-    const test = indexedDB.open("__test__", 1);
-    test.onblocked = () => {};
-    return true;
-  } catch {
-    return false;
-  }
 }

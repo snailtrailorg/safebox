@@ -10,7 +10,9 @@ import { RecoveryCodePage } from "../pages/auth/RecoveryCodePage";
 import { VaultListPage } from "../pages/vault/VaultListPage";
 import { ItemDetailPage } from "../pages/vault/ItemDetailPage";
 import { ItemEditPage } from "../pages/vault/ItemEditPage";
-import { SettingsPage } from "../pages/settings/SettingsPage";
+import { ChangePasswordPage } from "../pages/settings/ChangePasswordPage";
+import { ExportBackupPage } from "../pages/settings/ExportBackupPage";
+import { ImportBackupPage } from "../pages/settings/ImportBackupPage";
 
 export function AppRoutes() {
   return (
@@ -76,10 +78,26 @@ export function AppRoutes() {
         }
       />
       <Route
-        path="/settings"
+        path="/settings/change-password"
         element={
           <AuthGuard>
-            <SettingsPage />
+            <ChangePasswordPage />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path="/settings/export"
+        element={
+          <AuthGuard>
+            <ExportBackupPage />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path="/settings/import"
+        element={
+          <AuthGuard>
+            <ImportBackupPage />
           </AuthGuard>
         }
       />

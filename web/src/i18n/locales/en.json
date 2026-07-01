@@ -4,7 +4,9 @@
     "tagline": "End-to-End Encrypted Password Manager",
     "createAccount": "Create an End-to-End Encrypted Account",
     "recoverAccount": "Enter 12-Word Recovery Phrase",
-    "indexeddbWarning": "⚠️ This browser does not support local storage (possibly in incognito mode). SafeBox cannot be used."
+    "indexeddbWarning": "⚠️ This browser does not support local storage (possibly in incognito mode). SafeBox cannot be used.",
+    "dbErrorTitle": "Database Error",
+    "dbErrorDetail": "An unexpected database error occurred. Please force-refresh the page to recover (Ctrl+F5)."
   },
 
   "common": {
@@ -199,17 +201,9 @@
 
   "settings": {
     "title": "Settings",
-    "security": "🔐 Security",
-    "recoveryCode": "🔑 Recovery Phrase",
-    "recoveryCodeNote": "The recovery phrase is shown only once during registration and cannot be viewed again. If you lose both your password and recovery phrase, your account data will be permanently unrecoverable.",
     "changePassword": "🔒 Change Password",
-    "autoLock": "⏱️ Auto-Lock (5 min)",
-    "autoLockInfo": "Auto-lock: after 5 minutes of inactivity",
-    "dataManagement": "💾 Data",
-    "syncNow": "🔄 Sync Now",
     "exportBackup": "📤 Export Encrypted Backup",
     "importBackup": "📥 Import Backup",
-    "account": "👤 Account",
     "logout": "🚪 Sign Out",
     "currentPassword": "Current Password",
     "currentPasswordPlaceholder": "Enter current password",
@@ -232,14 +226,17 @@
     "exportFailed": "Export failed.",
     "importPasswordPrompt": "Enter backup password:",
     "imported": "Imported {{count}} item(s).",
-    "importFailed": "Import failed."
+    "importFailed": "Import failed.",
+    "exportDescription": "Export all your vault items as an encrypted backup file (.safebox). You will need a password to decrypt this file.",
+    "importDescription": "Import items from an encrypted backup file (.safebox). This will add items to your current vault."
   },
 
   "appLayout": {
     "offline": "⚠️ Offline — data will sync automatically when reconnected",
     "sync": "🔄 Sync",
     "home": "Home",
-    "discardEdit": "You have unsaved changes. Leave without saving?"
+    "discardEdit": "You have unsaved changes. Leave without saving?",
+    "userMenu": "Account"
   },
 
   "toast": {

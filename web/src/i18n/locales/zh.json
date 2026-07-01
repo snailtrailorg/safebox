@@ -4,7 +4,9 @@
     "tagline": "端到端加密密码管理器",
     "createAccount": "创建端到端加密账号",
     "recoverAccount": "输入 12 词恢复码",
-    "indexeddbWarning": "⚠️ 此浏览器不支持本地存储（可能处于无痕模式），无法使用 SafeBox。"
+    "indexeddbWarning": "⚠️ 此浏览器不支持本地存储（可能处于无痕模式），无法使用 SafeBox。",
+    "dbErrorTitle": "数据库错误",
+    "dbErrorDetail": "发生了意外的数据库错误，请强制刷新页面修复（Ctrl+F5）。"
   },
 
   "common": {
@@ -199,17 +201,9 @@
 
   "settings": {
     "title": "设置",
-    "security": "🔐 安全",
-    "recoveryCode": "🔑 恢复码",
-    "recoveryCodeNote": "恢复码仅在注册时显示一次，无法再次查看。如已丢失密码和恢复码，账号数据将永久无法恢复。",
     "changePassword": "🔒 修改密码",
-    "autoLock": "⏱️ 自动锁定（5 分钟）",
-    "autoLockInfo": "自动锁定：5 分钟无操作",
-    "dataManagement": "💾 数据管理",
-    "syncNow": "🔄 立即同步",
     "exportBackup": "📤 导出加密备份",
     "importBackup": "📥 导入备份",
-    "account": "👤 账号",
     "logout": "🚪 退出登录",
     "currentPassword": "当前密码",
     "currentPasswordPlaceholder": "输入当前密码",
@@ -232,14 +226,17 @@
     "exportFailed": "导出失败",
     "importPasswordPrompt": "输入备份密码：",
     "imported": "已导入 {{count}} 条条目",
-    "importFailed": "导入失败"
+    "importFailed": "导入失败",
+    "exportDescription": "将所有密码库条目导出为加密备份文件（.safebox）。需要一个密码来解密备份文件。",
+    "importDescription": "从加密备份文件（.safebox）导入条目。这会将条目添加到当前密码库中。"
   },
 
   "appLayout": {
     "offline": "⚠️ 网络已断开 — 数据将在恢复连接后自动同步",
     "sync": "🔄 同步",
     "home": "回到主页",
-    "discardEdit": "正在编辑中，离开将丢失未保存的修改。确定离开？"
+    "discardEdit": "正在编辑中，离开将丢失未保存的修改。确定离开？",
+    "userMenu": "账号"
   },
 
   "toast": {

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { VaultProvider } from "./context/VaultContext";
 import { AppRoutes } from "./routes";
+import { DbErrorBoundary } from "./components/ui/DbErrorBoundary";
 
 function IndexedDBWarning() {
   const { t } = useTranslation();
@@ -22,12 +23,14 @@ function IndexedDBWarning() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <VaultProvider>
-          <IndexedDBWarning />
-          <AppRoutes />
-        </VaultProvider>
-      </AuthProvider>
+      <DbErrorBoundary>
+        <AuthProvider>
+          <VaultProvider>
+            <IndexedDBWarning />
+            <AppRoutes />
+          </VaultProvider>
+        </AuthProvider>
+      </DbErrorBoundary>
     </BrowserRouter>
   );
 }

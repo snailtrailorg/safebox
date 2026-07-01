@@ -28,7 +28,7 @@ export async function getSession(): Promise<SessionData> {
 export async function saveSession(data: Partial<SessionData>): Promise<void> {
   const db = await getDb();
   const existing = await db.get("session", SESSION_KEY);
-  const merged = { ...EMPTY_SESSION, ...existing, ...data, key: SESSION_KEY };
+  const merged = { ...EMPTY_SESSION, ...(existing ?? {}), ...data, key: SESSION_KEY };
   await db.put("session", merged);
 }
 
