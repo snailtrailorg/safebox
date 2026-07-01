@@ -11,9 +11,10 @@ import {
 } from "../db/itemsStore";
 import { getLastSyncTime, updateLastSyncTime } from "../db/sessionStore";
 
-export async function sync(): Promise<{ pushed: number; pulled: number }> {
+export async function sync(): Promise<{ pushed: number; pulled: number; conflictCount: number }> {
   let pushed = 0;
   let pulled = 0;
+  let conflictCount = 0;
 
   // 1. Push dirty items
   const dirtyItems = await getDirtyItems();
@@ -32,7 +33,14 @@ export async function sync(): Promise<{ pushed: number; pulled: number }> {
     });
 
     for (const [i, result] of pushResult.results.entries()) {
-      if (
+      if (result.status === "conflict") {
+        // 冲突：以服务端为准，标记本地已同步（下次 pull 拉服务端版本）
+        conflictCount++;
+        if (dirtyItems[i]?.did) {
+          await markSynced(dirtyItems[i].did!, dirtyItems[i].serverId || `conflict-${dirtyItems[i].did}`);
+          pushed++;
+        }
+      } else if (
         (result.status === "created" || result.status === "updated") &&
         result.server_id &&
         dirtyItems[i]?.did
@@ -98,5 +106,5 @@ export async function sync(): Promise<{ pushed: number; pulled: number }> {
     await updateLastSyncTime(lastServerTime);
   }
 
-  return { pushed, pulled };
+  return { pushed, pulled, conflictCount };
 }

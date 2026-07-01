@@ -20,14 +20,14 @@ describe("IndexedDB — itemsStore", () => {
 
   it("getUserItems returns empty for new DB", async () => {
     const { getUserItems } = await import("../db/itemsStore");
-    const items = await getUserItems(1);
+    const items = await getUserItems('test-user');
     expect(items).toEqual([]);
   });
 
   it("upsertItem creates new item and returns did", async () => {
     const { upsertItem, getUserItems } = await import("../db/itemsStore");
     const did = await upsertItem({
-      uid: 1,
+      uid: "test-user",
       type: "account",
       icon: null,
       name: "test-item",
@@ -42,7 +42,7 @@ describe("IndexedDB — itemsStore", () => {
     });
     expect(did).toBeGreaterThan(0);
 
-    const items = await getUserItems(1);
+    const items = await getUserItems('test-user');
     expect(items.length).toBe(1);
     expect(items[0].name).toBe("test-item");
     expect(items[0].type).toBe("account");
@@ -52,7 +52,7 @@ describe("IndexedDB — itemsStore", () => {
   it("upsertItem updates existing item", async () => {
     const { upsertItem, getUserItems } = await import("../db/itemsStore");
     const did = await upsertItem({
-      uid: 1,
+      uid: "test-user",
       type: "android",
       icon: null,
       name: "original",
@@ -68,7 +68,7 @@ describe("IndexedDB — itemsStore", () => {
 
     await upsertItem({
       did,
-      uid: 1,
+      uid: "test-user",
       type: "android",
       icon: null,
       name: "updated-name",
@@ -91,7 +91,7 @@ describe("IndexedDB — itemsStore", () => {
   it("softDeleteItem marks item as deleted", async () => {
     const { upsertItem, softDeleteItem, getUserItems } = await import("../db/itemsStore");
     const did = await upsertItem({
-      uid: 1,
+      uid: "test-user",
       type: "file",
       icon: null,
       name: "to-delete",
@@ -106,7 +106,7 @@ describe("IndexedDB — itemsStore", () => {
     });
 
     await softDeleteItem(did);
-    const items = await getUserItems(1);
+    const items = await getUserItems('test-user');
     expect(items.find((i) => i.did === did)).toBeUndefined();
 
     const { getItem } = await import("../db/itemsStore");
@@ -118,11 +118,11 @@ describe("IndexedDB — itemsStore", () => {
     const { upsertItem, getDirtyItems, markSynced } = await import("../db/itemsStore");
 
     const did1 = await upsertItem({
-      uid: 1, type: "account", icon: null, name: "dirty1", description: null, data: null,
+      uid: "test-user", type: "account", icon: null, name: "dirty1", description: null, data: null,
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
     const did2 = await upsertItem({
-      uid: 1, type: "account", icon: null, name: "dirty2", description: null, data: null,
+      uid: "test-user", type: "account", icon: null, name: "dirty2", description: null, data: null,
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
 
@@ -137,7 +137,7 @@ describe("IndexedDB — itemsStore", () => {
   it("markSynced sets isDirty=false and sets serverId", async () => {
     const { upsertItem, markSynced, getItem } = await import("../db/itemsStore");
     const did = await upsertItem({
-      uid: 1, type: "account", icon: null, name: "synced", description: null, data: null,
+      uid: "test-user", type: "account", icon: null, name: "synced", description: null, data: null,
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
 
@@ -150,17 +150,17 @@ describe("IndexedDB — itemsStore", () => {
   it("getUserItems returns items and they are non-empty", async () => {
     const { upsertItem, getUserItems } = await import("../db/itemsStore");
     await upsertItem({
-      uid: 1, type: "account", icon: null, name: "item-a", description: null, data: null,
+      uid: "test-user", type: "account", icon: null, name: "item-a", description: null, data: null,
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: 1000, createdAt: 1000,
     });
     // 短暂延迟确保时间戳不同
     await new Promise((r) => setTimeout(r, 10));
     await upsertItem({
-      uid: 1, type: "account", icon: null, name: "item-b", description: null, data: null,
+      uid: "test-user", type: "account", icon: null, name: "item-b", description: null, data: null,
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
 
-    const items = await getUserItems(1);
+    const items = await getUserItems('test-user');
     expect(items.length).toBe(2);
     // 按 updatedAt 倒序，item-b 应该在前（更新时间更晚）
     expect(items[0].name).toBe("item-b");

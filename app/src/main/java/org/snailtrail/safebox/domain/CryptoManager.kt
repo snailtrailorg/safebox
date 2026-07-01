@@ -37,7 +37,7 @@ class CryptoManager @Inject constructor() {
 
         private const val RSA_ALGORITHM = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding"
         private const val RSA_KEY_LENGTH = 4096
-        private const val RSA_MAX_ENCRYPT_LENGTH = 470 // OAEP SHA-256 开销更大
+        private const val RSA_MAX_ENCRYPT_LENGTH = 446 // RSA-4096 OAEP SHA-256: 512 - 2*32 - 2 = 446
 
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val DEVICE_KEY_ALIAS = "safebox_device_key"

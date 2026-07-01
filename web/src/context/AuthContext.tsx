@@ -94,20 +94,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [logout]);
 
-  // 自动锁定计时器（5 分钟无操作）
+  // 自动锁定计时器（20 分钟无操作，到期前 30 秒警告）
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
+    const LOCK_TIMEOUT = 20 * 60 * 1000;  // 20 分钟
+    const WARNING_BEFORE = 30 * 1000;     // 提前 30 秒警告
+    let lockTimer: ReturnType<typeof setTimeout>;
+    let warnTimer: ReturnType<typeof setTimeout>;
+
     const resetTimer = () => {
-      clearTimeout(timer);
+      clearTimeout(lockTimer);
+      clearTimeout(warnTimer);
       if (state.isUnlocked) {
-        timer = setTimeout(() => lock(), 5 * 60 * 1000);
+        warnTimer = setTimeout(() => {
+          if (confirm("即将因长时间无操作而锁定，是否继续保持登录？")) {
+            resetTimer();
+          }
+        }, LOCK_TIMEOUT - WARNING_BEFORE);
+        lockTimer = setTimeout(() => lock(), LOCK_TIMEOUT);
       }
     };
     const events = ["mousedown", "keydown", "touchstart", "scroll"];
     events.forEach((e) => window.addEventListener(e, resetTimer));
     resetTimer();
     return () => {
-      clearTimeout(timer);
+      clearTimeout(lockTimer);
+      clearTimeout(warnTimer);
       events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
   }, [state.isUnlocked, lock]);

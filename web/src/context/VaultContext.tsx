@@ -16,7 +16,7 @@ interface VaultState {
 }
 
 interface VaultContextType extends VaultState {
-  loadItems: (uid: number) => Promise<void>;
+  loadItems: (uid: string) => Promise<void>;
   saveItem: (item: Item) => Promise<number>;
   deleteItem: (did: number) => Promise<void>;
   syncNow: () => Promise<void>;
@@ -34,7 +34,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     error: null,
   });
 
-  const loadItems = useCallback(async (uid: number) => {
+  const loadItems = useCallback(async (uid: string) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
       const items = await getUserItems(uid);
@@ -69,6 +69,9 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const uid = await getCurrentUserId();
       const items = await getUserItems(uid);
       setState((s) => ({ ...s, items, isSyncing: false }));
+      if (result.conflictCount > 0) {
+        setState((s) => ({ ...s, error: `${result.conflictCount} item(s) were modified on another device. Synced to latest version.` }));
+      }
     } catch (e) {
       setState((s) => ({
         ...s,

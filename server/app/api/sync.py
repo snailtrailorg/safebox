@@ -94,19 +94,28 @@ async def sync_push(
             existing = None
 
         if existing:
-            # 更新：LWW 策略
-            existing.type = item_req.type
-            existing.icon = item_req.icon
-            existing.name = item_req.name
-            existing.description = item_req.description
-            existing.data = item_req.data
-            existing.version = item_req.version
-            existing.is_deleted = False
-            results.append(SyncPushResult(
-                client_did=item_req.client_did,
-                server_id=str(existing.id),
-                status="updated",
-            ))
+            # LWW: 仅当客户端更新的时间晚于服务端记录时才覆盖
+            client_updated_at = datetime.fromisoformat(item_req.updated_at) if item_req.updated_at else existing.updated_at
+            if client_updated_at > existing.updated_at:
+                existing.type = item_req.type
+                existing.icon = item_req.icon
+                existing.name = item_req.name
+                existing.description = item_req.description
+                existing.data = item_req.data
+                existing.version = item_req.version
+                existing.is_deleted = False
+                existing.updated_at = client_updated_at
+                results.append(SyncPushResult(
+                    client_did=item_req.client_did,
+                    server_id=str(existing.id),
+                    status="updated",
+                ))
+            else:
+                results.append(SyncPushResult(
+                    client_did=item_req.client_did,
+                    server_id=str(existing.id),
+                    status="conflict",
+                ))
         else:
             # 新建
             item = Item(

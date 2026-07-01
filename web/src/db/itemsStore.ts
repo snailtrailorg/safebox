@@ -7,7 +7,7 @@ import { getCurrentUserId } from "./sessionStore";
 import type { Item, ItemType } from "../types/domain";
 
 /** 获取用户的所有未删除条目（按更新时间倒序） */
-export async function getUserItems(uid: number): Promise<Item[]> {
+export async function getUserItems(uid: string): Promise<Item[]> {
   const db = await getDb();
   const all = await db.getAllFromIndex("items", "by-uid", uid);
   return all

@@ -4,7 +4,7 @@ export type ItemType = "android" | "account" | "file";
 
 export interface Item {
   did?: number;            // 本地自增 ID
-  uid: number;
+  uid: string;             // 用户 ID (serverUserId UUID)
   type: ItemType;
   icon: string | null;
   name: string;            // RSA 加密的 Base64

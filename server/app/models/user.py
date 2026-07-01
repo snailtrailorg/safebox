@@ -86,6 +86,24 @@ class UserDevice(Base):
     user: Mapped["User"] = relationship(back_populates="devices")
 
 
+class TokenFamily(Base):
+    """Refresh token family — 防重放攻击。每个 family 一个活跃 token，刷新后旧 token 作废。"""
+
+    __tablename__ = "token_families"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    family: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    active_token_hash: Mapped[str] = mapped_column(String(128))
+    used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Item(Base):
     """加密条目。所有敏感字段由客户端 RSA 加密后上传。"""
 

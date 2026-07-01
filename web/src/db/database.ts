@@ -13,7 +13,7 @@ export interface SafeBoxDB extends DBSchema {
     key: number;
     value: Item;
     indexes: {
-      "by-uid": number;
+      "by-uid": string;
       "by-serverId": string;
       "by-dirty": number;
     };
