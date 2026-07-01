@@ -51,12 +51,13 @@ safebox/
 │       ├── db/             # IndexedDB (idb)
 │       ├── pages/          # auth, vault, settings
 │       └── __tests__/      # 84 tests
-├── docs/                   # 文档
+├── docs/                   # 开发文档
 │   ├── requirements.md     # 需求与架构设计
-│   ├── deploy.md           # 生产部署指南
-│   ├── dev-debug.md        # 本地开发调试
-│   └── web-client-plan.md  # Web 客户端实现方案
-└── deploy.sh               # 日常部署脚本
+│   ├── web-client-plan.md  # Web 客户端实现方案
+│   └── dev-debug.md        # 本地开发调试
+├── DEPLOY.md               # 生产部署指南
+├── .env.example            # 环境变量模板
+├── deploy.sh               # 日常部署脚本
 ```
 
 ## 快速开始
@@ -78,7 +79,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd web
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 84 tests
+npm test           # 89 tests
 ```
 
 ### Android
@@ -157,7 +158,7 @@ npm test           # 84 tests
 ./deploy.sh michael@your-server --web
 ```
 
-详细部署步骤见 `docs/deploy.md`。
+详细部署步骤见 `DEPLOY.md`。
 
 ## License
 
