@@ -19,6 +19,7 @@ interface AuthContextType extends AuthState {
   login: (accessToken: string, refreshToken: string, userId: string) => Promise<void>;
   logout: () => Promise<void>;
   lock: () => void;
+  unlock: () => void;
   checkSession: () => Promise<void>;
 }
 
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const has = await hasSession();
     const session = has ? await getSession() : null;
     setState({
-      isLoggedIn: has && keyManager.isUnlocked,
+      isLoggedIn: has,
       isUnlocked: keyManager.isUnlocked,
       isLoading: false,
       userId: session?.serverUserId || "",
@@ -81,7 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const lock = useCallback(() => {
     keyManager.lock();
-    setState((s) => ({ ...s, isUnlocked: false, isLoggedIn: false, dbUnavailable: false }));
+    setState((s) => ({ ...s, isUnlocked: false }));
+  }, []);
+
+  const unlock = useCallback(() => {
+    setState((s) => ({ ...s, isUnlocked: true }));
   }, []);
 
   useEffect(() => {
@@ -124,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.isUnlocked, lock]);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, lock, checkSession }}>
+    <AuthContext.Provider value={{ ...state, login, logout, lock, unlock, checkSession }}>
       {children}
     </AuthContext.Provider>
   );

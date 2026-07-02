@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { useVault } from "../../context/VaultContext";
 import { getSession } from "../../db/sessionStore";
+import { apiClient } from "../../services/api";
 import type { ReactNode } from "react";
 
 interface AppLayoutProps {
@@ -53,6 +54,20 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
     if (!confirm(t("settings.logoutConfirm"))) return;
     await logout();
     navigate("/login");
+  };
+
+  const handleDeleteAccount = async () => {
+    setDropdownOpen(false);
+    const confirm1 = prompt(t("settings.deleteAccountConfirm1"));
+    if (confirm1 !== t("settings.deleteAccountConfirmAnswer")) return;
+    if (!confirm(t("settings.deleteAccountConfirm2"))) return;
+    try {
+      await apiClient.deleteAccount();
+      await logout();
+      navigate("/login");
+    } catch (e: any) {
+      alert(e.message || "Failed to delete account");
+    }
   };
 
   return (
@@ -117,36 +132,6 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", position: "relative" }}>
           {actions}
-          {location.pathname === "/" && (
-            <>
-              <button
-                onClick={() => vaultSyncNow()}
-                disabled={isSyncing}
-                style={{
-                  background: "rgba(255,255,255,0.15)",
-                  border: "none",
-                  color: "#fff",
-                  padding: "0.4rem 0.8rem",
-                  borderRadius: 6,
-                  cursor: isSyncing ? "not-allowed" : "pointer",
-                  fontSize: "0.85rem",
-                }}
-              >
-                {isSyncing ? t("common.syncing") : t("appLayout.sync")}
-              </button>
-              {/* 下拉菜单里的同步按钮 */}
-              <button
-                onClick={() => {
-                  setDropdownOpen(false);
-                  vaultSyncNow();
-                }}
-                disabled={isSyncing}
-                style={menuBtnStyle(t("appLayout.sync"))}
-              >
-                {t("appLayout.sync")}
-              </button>
-            </>
-          )}
           {/* 用户头像 + 下拉菜单 */}
           <div ref={dropdownRef} style={{ position: "relative" }}>
             <button
@@ -209,6 +194,9 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
                   {t("settings.changePassword")}
                 </button>
 
+                {/* 分割线 */}
+                <div style={{ height: 1, background: "#eee" }} />
+
                 {/* 导出备份 */}
                 <button
                   onClick={() => navigateAndClose("/settings/export")}
@@ -225,18 +213,41 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
                   {t("settings.importBackup")}
                 </button>
 
+                {/* 同步 */}
+                <button
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    vaultSyncNow();
+                  }}
+                  disabled={isSyncing}
+                  style={menuBtnStyle(t("appLayout.sync"))}
+                >
+                  {isSyncing ? t("common.syncing") : t("appLayout.sync")}
+                </button>
+
                 {/* 分割线 */}
                 <div style={{ height: 1, background: "#eee" }} />
 
                 {/* 退出登录 */}
                 <button
                   onClick={handleLogout}
+                  style={menuBtnStyle(t("settings.logout"))}
+                >
+                  {t("settings.logout")}
+                </button>
+
+                {/* 分割线 */}
+                <div style={{ height: 1, background: "#eee" }} />
+
+                {/* 注销账号 */}
+                <button
+                  onClick={handleDeleteAccount}
                   style={{
-                    ...menuBtnStyle(t("settings.logout")),
+                    ...menuBtnStyle(t("settings.deleteAccount")),
                     color: "#e74c3c",
                   }}
                 >
-                  {t("settings.logout")}
+                  {t("settings.deleteAccount")}
                 </button>
               </div>
             )}

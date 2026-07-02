@@ -186,6 +186,12 @@ class ApiClient {
   async delete(req: SyncDeleteRequest): Promise<SyncDeleteResponse> {
     return this.request("POST", "/sync/delete", req);
   }
+
+  // ── 账号管理 ────────────────────────────────────
+
+  async deleteAccount(): Promise<void> {
+    await this.request("DELETE", "/auth/account");
+  }
 }
 
 export const apiClient = new ApiClient();

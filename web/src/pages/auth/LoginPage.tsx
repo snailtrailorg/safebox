@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AuthLayout } from "../../components/layout/AuthLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
+import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
 import { keyManager } from "../../services/keyManager";
 import { useAuth } from "../../context/AuthContext";
@@ -40,7 +41,6 @@ export function LoginPage() {
   const [phone, setPhone] = useState("");
   const [phonePassword, setPhonePassword] = useState("");
   const [code, setCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
 
   const [googlePassword, setGooglePassword] = useState("");
   const [googleIdToken, setGoogleIdToken] = useState("");
@@ -139,16 +139,8 @@ export function LoginPage() {
 
   const handleSendCode = async () => {
     if (!phone) return;
-    setSendingCode(true);
-    try {
-      await apiClient.sendCode({ target: "phone", value: phone });
-      setCodeSent(true);
-      setToast({ message: t("auth.login.codeSent"), type: "success" });
-    } catch (e: any) {
-      setToast({ message: e.message || t("auth.login.sendFailed"), type: "error" });
-    } finally {
-      setSendingCode(false);
-    }
+    await apiClient.sendCode({ target: "phone", value: phone });
+    setToast({ message: t("auth.login.codeSent"), type: "success" });
   };
 
   const handlePhoneLogin = async () => {
@@ -247,10 +239,7 @@ export function LoginPage() {
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.login.phonePlaceholder")}
               style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-            <button onClick={handleSendCode} disabled={sendingCode || !phone}
-              style={{ padding: "0.6rem 1rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-              {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.login.sendCode")}
-            </button>
+            <SendCodeButton onClick={handleSendCode} disabled={!phone} />
           </div>
         </div>
         <div style={{ marginBottom: "0.75rem" }}>

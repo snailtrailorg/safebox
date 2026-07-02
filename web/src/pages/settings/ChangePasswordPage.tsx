@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
+import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { useAuth } from "../../context/AuthContext";
 import { apiClient } from "../../services/api";
 import { keyManager } from "../../services/keyManager";
@@ -23,38 +24,21 @@ export function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
   const [changing, setChanging] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
 
   const handleSendVerifyCode = async () => {
-    if (!currentPassword) {
-      setToast({ message: t("settings.enterCurrentPassword"), type: "error" });
-      return;
-    }
-    setSendingCode(true);
-    try {
-      const session = await getSession();
+    const session = await getSession();
 
-      const ok = await keyManager.unlockWithPassword(currentPassword, session.passwordSalt, session.passwordWrapped);
-      if (!ok) {
-        setToast({ message: t("settings.wrongPassword"), type: "error" });
-        return;
-      }
-
-      const email = session.email || "";
-      if (!email) {
-        setToast({ message: t("settings.noEmail"), type: "error" });
-        return;
-      }
-      await apiClient.sendCode({ target: "email", value: email });
-      setCodeSent(true);
-      setToast({ message: t("settings.codeSent"), type: "success" });
-    } catch (e: any) {
-      setToast({ message: e.message || t("settings.sendFailed"), type: "error" });
-    } finally {
-      setSendingCode(false);
+    const ok = await keyManager.unlockWithPassword(currentPassword, session.passwordSalt, session.passwordWrapped);
+    if (!ok) {
+      throw new Error("wrong password");
     }
+
+    const email = session.email || "";
+    if (!email) {
+      throw new Error("no email");
+    }
+    await apiClient.sendCode({ target: "email", value: email });
   };
 
   const handleChangePassword = async () => {
@@ -97,7 +81,6 @@ export function ChangePasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setVerifyCode("");
-      setCodeSent(false);
     } catch (e: any) {
       setToast({ message: e.message || t("settings.changeFailed"), type: "error" });
     } finally {
@@ -128,17 +111,15 @@ export function ChangePasswordPage() {
               maxLength={6}
               style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
             />
-            <button
-              onClick={handleSendVerifyCode}
-              disabled={sendingCode || codeSent}
-              style={{
-                padding: "0.5rem 0.75rem", background: codeSent ? "#27ae60" : "#3498db",
-                color: "#fff", border: "none", borderRadius: 6, cursor: "pointer",
-                fontSize: "0.85rem", whiteSpace: "nowrap",
-              }}
-            >
-              {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.login.sendCode")}
-            </button>
+            <SendCodeButton onClick={async () => {
+              try {
+                await handleSendVerifyCode();
+                setToast({ message: t("settings.codeSent"), type: "success" });
+              } catch (e: any) {
+                setToast({ message: e.message || t("settings.sendFailed"), type: "error" });
+                throw e;
+              }
+            }} disabled={!currentPassword} />
           </div>
 
           <PasswordInput

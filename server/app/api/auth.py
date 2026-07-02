@@ -366,3 +366,19 @@ async def register_device(
     await db.refresh(device)
 
     return RegisterDeviceResponse(device_id=str(device.id))
+
+
+# ── 注销账号 ────────────────────────────────────────
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """注销当前账号并删除所有关联数据（级联删除 keys, devices, items, token_families）。"""
+    from sqlalchemy import delete
+    from app.models import User
+
+    await db.execute(delete(User).where(User.id == user_id))
+    await db.commit()
