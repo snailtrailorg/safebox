@@ -134,7 +134,7 @@ export function RecoveryPage() {
               style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" }} />
           </div>
           <button onClick={handleVerifyRecovery} disabled={loading}
-            style={{ width: "100%", padding: "0.75rem", background: loading ? "#95a5a6" : "#e74c3c", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+            style={{ width: "100%", padding: "0.75rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
             {loading ? t("common.loading") : t("auth.recovery.verifyBtn")}
           </button>
         </>
@@ -146,16 +146,16 @@ export function RecoveryPage() {
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
             <input type="text" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)}
               placeholder={t("auth.recovery.verifyCodePlaceholder")} maxLength={6}
-              style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }} />
+              style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
             <button onClick={handleSendCode} disabled={sendingCode || codeSent}
-              style={{ padding: "0.5rem 0.75rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
+              style={{ padding: "0.5rem 0.75rem", background: codeSent ? "#27ae60" : "#3498db", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
               {sendingCode ? t("common.sending") : codeSent ? t("common.sent") : t("auth.login.sendCode")}
             </button>
           </div>
           <PasswordInput label={t("auth.recovery.newPasswordLabel")} value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.recovery.newPasswordPlaceholder")} />
           <button onClick={handleResetPassword} disabled={loading}
-            style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#e74c3c", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+            style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
             {loading ? t("common.loading") : t("auth.recovery.resetAndLoginBtn")}
           </button>
         </>

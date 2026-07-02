@@ -152,7 +152,7 @@ export function ItemDetailPage() {
             onClick={() => navigate(`/item/${did}/edit`)}
             style={{
               background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
-              padding: "0.4rem 0.8rem", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem",
+              padding: "0.4rem 0.8rem", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem",
             }}
           >
             {t("vault.detail.edit")}
@@ -212,8 +212,8 @@ export function ItemDetailPage() {
                 disabled={downloading}
                 style={{
                   width: "100%", padding: "0.6rem", marginTop: "0.25rem",
-                  background: downloading ? "#e0e0e0" : "#3498db", color: "#fff",
-                  border: "none", borderRadius: 6, fontSize: "0.9rem", fontWeight: 600,
+                  background: downloading ? "#95a5a6" : "#3498db", color: "#fff",
+                  border: "none", borderRadius: 8, fontSize: "0.9rem", fontWeight: 600,
                   cursor: downloading ? "not-allowed" : "pointer",
                 }}
               >

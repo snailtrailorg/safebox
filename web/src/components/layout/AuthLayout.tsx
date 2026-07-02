@@ -19,7 +19,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
     }}>
       <div style={{
         width: "100%",
-        maxWidth: 440,
+        maxWidth: 400,
         background: "#fff",
         borderRadius: 16,
         padding: "2rem",

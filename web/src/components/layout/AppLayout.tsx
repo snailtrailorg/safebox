@@ -138,23 +138,9 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               title={t("appLayout.userMenu")}
               style={{
-                background: dropdownOpen ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)",
-                border: "none",
-                color: "#fff",
-                padding: "0.35rem 0.6rem",
-                borderRadius: 6,
-                cursor: "pointer",
-                fontSize: "0.95rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                if (!dropdownOpen) e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-              }}
-              onMouseLeave={(e) => {
-                if (!dropdownOpen) e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                background: "none", border: "none", color: "#fff",
+                fontSize: "1.3rem", cursor: "pointer", padding: 0,
+                lineHeight: 1,
               }}
             >
               👤

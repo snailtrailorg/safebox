@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
-import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { useVault } from "../../context/VaultContext";
 import { getItem, saveFileBlob } from "../../db/itemsStore";
@@ -174,10 +173,8 @@ export function ItemEditPage() {
             onChange={(e) => setName(e.target.value)}
             placeholder={t("vault.edit.namePlaceholder")}
             style={{
-              width: "100%", padding: "0.6rem 0",
-              border: "none", borderBottom: "1px solid #eee",
-              fontSize: "1rem", outline: "none",
-              boxSizing: "border-box",
+              width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8,
+              fontSize: "0.95rem", outline: "none", boxSizing: "border-box",
             }}
           />
         </div>
@@ -193,10 +190,8 @@ export function ItemEditPage() {
             onChange={(e) => setDescription(e.target.value)}
             placeholder={t("vault.edit.notesPlaceholder")}
             style={{
-              width: "100%", padding: "0.6rem 0",
-              border: "none", borderBottom: "1px solid #eee",
-              fontSize: "1rem", outline: "none",
-              boxSizing: "border-box",
+              width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8,
+              fontSize: "0.95rem", outline: "none", boxSizing: "border-box",
             }}
           />
         </div>
@@ -214,7 +209,7 @@ export function ItemEditPage() {
                   value={dataFields.package || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, package: e.target.value }))}
                   placeholder={t("vault.edit.packagePlaceholder")}
-                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
               <div style={{ marginBottom: "0.75rem" }}>
@@ -224,26 +219,40 @@ export function ItemEditPage() {
                   value={dataFields.username || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, username: e.target.value }))}
                   placeholder={t("vault.edit.usernamePlaceholder")}
-                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
-              <div>
-                <PasswordInput
-                  label={t("vault.edit.password")}
-                  value={dataFields.password || ""}
-                  onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
-                  placeholder={t("vault.edit.passwordPlaceholder")}
-                  style={{ flex: 1 }}
-                />
-                <button
-                  onClick={() => handleGeneratePassword("password")}
-                  style={{
-                    padding: "0.5rem 0.75rem", background: "#3498db", color: "#fff",
-                    border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap",
-                  }}
-                >
-                  {t("vault.edit.generate")}
-                </button>
+              <div style={{ marginBottom: "0.75rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.password")}</label>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div style={{ position: "relative", flex: 1 }}>
+                    <input
+                      type={dataFields._pwVisible === "true" ? "text" : "password"}
+                      value={dataFields.password || ""}
+                      onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
+                      placeholder={t("vault.edit.passwordPlaceholder")}
+                      style={{ width: "100%", padding: "0.5rem 2rem 0.5rem 0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
+                    />
+                    <button
+                      onClick={() => setDataFields((p) => ({ ...p, _pwVisible: p._pwVisible === "true" ? "" : "true" }))}
+                      style={{
+                        position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                        background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", color: "#666", padding: "0.25rem",
+                      }}
+                    >
+                      {dataFields._pwVisible === "true" ? "🙈" : "👁️"}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleGeneratePassword("password")}
+                    style={{
+                      padding: "0.5rem 0.75rem", background: "#3498db", color: "#fff",
+                      border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap", lineHeight: 1,
+                    }}
+                  >
+                    {t("vault.edit.generate")}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -257,38 +266,40 @@ export function ItemEditPage() {
                   value={dataFields.username || ""}
                   onChange={(e) => setDataFields((p) => ({ ...p, username: e.target.value }))}
                   placeholder={t("vault.edit.usernameEmailPlaceholder")}
-                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
                 />
               </div>
               <div style={{ marginBottom: "0.75rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.password")}</label>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <PasswordInput
-                    label={t("vault.edit.password")}
-                    value={dataFields.password || ""}
-                    onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
-                    placeholder={t("vault.edit.passwordPlaceholder")}
-                    style={{ flex: 1 }}
-                  />
+                  <div style={{ position: "relative", flex: 1 }}>
+                    <input
+                      type={dataFields._pwVisible === "true" ? "text" : "password"}
+                      value={dataFields.password || ""}
+                      onChange={(e) => setDataFields((p) => ({ ...p, password: e.target.value }))}
+                      placeholder={t("vault.edit.passwordPlaceholder")}
+                      style={{ width: "100%", padding: "0.5rem 2rem 0.5rem 0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
+                    />
+                    <button
+                      onClick={() => setDataFields((p) => ({ ...p, _pwVisible: p._pwVisible === "true" ? "" : "true" }))}
+                      style={{
+                        position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                        background: "none", border: "none", cursor: "pointer", fontSize: "0.85rem", color: "#666", padding: "0.25rem",
+                      }}
+                    >
+                      {dataFields._pwVisible === "true" ? "🙈" : "👁️"}
+                    </button>
+                  </div>
                   <button
                     onClick={() => handleGeneratePassword("password")}
                     style={{
                       padding: "0.5rem 0.75rem", background: "#3498db", color: "#fff",
-                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap",
+                      border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem", whiteSpace: "nowrap", lineHeight: 1,
                     }}
                   >
                     {t("vault.edit.generate")}
                   </button>
                 </div>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.edit.url")}</label>
-                <input
-                  type="url"
-                  value={dataFields.url || ""}
-                  onChange={(e) => setDataFields((p) => ({ ...p, url: e.target.value }))}
-                  placeholder={t("vault.edit.urlPlaceholder")}
-                  style={{ width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
-                />
               </div>
             </>
           )}

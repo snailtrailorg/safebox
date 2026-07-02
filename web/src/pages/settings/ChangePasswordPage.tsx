@@ -109,7 +109,7 @@ export function ChangePasswordPage() {
               onChange={(e) => setVerifyCode(e.target.value)}
               placeholder={t("settings.emailCodePlaceholder")}
               maxLength={6}
-              style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 6, fontSize: "0.95rem", boxSizing: "border-box" }}
+              style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
             />
             <SendCodeButton onClick={async () => {
               try {

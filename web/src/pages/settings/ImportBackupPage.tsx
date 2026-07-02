@@ -56,7 +56,7 @@ export function ImportBackupPage() {
             disabled={importing}
             style={{
               width: "100%", padding: "0.75rem",
-              background: importing ? "#e0e0e0" : "#0f3460",
+              background: importing ? "#95a5a6" : "#0f3460",
               color: "#fff", border: "none", borderRadius: 8,
               fontSize: "0.95rem", fontWeight: 600,
               cursor: importing ? "not-allowed" : "pointer",

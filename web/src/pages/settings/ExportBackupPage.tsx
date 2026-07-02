@@ -41,7 +41,7 @@ export function ExportBackupPage() {
             disabled={exporting}
             style={{
               width: "100%", padding: "0.75rem",
-              background: exporting ? "#e0e0e0" : "#0f3460",
+              background: exporting ? "#95a5a6" : "#0f3460",
               color: "#fff", border: "none", borderRadius: 8,
               fontSize: "0.95rem", fontWeight: 600,
               cursor: exporting ? "not-allowed" : "pointer",
