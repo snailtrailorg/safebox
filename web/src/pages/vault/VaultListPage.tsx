@@ -1,41 +1,25 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
 import { useVault } from "../../context/VaultContext";
-import { ITEM_TYPES, TYPE_ICONS } from "../../config/itemTypes";
-import type { Item, ItemType } from "../../types/domain";
+import { buildItemTypeConfigs } from "../../config/itemTypes";
+import type { Item } from "../../types/domain";
 
 export function VaultListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { items, isLoading, error, deleteItem, clearError, syncNow, isSyncing } = useVault();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { items, isLoading, error, deleteItem, clearError } = useVault();
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
-  const fabRef = useRef<HTMLDivElement>(null);
   const [swiping, setSwiping] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  const TYPE_LABELS: Record<ItemType, string> = {
-    android: t("vault.list.typeAndroid"),
-    account: t("vault.list.typeAccount"),
-    file: t("vault.list.typeFile"),
-  };
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (fabRef.current && !fabRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
+  const configs = buildItemTypeConfigs(t);
+  const typeConfigMap = Object.fromEntries(configs.map((c) => [c.type, c]));
 
   const handleTouchStart = (did: number, e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -72,15 +56,18 @@ export function VaultListPage() {
     }
     setSwiping(null);
     setSwipeOffset(0);
-  }, [swipeOffset, performDelete]);
-
-  const handleAdd = (type: ItemType) => {
-    setMenuOpen(false);
-    navigate(`/item/new/${type}`);
-  };
+  }, [swipeOffset]);
 
   const handleDelete = async (item: Item) => {
     await performDelete(item);
+  };
+
+  // 根据 item.type 获取配置，旧类型 fallback
+  const getTypeInfo = (type: string) => {
+    const cfg = typeConfigMap[type as keyof typeof typeConfigMap];
+    if (cfg) return cfg;
+    // fallback for old types
+    return { icon: "🔒", label: type };
   };
 
   return (
@@ -97,119 +84,98 @@ export function VaultListPage() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {items.map((item) => (
-            <div
-              key={item.did}
-              style={{
-                position: "relative",
-                overflow: "hidden",
-                borderRadius: 10,
-                background: "#fff",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-              }}
-            >
-              <div style={{
-                position: "absolute",
-                top: 0, bottom: 0, right: 0, width: 80,
-                background: "#e74c3c",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", fontSize: "0.85rem", fontWeight: 500,
-                borderRadius: "0 10px 10px 0",
-              }}>
-                {t("vault.list.deleteSwipe")}
-              </div>
+          {items.map((item) => {
+            const typeInfo = getTypeInfo(item.type);
+            return (
               <div
-                onClick={() => {
-                  if (swiping !== null) return;
-                  navigate(`/item/${item.did}`);
-                }}
-                onTouchStart={(e) => handleTouchStart(item.did!, e)}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={() => handleTouchEnd(item)}
+                key={item.did}
                 style={{
-                  padding: "1rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  cursor: "pointer",
-                  background: "#fff",
-                  borderRadius: 10,
-                  transform: swiping === item.did ? `translateX(${swipeOffset}px)` : "translateX(0)",
-                  transition: swiping === item.did ? "none" : "transform 0.2s",
                   position: "relative",
-                  zIndex: 1,
-                  touchAction: "pan-y",
+                  overflow: "hidden",
+                  borderRadius: 10,
+                  background: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                 }}
               >
-                <span style={{ fontSize: "1.5rem" }}>{TYPE_ICONS[item.type] || "🔒"}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.name}
-                  </div>
-                  {item.description && (
-                    <div style={{ fontSize: "0.8rem", color: "#999", marginTop: "0.15rem" }}>
-                      {item.description}
-                    </div>
-                  )}
+                <div style={{
+                  position: "absolute",
+                  top: 0, bottom: 0, right: 0, width: 80,
+                  background: "#e74c3c",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: "0.85rem", fontWeight: 500,
+                  borderRadius: "0 10px 10px 0",
+                }}>
+                  {t("vault.list.deleteSwipe")}
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#aaa" }}>
-                  {TYPE_LABELS[item.type]}
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(item);
+                <div
+                  onClick={() => {
+                    if (swiping !== null) return;
+                    navigate(`/item/${item.did}`);
                   }}
-                  disabled={deleting === item.did}
+                  onTouchStart={(e) => handleTouchStart(item.did!, e)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={() => handleTouchEnd(item)}
                   style={{
-                    background: "none", border: "none", color: "#e74c3c",
-                    cursor: deleting === item.did ? "not-allowed" : "pointer", fontSize: "0.85rem", padding: "0.25rem",
-                    opacity: deleting === item.did ? 0.3 : 0.6,
+                    padding: "1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    cursor: "pointer",
+                    background: "#fff",
+                    borderRadius: 10,
+                    transform: swiping === item.did ? `translateX(${swipeOffset}px)` : "translateX(0)",
+                    transition: swiping === item.did ? "none" : "transform 0.2s",
+                    position: "relative",
+                    zIndex: 1,
+                    touchAction: "pan-y",
                   }}
-                  title={t("common.delete")}
                 >
-                  {deleting === item.did ? "⏳" : "🗑️"}
-                </button>
+                  <span style={{ fontSize: "1.5rem" }}>{typeInfo.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.name}
+                    </div>
+                    {item.description && (
+                      <div style={{ fontSize: "0.8rem", color: "#999", marginTop: "0.15rem" }}>
+                        {item.description}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#aaa" }}>
+                    {typeInfo.label}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(item);
+                    }}
+                    disabled={deleting === item.did}
+                    style={{
+                      background: "none", border: "none", color: "#e74c3c",
+                      cursor: deleting === item.did ? "not-allowed" : "pointer", fontSize: "0.85rem", padding: "0.25rem",
+                      opacity: deleting === item.did ? 0.3 : 0.6,
+                    }}
+                    title={t("common.delete")}
+                  >
+                    {deleting === item.did ? "⏳" : "🗑️"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      <div ref={fabRef} style={{ position: "fixed", bottom: 24, right: 24, zIndex: 50 }}>
-        {menuOpen && (
-          <div style={{
-            position: "absolute", bottom: 60, right: 0,
-            background: "#fff", borderRadius: 10,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-            overflow: "hidden", minWidth: 180,
-          }}>
-            {ITEM_TYPES.map((type) => (
-              <button
-                key={type}
-                onClick={() => handleAdd(type)}
-                style={{
-                  display: "block", width: "100%", padding: "0.75rem 1rem",
-                  background: "none", border: "none", borderBottom: "1px solid #f0f0f0",
-                  cursor: "pointer", fontSize: "0.9rem", textAlign: "left",
-                }}
-              >
-                {TYPE_ICONS[type]} {TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-        )}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 50 }}>
         <button
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => navigate("/item/new/login")}
           style={{
             width: 56, height: 56, borderRadius: "50%",
-            background: menuOpen ? "#e74c3c" : "#0f3460",
+            background: "#0f3460",
             color: "#fff", border: "none",
             fontSize: "1.5rem", cursor: "pointer",
             boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
             display: "flex", justifyContent: "center", alignItems: "center",
-            transform: menuOpen ? "rotate(45deg)" : "rotate(0)",
-            transition: "all 0.2s",
           }}
         >
           +

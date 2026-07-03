@@ -121,7 +121,7 @@ function UnlockScreen() {
         <div style={{
           background: "#fef3cd", border: "1px solid #ffc107", borderRadius: 8,
           padding: "0.6rem 0.8rem", marginBottom: "1rem",
-          fontSize: "0.8rem", color: "#856404", lineHeight: 1.5, whiteSpace: "pre-line",
+          fontSize: "0.8rem", color: "#856404", lineHeight: 1.5,
         }}>
           {t("app.unlockHint")}
         </div>

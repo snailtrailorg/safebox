@@ -1,6 +1,6 @@
 /** 业务领域类型 */
 
-export type ItemType = "android" | "account" | "file";
+export type ItemType = "login" | "card" | "identity" | "note" | "file";
 
 export interface Item {
   did?: number;            // 本地自增 ID

@@ -1,8 +1,7 @@
 /**
  * AutoLockOverlay — 自动锁定倒计时浮层
  *
- * 当 AuthContext.countdown > 0 时渲染，显示剩余秒数和"继续保持"按钮。
- * 任何鼠标/键盘/触摸操作也会重置计时（由 AuthContext 的事件监听处理）。
+ * 全屏 fixed 遮罩，后台页面不可操作。用户点击按钮重置计时。
  */
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
@@ -33,18 +32,27 @@ export function AutoLockOverlay() {
         boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
       }}>
         <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>⏰</div>
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#333", margin: "0 0 0.25rem" }}>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#333", margin: "0 0 0.75rem" }}>
           {t("appLayout.autoLockTitle")}
         </h2>
-        <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "0.75rem" }}>
-          {t("appLayout.autoLockHint")}
-        </p>
         <div style={{
           fontSize: "2rem", fontWeight: 700, color: "#e74c3c",
           marginBottom: "1.25rem",
         }}>
-          {countdown}s
+          {countdown}
         </div>
+        <button
+          onClick={() => window.dispatchEvent(new Event("mousedown"))}
+          style={{
+            width: "100%", padding: "0.75rem",
+            background: "#0f3460", color: "#fff",
+            border: "none", borderRadius: 8,
+            fontSize: "0.95rem", fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          {t("appLayout.autoLockContinue")}
+        </button>
       </div>
     </div>
   );

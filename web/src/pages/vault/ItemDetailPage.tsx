@@ -6,7 +6,7 @@ import { Toast } from "../../components/ui/Toast";
 import { getItem, softDeleteItem, getFileBlob } from "../../db/itemsStore";
 import { keyManager } from "../../services/keyManager";
 import { formatFileSize } from "../../utils/format";
-import { ITEM_TYPES } from "../../config/itemTypes";
+import { buildItemTypeConfigs } from "../../config/itemTypes";
 import type { Item } from "../../types/domain";
 
 function SensitiveField({ label, value }: { label: string; value: string }) {
@@ -48,10 +48,12 @@ export function ItemDetailPage() {
   const [downloading, setDownloading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
-  const TYPE_LABELS: Record<string, string> = {
-    android: t("vault.detail.typeAndroid"),
-    account: t("vault.detail.typeAccount"),
-    file: t("vault.detail.typeFile"),
+  const typeConfigs = buildItemTypeConfigs(t);
+  const typeConfigMap = Object.fromEntries(typeConfigs.map((c) => [c.type, c]));
+
+  const getTypeLabel = (type: string): string => {
+    const cfg = typeConfigMap[type as keyof typeof typeConfigMap];
+    return cfg ? cfg.label : type;
   };
 
   useEffect(() => {
@@ -167,7 +169,7 @@ export function ItemDetailPage() {
             padding: "0.25rem 0.75rem", borderRadius: 20,
             fontSize: "0.8rem", fontWeight: 500,
           }}>
-            {TYPE_LABELS[item.type] || item.type}
+            {getTypeLabel(item.type)}
           </span>
         </div>
 

@@ -54,7 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-    const status: AuthStatus = has && tokenValid
+    // sessionStorage 在关闭浏览器或新开 tab 时自动清除，
+    // F5 刷新保留。关闭重开视为新用户，必须重新登录。
+    const isNewSession = !sessionStorage.getItem("sb_auth");
+    if (isNewSession && has && tokenValid) {
+      sessionStorage.setItem("sb_auth", "1");
+    }
+    const status: AuthStatus = has && tokenValid && !isNewSession
       ? (keyManager.isUnlocked ? "ready" : "locked")
       : "guest";
     setState({
