@@ -245,7 +245,9 @@
     "sync": "🔄 同步",
     "home": "回到主页",
     "discardEdit": "正在编辑中，离开将丢失未保存的修改。确定离开？",
-    "userMenu": "账号"
+    "userMenu": "账号",
+    "autoLockTitle": "即将自动锁定",
+    "autoLockHint": "长时间无操作，将在"
   },
 
   "toast": {

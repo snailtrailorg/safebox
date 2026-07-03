@@ -3,16 +3,17 @@
  */
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { keyManager } from "../services/keyManager";
-import { hasSession, clearSession, saveSession, getSession } from "../db/sessionStore";
+import { hasSession, clearSession, saveSession, getSession, getAccessToken } from "../db/sessionStore";
 import { isIndexedDBAvailable } from "../db/database";
 import { apiClient } from "../services/api";
 
+export type AuthStatus = "loading" | "guest" | "locked" | "ready";
+
 interface AuthState {
-  isLoggedIn: boolean;
-  isUnlocked: boolean;
-  isLoading: boolean;
+  status: AuthStatus;
   userId: string;
   dbUnavailable: boolean;
+  countdown: number;
 }
 
 interface AuthContextType extends AuthState {
@@ -27,66 +28,61 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
-    isLoggedIn: false,
-    isUnlocked: false,
-    isLoading: true,
+    status: "loading",
     userId: "",
     dbUnavailable: false,
+    countdown: 0,
   });
 
   const checkSession = useCallback(async () => {
-    setState((s) => ({ ...s, isLoading: true }));
+    setState((s) => ({ ...s, status: "loading" }));
     if (!isIndexedDBAvailable()) {
-      setState({
-        isLoggedIn: false,
-        isUnlocked: false,
-        isLoading: false,
-        userId: "",
-        dbUnavailable: true,
-      });
+      setState({ status: "guest", userId: "", dbUnavailable: true, countdown: 0 });
       return;
     }
     const has = await hasSession();
     const session = has ? await getSession() : null;
+    let tokenValid = false;
+    if (has) {
+      const token = await getAccessToken();
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          tokenValid = payload.exp * 1000 > Date.now();
+        } catch {
+          tokenValid = false;
+        }
+      }
+    }
+    const status: AuthStatus = has && tokenValid
+      ? (keyManager.isUnlocked ? "ready" : "locked")
+      : "guest";
     setState({
-      isLoggedIn: has,
-      isUnlocked: keyManager.isUnlocked,
-      isLoading: false,
+      status,
       userId: session?.serverUserId || "",
       dbUnavailable: false,
+      countdown: 0,
     });
   }, []);
 
   const login = useCallback(async (accessToken: string, refreshToken: string, userId: string) => {
     await saveSession({ accessToken, refreshToken, serverUserId: userId });
-    setState({
-      isLoggedIn: true,
-      isUnlocked: true,
-      isLoading: false,
-      userId,
-      dbUnavailable: false,
-    });
+    setState({ status: "ready", userId, dbUnavailable: false, countdown: 0 });
   }, []);
 
   const logout = useCallback(async () => {
     keyManager.lock();
     await clearSession();
-    setState({
-      isLoggedIn: false,
-      isUnlocked: false,
-      isLoading: false,
-      userId: "",
-      dbUnavailable: false,
-    });
+    setState({ status: "guest", userId: "", dbUnavailable: false, countdown: 0 });
   }, []);
 
   const lock = useCallback(() => {
     keyManager.lock();
-    setState((s) => ({ ...s, isUnlocked: false }));
+    setState((s) => ({ ...s, status: "locked", countdown: 0 }));
   }, []);
 
   const unlock = useCallback(() => {
-    setState((s) => ({ ...s, isUnlocked: true }));
+    setState((s) => ({ ...s, status: "ready" }));
   }, []);
 
   useEffect(() => {
@@ -99,34 +95,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [logout]);
 
-  // 自动锁定计时器（20 分钟无操作，到期前 30 秒警告）
+  // 自动锁定计时器：20 分钟无操作后锁定，到期前 60 秒倒计时
   useEffect(() => {
-    const LOCK_TIMEOUT = 20 * 60 * 1000;  // 20 分钟
-    const WARNING_BEFORE = 30 * 1000;     // 提前 30 秒警告
+    const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
+    const WARN_COUNTDOWN_MS    = 60 * 1000;
+    const WARN_AT_MS           = INACTIVITY_TIMEOUT_MS - WARN_COUNTDOWN_MS;
     let lockTimer: ReturnType<typeof setTimeout>;
-    let warnTimer: ReturnType<typeof setTimeout>;
+    let countdownTimer: ReturnType<typeof setInterval>;
+
+    const cancelTimers = () => {
+      clearTimeout(lockTimer);
+      clearInterval(countdownTimer);
+      setState((s) => (s.countdown > 0 ? { ...s, countdown: 0 } : s));
+    };
+
+    const startCountdown = () => {
+      setState((s) => ({ ...s, countdown: WARN_COUNTDOWN_MS / 1000 }));
+      countdownTimer = setInterval(() => {
+        setState((prev) => {
+          const next = prev.countdown - 1;
+          if (next <= 0) {
+            clearInterval(countdownTimer);
+            // 异步调度 lock()，避免在 setState updater 中触发副作用
+            setTimeout(() => lock(), 0);
+            return { ...prev, countdown: 0 };
+          }
+          return { ...prev, countdown: next };
+        });
+      }, 1000);
+    };
 
     const resetTimer = () => {
-      clearTimeout(lockTimer);
-      clearTimeout(warnTimer);
-      if (state.isUnlocked) {
-        warnTimer = setTimeout(() => {
-          if (confirm("即将因长时间无操作而锁定，是否继续保持登录？")) {
-            resetTimer();
-          }
-        }, LOCK_TIMEOUT - WARNING_BEFORE);
-        lockTimer = setTimeout(() => lock(), LOCK_TIMEOUT);
+      cancelTimers();
+      if (state.status === "ready") {
+        lockTimer = setTimeout(startCountdown, WARN_AT_MS);
       }
     };
+
     const events = ["mousedown", "keydown", "touchstart", "scroll"];
     events.forEach((e) => window.addEventListener(e, resetTimer));
     resetTimer();
     return () => {
-      clearTimeout(lockTimer);
-      clearTimeout(warnTimer);
+      cancelTimers();
       events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
-  }, [state.isUnlocked, lock]);
+  }, [state.status, lock]);
 
   return (
     <AuthContext.Provider value={{ ...state, login, logout, lock, unlock, checkSession }}>

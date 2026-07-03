@@ -26,7 +26,7 @@ interface VaultContextType extends VaultState {
 const VaultContext = createContext<VaultContextType | null>(null);
 
 export function VaultProvider({ children }: { children: ReactNode }) {
-  const { isLoggedIn } = useAuth();
+  const { status } = useAuth();
   const [state, setState] = useState<VaultState>({
     items: [],
     isLoading: false,
@@ -87,10 +87,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
   // 登录后自动加载
   useEffect(() => {
-    if (isLoggedIn) {
+    if (status === "ready") {
       getCurrentUserId().then((uid) => loadItems(uid));
     }
-  }, [isLoggedIn, loadItems]);
+  }, [status, loadItems]);
 
   return (
     <VaultContext.Provider

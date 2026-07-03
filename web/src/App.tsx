@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { VaultProvider } from "./context/VaultContext";
 import { AppRoutes } from "./routes";
 import { DbErrorBoundary } from "./components/ui/DbErrorBoundary";
+import { AutoLockOverlay } from "./components/ui/AutoLockOverlay";
 
 function IndexedDBWarning() {
   const { t } = useTranslation();
@@ -28,6 +29,7 @@ export default function App() {
           <VaultProvider>
             <IndexedDBWarning />
             <AppRoutes />
+            <AutoLockOverlay />
           </VaultProvider>
         </AuthProvider>
       </DbErrorBoundary>

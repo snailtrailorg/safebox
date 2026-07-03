@@ -13,9 +13,9 @@ import type { ReactNode } from "react";
 /** 需要登录才能访问 */
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const { isLoggedIn, isUnlocked, isLoading } = useAuth();
+  const { status } = useAuth();
 
-  if (isLoading) {
+  if (status === "loading") {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
         <p>{t("common.loading")}</p>
@@ -23,12 +23,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isLoggedIn) {
+  if (status === "guest") {
     return <Navigate to="/login" replace />;
   }
 
   // 已登录但密钥锁定 → 显示解锁界面
-  if (!isUnlocked) {
+  if (status === "locked") {
     return <UnlockScreen />;
   }
 
@@ -38,9 +38,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 /** 已登录则重定向到首页 */
 export function GuestGuard({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const { isLoggedIn, isLoading } = useAuth();
+  const { status } = useAuth();
 
-  if (isLoading) {
+  if (status === "loading") {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
         <p>{t("common.loading")}</p>
@@ -48,7 +48,7 @@ export function GuestGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isLoggedIn) {
+  if (status === "ready" || status === "locked") {
     return <Navigate to="/" replace />;
   }
 
@@ -71,6 +71,15 @@ function UnlockScreen() {
       const ok = await keyManager.unlockWithPassword(password, session.passwordSalt, session.passwordWrapped);
       if (!ok) {
         setError(t("auth.login.unlockFailed"));
+        setUnlocking(false);
+        return;
+      }
+      const rsaLoaded = await keyManager.loadRsaKeys(
+        session.encryptedPrivate,
+        session.rsaPublicKey,
+      );
+      if (!rsaLoaded) {
+        setError(t("auth.login.rsaFailed"));
         setUnlocking(false);
         return;
       }

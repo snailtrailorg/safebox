@@ -245,7 +245,9 @@
     "sync": "🔄 Sync",
     "home": "Home",
     "discardEdit": "You have unsaved changes. Leave without saving?",
-    "userMenu": "Account"
+    "userMenu": "Account",
+    "autoLockTitle": "Auto-Lock",
+    "autoLockHint": "Locking due to inactivity in"
   },
 
   "toast": {
