@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import settings
 from app.database import Base
-from app.models import Item, User, UserDevice, UserKeys  # noqa: F401 - 确保模型被导入
+from app.models import Item, TokenFamily, User, UserDevice, UserKeys  # noqa: F401 - 确保模型被导入
 
 config = context.config
 if config.config_file_name is not None:

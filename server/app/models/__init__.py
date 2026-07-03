@@ -1,3 +1,3 @@
-from app.models.user import Item, User, UserDevice, UserKeys
+from app.models.user import Item, TokenFamily, User, UserDevice, UserKeys
 
-__all__ = ["User", "UserKeys", "UserDevice", "Item"]
+__all__ = ["User", "UserKeys", "UserDevice", "TokenFamily", "Item"]

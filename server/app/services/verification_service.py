@@ -46,14 +46,7 @@ async def verify_and_consume(target: str, value: str, code: str) -> bool:
     """验证验证码，验证成功后删除。使用 GETDEL 避免 TOCTOU 竞态。"""
     r = await _get_redis()
     key = _redis_key(target, value)
-    try:
-        stored = await r.getdel(key)
-    except AttributeError:
-        stored = await r.get(key)
-        if stored is not None and stored == code:
-            await r.delete(key)
-            return True
-        return False
+    stored = await r.getdel(key)
     return stored is not None and stored == code
 
 
