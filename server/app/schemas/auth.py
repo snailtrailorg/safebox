@@ -111,6 +111,13 @@ class ResetPasswordRequest(BaseModel):
 
 class ResetPasswordResponse(BaseModel):
     success: bool
+    access_token: str | None = None
+    refresh_token: str | None = None
+    password_salt: str | None = None
+    password_wrapped: str | None = None
+    recovery_wrapped: str | None = None
+    encrypted_private: str | None = None
+    rsa_public_key: str | None = None
 
 
 # ── Token 刷新 ─────────────────────────────────────

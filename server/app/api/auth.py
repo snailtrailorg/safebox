@@ -326,7 +326,19 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
         keys.password_wrapped = req.new_password_wrapped
 
     await db.commit()
-    return ResetPasswordResponse(success=True)
+
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+    return ResetPasswordResponse(
+        success=True,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        password_salt=user.password_salt if user.password_salt else None,
+        password_wrapped=keys.password_wrapped if keys else None,
+        recovery_wrapped=keys.recovery_wrapped if keys else "",
+        encrypted_private=keys.encrypted_private if keys else "",
+        rsa_public_key=keys.rsa_public_key if keys else "",
+    )
 
 
 # ── Token 刷新 ─────────────────────────────────────

@@ -92,7 +92,9 @@ export function ItemEditPage() {
         dataFields.fileType = selectedFile.type || "application/octet-stream";
       }
 
-      const dataJson = JSON.stringify(dataFields);
+      // 剥离 UI 状态字段，避免泄漏到加密数据
+      const { _pwVisible, ...cleanFields } = dataFields;
+      const dataJson = JSON.stringify(cleanFields);
       const encrypted = await keyManager.encryptItemData(dataJson);
 
       const uid = await getCurrentUserId();

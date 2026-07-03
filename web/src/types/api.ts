@@ -92,6 +92,13 @@ export interface ResetPasswordRequest {
 
 export interface ResetPasswordResponse {
   success: boolean;
+  access_token?: string;
+  refresh_token?: string;
+  password_salt?: string;
+  password_wrapped?: string;
+  recovery_wrapped?: string;
+  encrypted_private?: string;
+  rsa_public_key?: string;
 }
 
 export interface RefreshTokenRequest {

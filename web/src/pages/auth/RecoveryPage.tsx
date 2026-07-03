@@ -100,7 +100,7 @@ export function RecoveryPage() {
       const newPasswordHash = await deriveKeyHash(newPassword, newSalt);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      await apiClient.resetPassword({
+      const resp = await apiClient.resetPassword({
         target: "email",
         value: email,
         verification_code: verifyCode,
@@ -108,8 +108,15 @@ export function RecoveryPage() {
         new_password_salt: saltBase64,
         new_password_wrapped: newPasswordWrapped,
       });
-      await saveSession({ email, passwordSalt: saltBase64, passwordWrapped: newPasswordWrapped });
-      await login("", "", "");
+      await saveSession({
+        email,
+        passwordSalt: saltBase64,
+        passwordWrapped: newPasswordWrapped,
+        recoveryWrapped: resp.recovery_wrapped ?? "",
+        encryptedPrivate: resp.encrypted_private ?? "",
+        rsaPublicKey: resp.rsa_public_key ?? "",
+      });
+      await login(resp.access_token ?? "", resp.refresh_token ?? "", "");
       navigate("/");
     } catch (e: any) {
       setToast({ message: e.message || t("auth.recovery.resetFailed"), type: "error" });
