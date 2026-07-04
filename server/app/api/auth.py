@@ -30,15 +30,15 @@ from app.schemas.auth import (
 )
 from app.services.auth_service import (
     create_access_token,
-    create_refresh_token,
     create_user_with_keys,
-    decode_refresh_token,
     find_user_by_email,
     find_user_by_google_id,
     find_user_by_phone,
     get_user_devices,
     get_user_keys,
     hash_password,
+    revoke_all_user_tokens,
+    verify_and_rotate_refresh_token,
     verify_password,
 )
 from app.services.email_service import send_verification_email
@@ -153,7 +153,7 @@ async def register_email(req: RegisterEmailRequest, db: AsyncSession = Depends(g
     )
 
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
 
 
@@ -181,7 +181,7 @@ async def register_phone(req: RegisterPhoneRequest, db: AsyncSession = Depends(g
     )
 
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
 
 
@@ -210,7 +210,7 @@ async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends
     )
 
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
 
 
@@ -218,8 +218,9 @@ async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends
 
 async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
     """构建登录响应（公共逻辑）。"""
+    # 构建登录响应时生成 token
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
 
     keys = await get_user_keys(db, user.id)
     devices = await get_user_devices(db, user.id)
@@ -327,8 +328,14 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
 
     await db.commit()
 
+    # 密码更改后撤销该用户的所有 refresh token
+    if user:
+        await revoke_all_user_tokens(db, user.id)
+        await db.commit()
+
+    # 构建登录响应时生成 token
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return ResetPasswordResponse(
         success=True,
         access_token=access_token,
@@ -341,19 +348,21 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
     )
 
 
-# ── Token 刷新 ─────────────────────────────────────
+# ── Token 刷新（带 rotation 防重放）────────────────
 
 @router.post("/refresh-token", response_model=RefreshTokenResponse)
-async def refresh_token(req: RefreshTokenRequest, _ = Depends(get_i18n)):
-    """用 refresh_token 换取新的 access_token + refresh_token。"""
-    user_id = decode_refresh_token(req.refresh_token)
-    if user_id is None:
+async def refresh_token(
+    req: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_i18n),
+):
+    """用 refresh_token 换取新的 token 对。同 family 检测到重放时全线失效。"""
+    result = await verify_and_rotate_refresh_token(db, req.refresh_token)
+    if result is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("refresh_token_invalid"))
 
-    return RefreshTokenResponse(
-        access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
-    )
+    new_access, new_refresh, user_id = result
+    return RefreshTokenResponse(access_token=new_access, refresh_token=new_refresh)
 
 
 # ── 设备注册（换手机时）────────────────────────────
