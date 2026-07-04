@@ -84,8 +84,10 @@ async def verify_and_rotate_refresh_token(
     if not family:
         return None
 
-    # 查询 TokenFamily
-    result = await db.execute(select(TokenFamily).where(TokenFamily.family == family))
+    # 查询 TokenFamily（加行级锁防止竞态）
+    result = await db.execute(
+        select(TokenFamily).where(TokenFamily.family == family).with_for_update()
+    )
     entry: TokenFamily | None = result.scalar_one_or_none()
 
     if entry is None:

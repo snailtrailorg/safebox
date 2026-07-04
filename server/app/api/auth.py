@@ -27,6 +27,7 @@ from app.schemas.auth import (
     ResetPasswordResponse,
     SendCodeRequest,
     SendCodeResponse,
+    LogoutRequest,
 )
 from app.services.auth_service import (
     create_access_token,
@@ -364,6 +365,20 @@ async def refresh_token(
 
     new_access, new_refresh, user_id = result
     return RefreshTokenResponse(access_token=new_access, refresh_token=new_refresh)
+
+
+# ── 登出 ──────────────────────────────────────────
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    req: LogoutRequest,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """登出。撤销该用户所有 refresh token。"""
+    await revoke_all_user_tokens(db, user_id)
+    await db.commit()
 
 
 # ── 设备注册（换手机时）────────────────────────────
