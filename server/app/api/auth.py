@@ -27,18 +27,20 @@ from app.schemas.auth import (
     ResetPasswordResponse,
     SendCodeRequest,
     SendCodeResponse,
+    LogoutRequest,
 )
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
     create_user_with_keys,
-    decode_refresh_token,
     find_user_by_email,
     find_user_by_google_id,
     find_user_by_phone,
     get_user_devices,
     get_user_keys,
     hash_password,
+    revoke_all_user_tokens,
+    verify_and_rotate_refresh_token,
     verify_password,
 )
 from app.services.email_service import send_verification_email
@@ -49,7 +51,6 @@ from app.services.verification_service import (
     check_rate_limit,
     clear_login_failures,
     generate_code,
-    record_login_failure,
     store_code,
     verify_and_consume,
 )
@@ -153,7 +154,7 @@ async def register_email(req: RegisterEmailRequest, db: AsyncSession = Depends(g
     )
 
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
 
 
@@ -181,7 +182,7 @@ async def register_phone(req: RegisterPhoneRequest, db: AsyncSession = Depends(g
     )
 
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
 
 
@@ -210,7 +211,7 @@ async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends
     )
 
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
 
 
@@ -219,7 +220,7 @@ async def register_google(req: RegisterGoogleRequest, db: AsyncSession = Depends
 async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
     """构建登录响应（公共逻辑）。"""
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
 
     keys = await get_user_keys(db, user.id)
     devices = await get_user_devices(db, user.id)
@@ -246,15 +247,13 @@ async def login_email(req: LoginEmailRequest, db: AsyncSession = Depends(get_db)
     if wait > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=_("verification_code_rate_limited", seconds=wait),
+            detail=_("login_rate_limited", seconds=wait),
         )
     user = await find_user_by_email(db, req.email)
     if not user:
-        await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
 
     if not verify_password(req.password_hash, user.password_hash):
-        await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("email_or_password_wrong"))
 
     await clear_login_failures("email", req.email)
@@ -268,18 +267,16 @@ async def login_phone(req: LoginPhoneRequest, db: AsyncSession = Depends(get_db)
     if wait > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=_("verification_code_rate_limited", seconds=wait),
+            detail=_("login_rate_limited", seconds=wait),
         )
     if not await verify_and_consume("phone", req.phone, req.verification_code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_("verification_code_invalid"))
 
     user = await find_user_by_phone(db, req.phone)
     if not user:
-        await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("phone_or_password_wrong"))
 
     if not verify_password(req.password_hash, user.password_hash):
-        await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("phone_or_password_wrong"))
 
     await clear_login_failures("phone", req.phone)
@@ -327,8 +324,13 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
 
     await db.commit()
 
+    # 撤销旧 refresh token
+    if user:
+        await revoke_all_user_tokens(db, user.id)
+        await db.commit()
+
     access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    refresh_token = await create_refresh_token(db, user.id)
     return ResetPasswordResponse(
         success=True,
         access_token=access_token,
@@ -341,19 +343,35 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
     )
 
 
-# ── Token 刷新 ─────────────────────────────────────
+# ── Token 刷新（带 rotation）─────────────────────
 
 @router.post("/refresh-token", response_model=RefreshTokenResponse)
-async def refresh_token(req: RefreshTokenRequest, _ = Depends(get_i18n)):
-    """用 refresh_token 换取新的 access_token + refresh_token。"""
-    user_id = decode_refresh_token(req.refresh_token)
-    if user_id is None:
+async def refresh_token(
+    req: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_i18n),
+):
+    """用 refresh_token 换取新的 token 对。旧 token（无 family）降级刷新。"""
+    result = await verify_and_rotate_refresh_token(db, req.refresh_token)
+    if result is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_("refresh_token_invalid"))
 
-    return RefreshTokenResponse(
-        access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
-    )
+    new_access, new_refresh, _ = result
+    return RefreshTokenResponse(access_token=new_access, refresh_token=new_refresh)
+
+
+# ── 登出 ──────────────────────────────────────────
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    req: LogoutRequest,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """登出。撤销用户所有 refresh token。"""
+    await revoke_all_user_tokens(db, user_id)
+    await db.commit()
 
 
 # ── 设备注册（换手机时）────────────────────────────

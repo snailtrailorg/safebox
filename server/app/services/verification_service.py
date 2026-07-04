@@ -61,32 +61,25 @@ async def check_rate_limit(target: str, value: str) -> bool:
 # ── 登录频率限制（指数退避）──────────────────────────
 
 LOGIN_LOCKOUT_SECONDS = 3600  # 5 次失败后锁定 1 小时
+LOGIN_RATE_LIMIT_DISABLED = 0  # 设为 0 可关闭限流（调试用）
 
 
 async def check_login_rate_limit(target: str, value: str) -> int:
-    """检查登录频率限制。返回还需等待的秒数，0 表示可以尝试。"""
-    r = await _get_redis()
-    key = _login_fail_key(target, value)
-    count_str = await r.get(key)
-    count = int(count_str) if count_str else 0
+    """检查并记录登录失败频率。每次调用递增计数。
 
-    if count == 0:
-        return 0
-    if count >= 5:
-        return LOGIN_LOCKOUT_SECONDS
-    # 指数退避: 1, 2, 4, 8 秒
-    return 1 << (count - 1)
-
-
-async def record_login_failure(target: str, value: str) -> int:
-    """记录一次登录失败，返回当前失败次数。"""
+    返回等待秒数，0=可尝试。
+    第 1 次不限制，后续指数退避（1,2,4,8 秒），第 5 次锁定 1 小时。
+    """
     r = await _get_redis()
     key = _login_fail_key(target, value)
     count = await r.incr(key)
-    # 第一次失败时设置 1 小时过期
     if count == 1:
         await r.expire(key, LOGIN_LOCKOUT_SECONDS)
-    return count
+        return 0
+    if count >= 6:          # 第 5 次 incr 后 count=6 → 锁定
+        return LOGIN_LOCKOUT_SECONDS
+    # 指数退避：从第 2 次开始 1, 2, 4, 8
+    return 1 << (count - 2)
 
 
 async def clear_login_failures(target: str, value: str) -> None:
