@@ -30,7 +30,6 @@ from app.schemas.auth import (
 )
 from app.services.auth_service import (
     create_access_token,
-    create_refresh_token,
     create_user_with_keys,
     find_user_by_email,
     find_user_by_google_id,
