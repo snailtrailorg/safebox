@@ -77,11 +77,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await apiClient.logout();
-    } catch {
-      // 网络错误不影响本地登出
-    }
     keyManager.lock();
     await clearSession();
     setState({ status: "guest", userId: "", dbUnavailable: false, countdown: 0 });

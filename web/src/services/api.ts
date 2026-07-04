@@ -192,10 +192,6 @@ class ApiClient {
   async deleteAccount(): Promise<void> {
     await this.request("DELETE", "/auth/account");
   }
-
-  async logout(): Promise<void> {
-    await this.request("POST", "/auth/logout", {});
-  }
 }
 
 export const apiClient = new ApiClient();

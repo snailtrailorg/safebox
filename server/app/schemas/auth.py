@@ -141,7 +141,3 @@ class RegisterDeviceRequest(BaseModel):
 
 class RegisterDeviceResponse(BaseModel):
     device_id: str
-
-
-class LogoutRequest(BaseModel):
-    refresh_token: str | None = None
