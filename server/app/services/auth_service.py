@@ -95,7 +95,8 @@ async def verify_and_rotate_refresh_token(
     current_hash = _token_hash(token)
     if entry.active_token_hash != current_hash:
         # token 重放！全线失效
-        await db.execute(select(TokenFamily).where(TokenFamily.user_id == user_id).delete())
+        from sqlalchemy import delete as sa_delete
+        await db.execute(sa_delete(TokenFamily).where(TokenFamily.user_id == user_id))
         await db.commit()
         return None
 
