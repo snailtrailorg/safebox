@@ -193,7 +193,11 @@ async def login_email(req: LoginEmailRequest, request: Request, db: AsyncSession
     if wait > 0:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=_t(request, "login_rate_limited", seconds=wait))
     user = await find_user_by_email(db, req.email)
-    if not user or not verify_password(req.password_hash, user.password_hash):
+    if not user:
+        # 恒等时间：不存在时也跑一次 bcrypt，防止枚举侧信道
+        hash_password(req.password_hash)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
+    if not verify_password(req.password_hash, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
     await clear_login_failures("email", req.email)
     return await _build_login_response(db, user)
@@ -207,7 +211,10 @@ async def login_phone(req: LoginPhoneRequest, request: Request, db: AsyncSession
     if not await verify_and_consume("phone", req.phone, req.verification_code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
     user = await find_user_by_phone(db, req.phone)
-    if not user or not verify_password(req.password_hash, user.password_hash):
+    if not user:
+        hash_password(req.password_hash)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
+    if not verify_password(req.password_hash, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
     await clear_login_failures("phone", req.phone)
     return await _build_login_response(db, user)
