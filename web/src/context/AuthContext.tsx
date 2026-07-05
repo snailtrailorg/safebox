@@ -127,7 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const next = prev.countdown - 1;
           if (next <= 0) {
             clearInterval(countdownTimer);
-            // 异步调度 lock()，避免在 setState updater 中触发副作用
             setTimeout(() => lock(), 0);
             return { ...prev, countdown: 0 };
           }
@@ -150,7 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelTimers();
       events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
-  }, [state.status, lock]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status === "ready", lock]);
 
   return (
     <AuthContext.Provider value={{ ...state, login, logout, lock, unlock, checkSession }}>
