@@ -2,8 +2,12 @@
  * AES-256-GCM 加解密
  * 与 Android CryptoManager.aesEncrypt/aesDecrypt 完全一致
  * 格式：nonce(12) + ciphertext → Base64
+ *
+ * 所有加密操作绑定上下文 AAD，防止密文被移动到其他字段解密。
  */
 import { GCM_NONCE_LENGTH, GCM_TAG_LENGTH } from "../config/constants";
+
+const AES_AAD = new TextEncoder().encode("safebox-aes");
 
 /**
  * AES-256-GCM 加密
@@ -16,7 +20,7 @@ export async function aesEncrypt(
   const nonce = new Uint8Array(GCM_NONCE_LENGTH);
   crypto.getRandomValues(nonce);
   const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce as BufferSource, tagLength: GCM_TAG_LENGTH },
+    { name: "AES-GCM", iv: nonce as BufferSource, tagLength: GCM_TAG_LENGTH, additionalData: AES_AAD },
     key,
     plaintext as BufferSource,
   );
@@ -43,7 +47,7 @@ export async function aesDecrypt(
     const nonce = data.slice(0, GCM_NONCE_LENGTH) as BufferSource;
     const ciphertext = data.slice(GCM_NONCE_LENGTH) as BufferSource;
     const plaintext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: nonce, tagLength: GCM_TAG_LENGTH },
+      { name: "AES-GCM", iv: nonce, tagLength: GCM_TAG_LENGTH, additionalData: AES_AAD },
       key,
       ciphertext as BufferSource,
     );
