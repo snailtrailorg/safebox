@@ -47,8 +47,13 @@ let dbInstance: IDBPDatabase<SafeBoxDB> | null = null;
 export function isIndexedDBAvailable(): boolean {
   try {
     if (typeof indexedDB === "undefined") return false;
-    const test = indexedDB.open("__test__", 1);
-    test.onblocked = () => {};
+    const request = indexedDB.open("__safebox_test__", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (db.objectStoreNames.contains("_t")) return;
+      db.createObjectStore("_t", { keyPath: "id" });
+    };
+    // 同步不能等，只能假设可用
     return true;
   } catch {
     return false;

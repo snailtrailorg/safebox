@@ -14,7 +14,7 @@ export function VaultListPage() {
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [swiping, setSwiping] = useState<number | null>(null);
-  const [swipeOffset, setSwipeOffset] = useState(0);
+  const swipeRef = useRef({ offset: 0 });
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
@@ -25,7 +25,7 @@ export function VaultListPage() {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
     setSwiping(did);
-    setSwipeOffset(0);
+    swipeRef.current.offset = 0;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -33,7 +33,9 @@ export function VaultListPage() {
     const dx = e.touches[0].clientX - touchStartX.current;
     const dy = e.touches[0].clientY - touchStartY.current;
     if (Math.abs(dy) > Math.abs(dx)) return;
-    setSwipeOffset(Math.min(0, dx));
+    swipeRef.current.offset = Math.min(0, dx);
+    // 强制重渲染让 transform 更新
+    setSwiping(swiping);
   };
 
   const performDelete = async (item: Item) => {
@@ -50,13 +52,13 @@ export function VaultListPage() {
     }
   };
 
-  const handleTouchEnd = useCallback(async (item: Item) => {
-    if (swipeOffset < -80) {
+  const handleTouchEnd = async (item: Item) => {
+    if (swipeRef.current.offset < -80) {
       await performDelete(item);
     }
     setSwiping(null);
-    setSwipeOffset(0);
-  }, [swipeOffset]);
+    swipeRef.current.offset = 0;
+  };
 
   const handleDelete = async (item: Item) => {
     await performDelete(item);
@@ -123,7 +125,7 @@ export function VaultListPage() {
                     cursor: "pointer",
                     background: "#fff",
                     borderRadius: 10,
-                    transform: swiping === item.did ? `translateX(${swipeOffset}px)` : "translateX(0)",
+                    transform: swiping === item.did ? `translateX(${swipeRef.current.offset}px)` : "translateX(0)",
                     transition: swiping === item.did ? "none" : "transform 0.2s",
                     position: "relative",
                     zIndex: 1,

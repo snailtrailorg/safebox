@@ -4,16 +4,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api import api_router
 from app.config import settings
-from app.database import Base, get_engine
+from app.database import get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期：启动/关闭。"""
     yield
+    from app.database import get_engine
     engine = get_engine()
     await engine.dispose()
 
@@ -41,4 +43,12 @@ app.include_router(api_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """健康检查。验证 DB 可达性。"""
+    try:
+        async for session in get_db():
+            await session.execute(text("SELECT 1"))
+            break
+        return {"status": "ok"}
+    except Exception:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content={"status": "unavailable"})

@@ -75,9 +75,14 @@ class ApiClient {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    // 401 自动刷新 token
+    // 401 自动刷新 token（仅当服务端返回 401 时才触发，网络错误跳过）
     if (response.status === 401 && !skipAuth) {
-      const refreshed = await this.tryRefreshToken();
+      let refreshed = false;
+      try {
+        refreshed = await this.tryRefreshToken();
+      } catch {
+        // 网络错误不触发登出
+      }
       if (refreshed) {
         const newToken = await getAccessToken();
         if (newToken) {
