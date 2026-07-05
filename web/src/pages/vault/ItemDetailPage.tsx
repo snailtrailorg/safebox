@@ -78,8 +78,7 @@ export function ItemDetailPage() {
 
   const handleShowSensitive = async () => {
     if (!item?.data) return;
-    setShowSensitive(!showSensitive);
-    if (!showSensitive && !decryptedData) {
+    if (!decryptedData) {
       try {
         const plain = await keyManager.decryptItemData(item.data);
         if (plain) {
@@ -95,6 +94,11 @@ export function ItemDetailPage() {
         }
       }
     }
+    setShowSensitive(true);
+  };
+
+  const handleHideSensitive = () => {
+    setShowSensitive(false);
   };
 
   const handleDelete = async () => {
@@ -234,10 +238,10 @@ export function ItemDetailPage() {
             <div style={{ fontSize: "0.8rem", color: "#999", marginBottom: "0.5rem" }}>{t("vault.detail.sensitive")}</div>
             {!showSensitive ? (
               <button
-                onMouseDown={handleShowSensitive}
-                onMouseUp={handleShowSensitive}
+                onMouseDown={(e) => { e.preventDefault(); handleShowSensitive(); }}
+                onMouseUp={handleHideSensitive}
                 onTouchStart={handleShowSensitive}
-                onTouchEnd={handleShowSensitive}
+                onTouchEnd={handleHideSensitive}
                 style={{
                   width: "100%", padding: "1rem",
                   background: "#f5f5f5", border: "2px dashed #ddd",

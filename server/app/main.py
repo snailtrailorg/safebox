@@ -25,12 +25,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — 通过 SAFEBOX_CORS_ORIGINS 环境变量配置，默认开发模式允许所有
+# CORS — 通配符源时禁 credentials，否则浏览器拒绝
 cors_origins = settings.cors_origins.split(",") if settings.cors_origins != "*" else ["*"]
+allow_creds = settings.cors_origins != "*"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
 )

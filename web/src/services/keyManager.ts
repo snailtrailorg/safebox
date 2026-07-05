@@ -206,6 +206,7 @@ class KeyManager {
     this.masterKey = null;
     this.rsaPublicKey = null;
     this.rsaPrivateKey = null;
+    this.recoveryCode = null;
   }
 
   // ── 工具方法 ────────────────────────────────────

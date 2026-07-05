@@ -83,7 +83,7 @@ async def verify_and_rotate_refresh_token(
         new_refresh = await create_refresh_token(db, user_id)
         return (new_access, new_refresh, user_id)
 
-    # 主路径：带 rotation
+    # 主路径：带 rotation（FOR UPDATE 防止并发竞态）
     result = await db.execute(
         select(TokenFamily).where(TokenFamily.family == family).with_for_update()
     )
