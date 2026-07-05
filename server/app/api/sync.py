@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +35,7 @@ async def sync_pull(
     try:
         since_dt = datetime.fromisoformat(since)
     except ValueError:
-        since_dt = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid since format")
 
     result = await db.execute(
         select(Item)
@@ -49,7 +49,8 @@ async def sync_pull(
     if has_more:
         items = items[:limit]
 
-    server_time = datetime.now(timezone.utc).isoformat()
+    # 用最后条目的 updated_at 作为 next 游标，避免服务器时间滑动导致跳号
+    cursor = items[-1].updated_at.isoformat() if items else datetime.now(timezone.utc).isoformat()
 
     return SyncPullResponse(
         items=[
@@ -67,7 +68,7 @@ async def sync_pull(
             )
             for item in items
         ],
-        server_time=server_time,
+        server_time=cursor,
         has_more=has_more,
     )
 
@@ -80,9 +81,9 @@ async def sync_push(
 ):
     """上传本地修改的条目。LWW 策略：按 updated_at 覆盖。"""
     results: list[SyncPushResult] = []
+    new_items: list[Item] = []  # 新建的 Item 对象，flush 后取 ID
 
     for item_req in req.items:
-        # 检查是否已存在（通过 client_did 匹配）
         if item_req.client_did is not None:
             result = await db.execute(
                 select(Item).where(
@@ -94,7 +95,6 @@ async def sync_push(
             existing = None
 
         if existing:
-            # LWW: 仅当客户端更新的时间晚于服务端记录时才覆盖
             client_updated_at = datetime.fromisoformat(item_req.updated_at) if item_req.updated_at else existing.updated_at
             if client_updated_at > existing.updated_at:
                 existing.type = item_req.type
@@ -105,37 +105,23 @@ async def sync_push(
                 existing.version = item_req.version
                 existing.is_deleted = False
                 existing.updated_at = client_updated_at
-                results.append(SyncPushResult(
-                    client_did=item_req.client_did,
-                    server_id=str(existing.id),
-                    status="updated",
-                ))
+                results.append(SyncPushResult(client_did=item_req.client_did, server_id=str(existing.id), status="updated"))
             else:
-                results.append(SyncPushResult(
-                    client_did=item_req.client_did,
-                    server_id=str(existing.id),
-                    status="conflict",
-                ))
+                results.append(SyncPushResult(client_did=item_req.client_did, server_id=str(existing.id), status="conflict"))
         else:
-            # 新建
             item = Item(
-                user_id=user_id,
-                client_did=item_req.client_did,
-                type=item_req.type,
-                icon=item_req.icon,
-                name=item_req.name,
-                description=item_req.description,
-                data=item_req.data,
-                version=item_req.version,
+                user_id=user_id, client_did=item_req.client_did, type=item_req.type,
+                icon=item_req.icon, name=item_req.name, description=item_req.description,
+                data=item_req.data, version=item_req.version,
             )
             db.add(item)
-            await db.flush()
-            results.append(SyncPushResult(
-                client_did=item_req.client_did,
-                server_id=str(item.id),
-                status="created",
-            ))
+            new_items.append(item)
+            results.append(SyncPushResult(client_did=item_req.client_did, server_id="", status="created"))
 
+    await db.flush()
+    # flush 后新 Item 已分配 ID
+    for item, result_item in zip(new_items, [r for r in results if r.status == "created"]):
+        result_item.server_id = str(item.id)
     await db.commit()
     return SyncPushResponse(results=results)
 
