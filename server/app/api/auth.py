@@ -1,14 +1,17 @@
 """认证 API：注册、登录、验证码、密码重置、设备注册。"""
 
+import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.i18n import get_lang, get_text
 from app.middleware import get_current_user_id
+from app.models import User, UserDevice
 from app.schemas.auth import (
     DeviceInfo,
     LoginEmailRequest,
@@ -87,7 +90,6 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
             "rsa_public_key": keys.rsa_public_key if keys else "",
         }
     # 用户不存在时返回随机 salt，防止枚举
-    import secrets
     return {"password_salt": secrets.token_hex(16)}
 
 
@@ -383,8 +385,6 @@ async def register_device(
     db: AsyncSession = Depends(get_db),
 ):
     """注册新设备（Keystore 密钥对）。"""
-    from app.models import UserDevice
-
     device = UserDevice(
         user_id=user_id,
         device_name=req.device_name,
@@ -407,8 +407,5 @@ async def delete_account(
     db: AsyncSession = Depends(get_db),
 ):
     """注销当前账号并删除所有关联数据（级联删除 keys, devices, items, token_families）。"""
-    from sqlalchemy import delete
-    from app.models import User
-
-    await db.execute(delete(User).where(User.id == user_id))
+    await db.execute(sa_delete(User).where(User.id == user_id))
     await db.commit()

@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # 数据库
     database_url: str = "postgresql+asyncpg://safebox:safebox@localhost:5432/safebox"
 
-    # JWT — 生产环境必须覆盖此默认值
+    # JWT
     jwt_secret_key: str = "change-me-in-production-use-openssl-rand-hex-32"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -15,16 +15,16 @@ class Settings(BaseSettings):
 
     # 验证码
     verification_code_length: int = 6
-    verification_code_expire_seconds: int = 300  # 5 分钟
-    verification_code_rate_limit_seconds: int = 60  # 同目标 60 秒内只能发一次
+    verification_code_expire_seconds: int = 300
+    verification_code_rate_limit_seconds: int = 60
 
-    # Redis (验证码存储)
+    # Redis
     redis_url: str = "redis://localhost:6379/0"
 
     # SMS (Twilio)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
-    twilio_phone_number: str = ""  # e.g. +1234567890
+    twilio_phone_number: str = ""
 
     # Email
     smtp_host: str = "smtp.example.com"
