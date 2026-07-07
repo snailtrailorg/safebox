@@ -6,7 +6,7 @@
  *
  * Android 交叉验证步骤：
  * 1. 在 Android 端用固定密码和盐生成密钥
- * 2. 导出 passwordHash / passwordWrapped / rsaPublicKey 等
+ * 2. 导出 authKeyHash / passwordWrapped / rsaPublicKey 等
  * 3. 填入下方 ANDROID_TEST_VECTORS
  * 4. 运行此测试验证 Web 端产生相同输出
  */
@@ -180,11 +180,11 @@ describe("Android ↔ Web cross-platform verification", () => {
    * val key = cryptoManager.deriveKey(password, salt)
    * val masterKey = cryptoManager.generateMasterKey()
    * val passwordWrapped = cryptoManager.aesEncrypt(key, masterKey.encoded)
-   * val passwordHash = Base64.encodeToString(key.encoded, Base64.NO_WRAP)
+   * val authKeyHash = Base64.encodeToString(key.encoded, Base64.NO_WRAP)
    * val saltBase64 = Base64.encodeToString(salt, Base64.NO_WRAP)
    *
    * Log.d("TEST_VECTOR", "salt=$saltBase64")
-   * Log.d("TEST_VECTOR", "passwordHash=$passwordHash")
+   * Log.d("TEST_VECTOR", "authKeyHash=$authKeyHash")
    * Log.d("TEST_VECTOR", "passwordWrapped=$passwordWrapped")
    * ```
    *
@@ -205,11 +205,11 @@ describe("Android ↔ Web cross-platform verification", () => {
   it("AES-GCM: Android encrypted → Web decrypted", async () => {
     // Java JCA 生成的测试向量
     const androidPasswordWrapped = "T3puS0DslgI0sHbU2ZMjv5PPv1ggGAJel07Mxu1xyRBIjzbvJpXeET+MwlpryKPjLua3MMKWuz0C8JSF";
-    const androidPasswordHash = "U5H+HJBw/VJENOBDWFnbgQVc85FWXkHOWf8fgXxfv7g=";
+    const androidAuthKeyHash = "U5H+HJBw/VJENOBDWFnbgQVc85FWXkHOWf8fgXxfv7g=";
     const expectedMasterKeyHex = "af8068512bf82972f27287a127f4d45e79edb7fa404802615a008ce5da22acb8";
 
-    // 用 passwordHash 作为 AES key 解密 passwordWrapped
-    const keyBytes = base64ToBytes(androidPasswordHash);
+    // 用 authKeyHash 作为 AES key 解密 passwordWrapped
+    const keyBytes = base64ToBytes(androidAuthKeyHash);
     const key = await crypto.subtle.importKey(
       "raw", keyBytes as BufferSource, "AES-GCM", false, ["encrypt", "decrypt"],
     );

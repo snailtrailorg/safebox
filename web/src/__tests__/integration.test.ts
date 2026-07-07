@@ -248,7 +248,7 @@ describe("KeyManager", () => {
   it("generateKeys produces all required fields", async () => {
     const { keyManager } = await import("../services/keyManager");
     const keys = await keyManager.generateKeys("test-password");
-    expect(keys.passwordHash).toBeTruthy();
+    expect(keys.authKeyHash).toBeTruthy();
     expect(keys.passwordSalt).toBeTruthy();
     expect(keys.passwordWrapped).toBeTruthy();
     expect(keys.recoveryWrapped).toBeTruthy();
