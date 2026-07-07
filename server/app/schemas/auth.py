@@ -17,23 +17,26 @@ class SendCodeResponse(BaseModel):
 # ── 注册 ──────────────────────────────────────────
 
 class RegisterEmailRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     email: EmailStr
     verification_code: str = Field(..., min_length=6, max_length=6)
-    password_hash: str          # PBKDF2(password, salt) - 客户端已哈希
+    auth_key_hash: str = Field(..., alias="password_hash")  # PBKDF2(password, salt+"auth") - 客户端已派生
     password_salt: str
     password_wrapped: str       # AES-256-GCM(masterKey, passwordDerivedKey)
-    recovery_wrapped: str       # AES-256-GCM(masterKey, recoveryKey)
+    recovery_wrapped: str = ""       # 注册时不再生成（恢复码在安全设置页单独生成）
     encrypted_private: str      # AES-256-GCM(rsaPrivateKey, masterKey)
     rsa_public_key: str
+    kdf_settings: dict | None = None
     device_name: str | None = None
-    device_public_key: str = "web"      # Android Keystore 公钥
-    device_wrapped: str = "web"         # AES-256-GCM(masterKey, devicePublicKey)
+    device_public_key: str = "web"
+    device_wrapped: str = "web"
 
 
 class RegisterPhoneRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
     verification_code: str = Field(..., min_length=6, max_length=6)
-    password_hash: str
+    auth_key_hash: str = Field(..., alias="password_hash")
     password_salt: str
     password_wrapped: str
     recovery_wrapped: str
@@ -45,8 +48,9 @@ class RegisterPhoneRequest(BaseModel):
 
 
 class RegisterGoogleRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     google_id_token: str
-    password_hash: str
+    auth_key_hash: str = Field(..., alias="password_hash")
     password_salt: str
     password_wrapped: str
     recovery_wrapped: str
@@ -66,14 +70,16 @@ class RegisterResponse(BaseModel):
 # ── 登录 ──────────────────────────────────────────
 
 class LoginEmailRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     email: EmailStr
-    password_hash: str
+    auth_key_hash: str = Field(..., alias="password_hash")
 
 
 class LoginPhoneRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     phone: str
     verification_code: str = Field(..., min_length=6, max_length=6)
-    password_hash: str
+    auth_key_hash: str = Field(..., alias="password_hash")
 
 
 class LoginGoogleRequest(BaseModel):
@@ -101,10 +107,21 @@ class DeviceInfo(BaseModel):
 # ── 密码重置 ───────────────────────────────────────
 
 class ResetPasswordRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     target: str = Field(..., pattern="^(phone|email)$")
     value: str
     verification_code: str = Field(..., min_length=6, max_length=6)
-    new_password_hash: str
+    new_auth_key_hash: str = Field(..., alias="new_password_hash")
+    new_password_salt: str
+    new_password_wrapped: str
+
+
+class RecoveryResetRequest(BaseModel):
+    """恢复码重置密码（无需邮箱验证码，恢复码本身证明身份）。"""
+    model_config = {"populate_by_name": True}
+    target: str = Field(..., pattern="^(phone|email)$")
+    value: str
+    new_auth_key_hash: str = Field(..., alias="new_password_hash")
     new_password_salt: str
     new_password_wrapped: str
 
@@ -145,3 +162,9 @@ class RegisterDeviceResponse(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str | None = None
+
+
+class DeleteAccountRequest(BaseModel):
+    target: str = Field(..., pattern="^(phone|email)$")
+    value: str
+    verification_code: str = Field(..., min_length=6, max_length=6)

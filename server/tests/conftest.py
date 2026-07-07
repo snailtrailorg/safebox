@@ -2,6 +2,7 @@
 
 import asyncio
 from typing import AsyncGenerator
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -40,8 +41,25 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    # Mock Redis 依赖的验证/限流函数，测试中用 SQLite 运行
+    with (
+        patch("app.api.auth.verify_and_consume", new_callable=AsyncMock) as mock_verify,
+        patch("app.api.auth.check_ip_rate", new_callable=AsyncMock) as mock_ip,
+        patch("app.api.auth.check_rate_limit", new_callable=AsyncMock) as mock_rl,
+        patch("app.api.auth.get_login_wait", new_callable=AsyncMock) as mock_wait,
+        patch("app.api.auth.record_login_failure", new_callable=AsyncMock),
+        patch("app.api.auth.clear_login_failures", new_callable=AsyncMock),
+        patch("app.api.auth.store_code", new_callable=AsyncMock),
+        patch("app.api.auth.send_verification_email", new_callable=AsyncMock),
+        patch("app.api.auth.send_sms", new_callable=AsyncMock),
+    ):
+        mock_verify.return_value = True
+        mock_ip.return_value = False
+        mock_rl.return_value = True
+        mock_wait.return_value = 0
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
     app.dependency_overrides.clear()
