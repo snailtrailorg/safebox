@@ -6,10 +6,10 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
-import { keyManager } from "../../services/keyManager";
+import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
 import { saveSession } from "../../db/sessionStore";
-import { deriveKeyHash } from "../../crypto/pbkdf2";
+import { deriveAuthKey } from "../../crypto/kdf";
 import { GOOGLE_CLIENT_ID } from "../../config/constants";
 import type { LoginResponse } from "../../types/api";
 
@@ -93,12 +93,12 @@ export function LoginPage() {
   // ── 通用登录响应处理 ─────────────────────────────
   const handleLoginResponse = async (response: LoginResponse, pw: string) => {
     const actualSalt = response.password_salt || "";
-    const ok = await keyManager.unlockWithPassword(pw, actualSalt, response.password_wrapped ?? "");
+    const ok = await keyChain.unlockWithPassword(pw, actualSalt, response.password_wrapped ?? "");
     if (!ok) {
       setToast({ message: t("auth.login.unlockFailed"), type: "error" });
       return;
     }
-    const rsaLoaded = await keyManager.loadRsaKeys(
+    const rsaLoaded = await keyChain.loadRsaKeys(
       response.encrypted_private,
       response.rsa_public_key,
     );
@@ -119,8 +119,8 @@ export function LoginPage() {
     try {
       const { password_salt: salt } = await apiClient.getSalt(email);
       const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
-      const passwordHash = await deriveKeyHash(password, saltBytes);
-      const response = await apiClient.loginEmail({ email, password_hash: passwordHash });
+      const authKeyHash = await deriveAuthKey(password, saltBytes);
+      const response = await apiClient.loginEmail({ email, auth_key_hash: authKeyHash });
       await saveSession({
         email,
         passwordSalt: response.password_salt,
@@ -152,8 +152,8 @@ export function LoginPage() {
     try {
       const { password_salt: salt } = await apiClient.getSalt(undefined, phone);
       const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
-      const passwordHash = await deriveKeyHash(phonePassword, saltBytes);
-      const response = await apiClient.loginPhone({ phone, verification_code: code, password_hash: passwordHash });
+      const authKeyHash = await deriveAuthKey(phonePassword, saltBytes);
+      const response = await apiClient.loginPhone({ phone, verification_code: code, auth_key_hash: authKeyHash });
       await saveSession({
         email: phone,
         passwordSalt: response.password_salt,

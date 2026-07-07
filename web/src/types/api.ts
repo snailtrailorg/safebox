@@ -14,12 +14,13 @@ export interface SendCodeResponse {
 export interface RegisterEmailRequest {
   email: string;
   verification_code: string;
-  password_hash: string;
+  auth_key_hash: string;
   password_salt: string;
   password_wrapped: string;
   recovery_wrapped: string;
   encrypted_private: string;
   rsa_public_key: string;
+  kdf_settings?: Record<string, unknown>;
   device_name?: string;
   device_public_key?: string;
   device_wrapped?: string;
@@ -32,12 +33,13 @@ export interface RegisterPhoneRequest extends RegisterEmailRequest {
 
 export interface RegisterGoogleRequest {
   google_id_token: string;
-  password_hash: string;
+  auth_key_hash: string;
   password_salt: string;
   password_wrapped: string;
   recovery_wrapped: string;
   encrypted_private: string;
   rsa_public_key: string;
+  kdf_settings?: Record<string, unknown>;
   device_name?: string;
   device_public_key?: string;
   device_wrapped?: string;
@@ -51,13 +53,13 @@ export interface RegisterResponse {
 
 export interface LoginEmailRequest {
   email: string;
-  password_hash: string;
+  auth_key_hash: string;
 }
 
 export interface LoginPhoneRequest {
   phone: string;
   verification_code: string;
-  password_hash: string;
+  auth_key_hash: string;
 }
 
 export interface LoginGoogleRequest {
@@ -85,7 +87,7 @@ export interface ResetPasswordRequest {
   target: "phone" | "email";
   value: string;
   verification_code: string;
-  new_password_hash: string;
+  new_auth_key_hash: string;
   new_password_salt: string;
   new_password_wrapped: string;
 }
@@ -118,6 +120,55 @@ export interface RegisterDeviceRequest {
 
 export interface RegisterDeviceResponse {
   device_id: string;
+}
+
+// ── Recovery ───────────────────────────────────────
+
+export interface GenerateRecoveryRequest {
+  target: "phone" | "email";
+  value: string;
+  verification_code: string;
+  current_auth_key_hash: string;
+}
+
+export interface GenerateRecoveryResponse {
+  recovery_code: string;
+}
+
+export interface InitiateRecoveryRequest {
+  target: "phone" | "email";
+  value: string;
+  recovery_code: string;
+  new_auth_key_hash: string;
+  new_password_salt: string;
+  new_kdf_settings: Record<string, unknown>;
+  new_wrapped_user_key: string;
+}
+
+export interface InitiateRecoveryResponse {
+  cooldown_expires_at: string;
+}
+
+export interface AccelerateRecoveryRequest {
+  signed_token: string;
+  verification_code: string;
+}
+
+export interface FreezeRecoveryRequest {
+  signed_token: string;
+}
+
+export interface RecoveryStatusResponse {
+  status: string;
+  cooldown_expires_at: string | null;
+  recovery_attempt_count: number;
+}
+
+export interface RevokeRecoveryRequest {
+  target: "phone" | "email";
+  value: string;
+  verification_code: string;
+  current_auth_key_hash: string;
 }
 
 // ── Sync ──────────────────────────────────────────

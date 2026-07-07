@@ -19,6 +19,14 @@ import type {
   RefreshTokenResponse,
   RegisterDeviceRequest,
   RegisterDeviceResponse,
+  GenerateRecoveryRequest,
+  GenerateRecoveryResponse,
+  InitiateRecoveryRequest,
+  InitiateRecoveryResponse,
+  AccelerateRecoveryRequest,
+  FreezeRecoveryRequest,
+  RecoveryStatusResponse,
+  RevokeRecoveryRequest,
   SyncPushRequest,
   SyncPushResponse,
   SyncPullResponse,
@@ -110,6 +118,11 @@ class ApiClient {
       throw new ApiError(response.status, message);
     }
 
+    // 204 No Content — 无 body，跳过 json 解析
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
     return response.json();
   }
 
@@ -169,6 +182,40 @@ class ApiClient {
 
   async resetPassword(req: ResetPasswordRequest): Promise<ResetPasswordResponse> {
     return this.request("POST", "/auth/reset-password", req, true);
+  }
+
+  async changePassword(req: ResetPasswordRequest): Promise<ResetPasswordResponse> {
+    return this.request("POST", "/auth/change-password", req, true);
+  }
+
+  async recoveryReset(req: { target: string; value: string; new_auth_key_hash: string; new_password_salt: string; new_password_wrapped: string }): Promise<ResetPasswordResponse> {
+    return this.request("POST", "/auth/recovery-reset", req, true);
+  }
+
+  // ── Recovery 端点 ─────────────────────────────────
+
+  async generateRecovery(req: GenerateRecoveryRequest): Promise<GenerateRecoveryResponse> {
+    return this.request("POST", "/auth/recovery/generate", req, true);
+  }
+
+  async initiateRecovery(req: InitiateRecoveryRequest): Promise<InitiateRecoveryResponse> {
+    return this.request("POST", "/auth/recovery/initiate", req, true);
+  }
+
+  async getRecoveryStatus(): Promise<RecoveryStatusResponse> {
+    return this.request("GET", "/auth/recovery/status");
+  }
+
+  async accelerateRecovery(req: AccelerateRecoveryRequest): Promise<void> {
+    return this.request("POST", "/auth/recovery/accelerate", req, true);
+  }
+
+  async freezeRecovery(req: FreezeRecoveryRequest): Promise<void> {
+    return this.request("POST", "/auth/recovery/freeze", req, true);
+  }
+
+  async revokeRecovery(req: RevokeRecoveryRequest): Promise<void> {
+    return this.request("POST", "/auth/recovery/revoke", req, true);
   }
 
   async registerDevice(req: RegisterDeviceRequest): Promise<RegisterDeviceResponse> {

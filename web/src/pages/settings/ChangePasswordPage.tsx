@@ -1,5 +1,5 @@
 /**
- * ChangePasswordPage — 修改密码
+ * ChangePasswordPage — 修改密码（需验证码 + 当前密码）
  */
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,10 +10,12 @@ import { Toast } from "../../components/ui/Toast";
 import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { useAuth } from "../../context/AuthContext";
 import { apiClient } from "../../services/api";
-import { keyManager } from "../../services/keyManager";
+import { keyChain } from "../../keychain/keyChain";
 import { getSession, saveSession } from "../../db/sessionStore";
-import { deriveKeyHash, generateSalt, deriveKey } from "../../crypto/pbkdf2";
+import { deriveKey, deriveAuthKey, DEFAULT_KDF } from "../../crypto/kdf";
 import { aesEncrypt } from "../../crypto/aes";
+import { checkPasswordStrength } from "../../config/constants";
+import type { KdfSettings } from "../../crypto/kdf";
 
 export function ChangePasswordPage() {
   const { t } = useTranslation();
@@ -28,16 +30,10 @@ export function ChangePasswordPage() {
 
   const handleSendVerifyCode = async () => {
     const session = await getSession();
-
-    const ok = await keyManager.unlockWithPassword(currentPassword, session.passwordSalt, session.passwordWrapped);
-    if (!ok) {
-      throw new Error("wrong password");
-    }
-
+    const ok = await keyChain.unlockWithPassword(currentPassword, session.passwordSalt, session.passwordWrapped);
+    if (!ok) throw new Error("wrong password");
     const email = session.email || "";
-    if (!email) {
-      throw new Error("no email");
-    }
+    if (!email) throw new Error("no email");
     await apiClient.sendCode({ target: "email", value: email });
   };
 
@@ -46,8 +42,9 @@ export function ChangePasswordPage() {
       setToast({ message: t("settings.enterNewPwAndCode"), type: "error" });
       return;
     }
-    if (newPassword.length < 8) {
-      setToast({ message: t("settings.passwordMinLength"), type: "error" });
+    const pwCheck = checkPasswordStrength(newPassword);
+    if (!pwCheck.ok) {
+      setToast({ message: pwCheck.reason || t("settings.passwordMinLength"), type: "error" });
       return;
     }
     setChanging(true);
@@ -55,19 +52,22 @@ export function ChangePasswordPage() {
       const session = await getSession();
       const email = session.email || "";
 
-      const newSalt = generateSalt();
+      const newSalt = new Uint8Array(32);
+      crypto.getRandomValues(newSalt);
       const newDerivedKey = await deriveKey(newPassword, newSalt);
-      const newPasswordHash = await deriveKeyHash(newPassword, newSalt);
+      const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
 
-      const masterRaw = await crypto.subtle.exportKey("raw", (keyManager as any).masterKey);
-      const newPasswordWrapped = await aesEncrypt(newDerivedKey, new Uint8Array(masterRaw));
+      const masterRaw = new Uint8Array(
+        await crypto.subtle.exportKey("raw", (keyChain as any).userKey)
+      );
+      const newPasswordWrapped = await aesEncrypt(newDerivedKey, masterRaw);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      await apiClient.resetPassword({
+      await apiClient.changePassword({
         target: "email",
         value: email,
         verification_code: verifyCode,
-        new_password_hash: newPasswordHash,
+        new_auth_key_hash: newAuthKeyHash,
         new_password_salt: saltBase64,
         new_password_wrapped: newPasswordWrapped,
       });
@@ -101,49 +101,35 @@ export function ChangePasswordPage() {
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder={t("settings.currentPasswordPlaceholder")}
           />
-
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
-            <input
-              type="text"
-              value={verifyCode}
-              onChange={(e) => setVerifyCode(e.target.value)}
-              placeholder={t("settings.emailCodePlaceholder")}
-              maxLength={6}
-              style={{ flex: 1, padding: "0.5rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }}
-            />
-            <SendCodeButton onClick={async () => {
-              try {
-                await handleSendVerifyCode();
-                setToast({ message: t("settings.codeSent"), type: "success" });
-              } catch (e: any) {
-                setToast({ message: e.message || t("settings.sendFailed"), type: "error" });
-                throw e;
-              }
-            }} disabled={!currentPassword} />
-          </div>
-
           <PasswordInput
             label={t("settings.newPassword")}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder={t("settings.newPasswordPlaceholder")}
           />
-
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginTop: "0.5rem" }}>
+            <input
+              value={verifyCode}
+              onChange={(e) => setVerifyCode(e.target.value)}
+              placeholder={t("settings.verifyCodePlaceholder")}
+              maxLength={6}
+              style={{ flex: 1, padding: "0.6rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem" }}
+            />
+            <SendCodeButton onClick={handleSendVerifyCode} />
+          </div>
           <button
             onClick={handleChangePassword}
             disabled={changing}
             style={{
-              width: "100%", padding: "0.75rem",
+              width: "100%", padding: "0.75rem", marginTop: "0.75rem",
               background: changing ? "#95a5a6" : "#0f3460", color: "#fff",
-              border: "none", borderRadius: 8, fontSize: "0.95rem", fontWeight: 600,
+              border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600,
               cursor: changing ? "not-allowed" : "pointer",
-            }}
-          >
-            {changing ? t("common.changing") : t("settings.confirmChange")}
+            }}>
+            {changing ? t("common.loading") : t("settings.changePassword")}
           </button>
         </section>
       </div>
-
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </AppLayout>
   );

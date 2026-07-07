@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Toast } from "../../components/ui/Toast";
 import { getItem, softDeleteItem, getFileBlob } from "../../db/itemsStore";
-import { keyManager } from "../../services/keyManager";
+import { keyChain } from "../../keychain/keyChain";
 import { formatFileSize } from "../../utils/format";
 import { buildItemTypeConfigs } from "../../config/itemTypes";
 import type { Item } from "../../types/domain";
@@ -66,7 +66,7 @@ export function ItemDetailPage() {
       setLoading(false);
       if (found?.type === "file" && found.data) {
         try {
-          const plain = await keyManager.decryptItemData(found.data);
+          const plain = await keyChain.decryptItemData(found.data);
           if (!cancelled && plain) setDecryptedData(JSON.parse(plain));
         } catch {
           console.warn("Failed to decrypt file type item data, using raw data");
@@ -80,7 +80,7 @@ export function ItemDetailPage() {
     if (!item?.data) return;
     if (!decryptedData) {
       try {
-        const plain = await keyManager.decryptItemData(item.data);
+        const plain = await keyChain.decryptItemData(item.data);
         if (plain) {
           setDecryptedData(JSON.parse(plain));
         } else {
@@ -117,7 +117,7 @@ export function ItemDetailPage() {
         setDownloading(false);
         return;
       }
-      const decrypted = await keyManager.decryptFileBlob(blob.encryptedBlob);
+      const decrypted = await keyChain.decryptFileBlob(blob.encryptedBlob);
       if (!decrypted) {
         setToast({ message: t("vault.detail.decryptFailed"), type: "error" });
         setDownloading(false);

@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { getSession } from "../db/sessionStore";
-import { keyManager } from "../services/keyManager";
+import { keyChain } from "../keychain/keyChain";
 import { PasswordInput } from "../components/ui/PasswordInput";
 import type { ReactNode } from "react";
 
@@ -68,13 +68,13 @@ function UnlockScreen() {
     setError("");
     try {
       const session = await getSession();
-      const ok = await keyManager.unlockWithPassword(password, session.passwordSalt, session.passwordWrapped);
+      const ok = await keyChain.unlockWithPassword(password, session.passwordSalt, session.passwordWrapped);
       if (!ok) {
         setError(t("auth.login.unlockFailed"));
         setUnlocking(false);
         return;
       }
-      const rsaLoaded = await keyManager.loadRsaKeys(
+      const rsaLoaded = await keyChain.loadRsaKeys(
         session.encryptedPrivate,
         session.rsaPublicKey,
       );

@@ -13,7 +13,7 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { useVault } from "../../context/VaultContext";
 import { getItem, saveFileBlob } from "../../db/itemsStore";
 import { getCurrentUserId } from "../../db/sessionStore";
-import { keyManager } from "../../services/keyManager";
+import { keyChain } from "../../keychain/keyChain";
 import { generatePassword } from "../../utils/password";
 import { formatFileSize } from "../../utils/format";
 import { buildItemTypeConfigs } from "../../config/itemTypes";
@@ -48,7 +48,7 @@ export function ItemEditPage() {
           setDescription(item.description || "");
           if (item.data) {
             try {
-              const plain = await keyManager.decryptItemData(item.data);
+              const plain = await keyChain.decryptItemData(item.data);
               if (plain) {
                 setDataFields(JSON.parse(plain));
               } else {
@@ -84,7 +84,7 @@ export function ItemEditPage() {
       let pendingFileEncrypted: string | null = null;
       if (itemType === "file" && selectedFile) {
         const fileBuffer = await selectedFile.arrayBuffer();
-        const encrypted = await keyManager.encryptFileBlob(fileBuffer);
+        const encrypted = await keyChain.encryptFileBlob(fileBuffer);
         if (!encrypted) {
           setToast({ message: t("vault.edit.saveFailed"), type: "error" });
           setSaving(false);
@@ -97,7 +97,7 @@ export function ItemEditPage() {
       }
 
       const dataJson = JSON.stringify(dataFields);
-      const encrypted = await keyManager.encryptItemData(dataJson);
+      const encrypted = await keyChain.encryptItemData(dataJson);
 
       const uid = await getCurrentUserId();
       const item: Item = {

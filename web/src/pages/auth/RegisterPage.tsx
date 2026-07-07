@@ -6,9 +6,9 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
-import { keyManager } from "../../services/keyManager";
+import { keyChain } from "../../keychain/keyChain";
 import { saveSession } from "../../db/sessionStore";
-import { GOOGLE_CLIENT_ID } from "../../config/constants";
+import { GOOGLE_CLIENT_ID, checkPasswordStrength } from "../../config/constants";
 
 type RegisterTab = "email" | "phone" | "google";
 
@@ -94,16 +94,23 @@ export function RegisterPage() {
       return;
     }
 
+    const pwCheck = checkPasswordStrength(password);
+    if (!pwCheck.ok) {
+      setToast({ message: pwCheck.reason || t("auth.register.passwordTooWeak"), type: "error" });
+      return;
+    }
+
     setLoading(true);
     try {
-      const keys = await keyManager.generateKeys(password);
+      const keys = await keyChain.generateKeys(password);
 
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
-          password_hash: keys.passwordHash, password_salt: keys.passwordSalt,
+          auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
           password_wrapped: keys.passwordWrapped, recovery_wrapped: keys.recoveryWrapped,
           encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
+          kdf_settings: keys.kdfSettings,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
@@ -114,9 +121,10 @@ export function RegisterPage() {
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
-          password_hash: keys.passwordHash, password_salt: keys.passwordSalt,
+          auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
           password_wrapped: keys.passwordWrapped, recovery_wrapped: keys.recoveryWrapped,
           encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
+          kdf_settings: keys.kdfSettings,
         } as any);
         await saveSession({
           email: phone, passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
@@ -126,9 +134,10 @@ export function RegisterPage() {
       } else {
         const response = await apiClient.registerGoogle({
           google_id_token: googleIdToken,
-          password_hash: keys.passwordHash, password_salt: keys.passwordSalt,
+          auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
           password_wrapped: keys.passwordWrapped, recovery_wrapped: keys.recoveryWrapped,
           encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
+          kdf_settings: keys.kdfSettings,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
@@ -138,7 +147,7 @@ export function RegisterPage() {
         });
       }
 
-      navigate("/register/recovery");
+      navigate("/");
     } catch (e: any) {
       setToast({ message: e.message || t("auth.register.registerFailed"), type: "error" });
     } finally {
