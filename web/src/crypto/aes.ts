@@ -102,6 +102,74 @@ export async function importAesKey(base64: string): Promise<CryptoKey> {
   );
 }
 
+// ── 字段级 AAD 加密（v2 新增）─────────────────────────
+
+/** AAD 拼接规则：itemType:fieldName（如 login:name, credit_card:data）。
+ *  不同 itemType 的 data 字段 AAD 不同，防止密文跨类型移动。 */
+export function makeFieldAAD(fieldName: string, itemType?: string): Uint8Array {
+  const ctx = itemType ? `safebox:v2:item:${fieldName}:${itemType}`
+                       : `safebox:v2:item:${fieldName}`;
+  return new TextEncoder().encode(ctx);
+}
+
+/**
+ * AES-256-GCM 加密（字段级 AAD）
+ * 输出格式: Base64(nonce(12) + ciphertext)
+ */
+export async function aesEncryptField(
+  key: CryptoKey,
+  plaintext: Uint8Array,
+  fieldName: string,
+  itemType?: string,
+): Promise<string> {
+  const aad = makeFieldAAD(fieldName, itemType);
+  const nonce = new Uint8Array(GCM_NONCE_LENGTH);
+  crypto.getRandomValues(nonce);
+  const iv = nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer;
+  const ad = aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer;
+  const pt = plaintext.buffer.slice(plaintext.byteOffset, plaintext.byteOffset + plaintext.byteLength) as ArrayBuffer;
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv, tagLength: GCM_TAG_LENGTH, additionalData: ad },
+    key,
+    pt,
+  ) as ArrayBuffer;
+  const ct = new Uint8Array(ciphertext);
+  const result = new Uint8Array(nonce.length + ct.length);
+  result.set(nonce, 0);
+  result.set(ct, nonce.length);
+  return bytesToBase64(result);
+}
+
+/**
+ * AES-256-GCM 解密（字段级 AAD）
+ * 失败返回 null（GCM 标签校验失败或格式不匹配）
+ */
+export async function aesDecryptField(
+  key: CryptoKey,
+  encoded: string,
+  fieldName: string,
+  itemType?: string,
+): Promise<Uint8Array | null> {
+  try {
+    const aad = makeFieldAAD(fieldName, itemType);
+    const data = base64ToBytes(encoded);
+    if (data.length < GCM_NONCE_LENGTH + 1) return null;
+    const nonce = data.slice(0, GCM_NONCE_LENGTH);
+    const ciphertext = data.slice(GCM_NONCE_LENGTH);
+    const iv = nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer;
+    const ct = ciphertext.buffer.slice(ciphertext.byteOffset, ciphertext.byteOffset + ciphertext.byteLength) as ArrayBuffer;
+    const ad = aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer;
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: iv, tagLength: GCM_TAG_LENGTH, additionalData: ad },
+      key,
+      ct,
+    ) as ArrayBuffer;
+    return new Uint8Array(plaintext);
+  } catch {
+    return null;
+  }
+}
+
 // ── Base64 工具 ────────────────────────────────────
 
 export function bytesToBase64(bytes: Uint8Array): string {

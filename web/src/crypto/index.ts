@@ -12,6 +12,9 @@ export {
   generateAesKey,
   exportAesKey,
   importAesKey,
+  makeFieldAAD,
+  aesEncryptField,
+  aesDecryptField,
   bytesToBase64,
   base64ToBytes,
 } from "./aes";

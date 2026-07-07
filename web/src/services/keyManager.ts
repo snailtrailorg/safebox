@@ -1,8 +1,10 @@
 /**
- * KeyManager — 内存中密钥生命周期管理
- * 对应 Android KeyManager.kt
+ * KeyManager — 内存中密钥生命周期管理（已废弃）
  *
- * 密钥仅存于 JavaScript 堆内存（CryptoKey 对象），永不持久化
+ * @deprecated 使用 keychain/keyChain.ts 替代。
+ *             保留仅用于测试兼容和旧代码参考。
+ *             新代码请使用:
+ *               import { keyChain } from "../keychain/keyChain";
  */
 import {
   deriveKey,
@@ -48,7 +50,7 @@ class KeyManager {
   // ── 密钥生成（注册时） ──────────────────────────
 
   async generateKeys(password: string): Promise<{
-    passwordHash: string;
+    authKeyHash: string;
     passwordSalt: string;
     passwordWrapped: string;
     recoveryWrapped: string;
@@ -61,7 +63,7 @@ class KeyManager {
     const salt = generateSalt();
     this.masterKey = await generateAesKey();
     const derivedKey = await deriveKey(password, salt);
-    const passwordHash = await deriveKeyHash(password, salt);
+    const authKeyHash = await deriveKeyHash(password, salt);
 
     // 生成 RSA 密钥对
     const rsaPair = await generateRsaKeyPair();
@@ -88,7 +90,7 @@ class KeyManager {
     const saltBase64 = this.bytesToBase64(salt);
 
     return {
-      passwordHash,
+      authKeyHash,
       passwordSalt: saltBase64,
       passwordWrapped,
       recoveryWrapped,

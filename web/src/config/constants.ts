@@ -18,3 +18,29 @@ export const DEVICE_KEY_ALIAS = "safebox_device_key";
 // Google OAuth — 在 Google Cloud Console 创建 Web 应用 OAuth 2.0 客户端 ID
 // https://console.cloud.google.com/apis/credentials
 export const GOOGLE_CLIENT_ID = "1081355276099-7vt4a4rbvshbf48ga4nj9vpitc6ap2tp.apps.googleusercontent.com";
+
+// ── 密码强度校验 ──────────────────────────────────
+
+export function checkPasswordStrength(password: string): { ok: boolean; reason?: string } {
+  if (password.length < 12) return { ok: false, reason: "最少 12 个字符" };
+  if (!/[A-Z]/.test(password)) return { ok: false, reason: "需要大写字母" };
+  if (!/[a-z]/.test(password)) return { ok: false, reason: "需要小写字母" };
+  if (!/[0-9]/.test(password)) return { ok: false, reason: "需要数字" };
+  const SPECIAL_CHARS = `~!@#$%^&*()_+{}[]:;<>,./?'"`;
+  if (!password.split('').some(c => SPECIAL_CHARS.includes(c)))
+    return { ok: false, reason: "需要特殊字符" };
+  if (hasSequentialPattern(password))
+    return { ok: false, reason: "包含连续序列，换个密码" };
+  return { ok: true };
+}
+
+function hasSequentialPattern(password: string): boolean {
+  for (let i = 0; i < password.length - 2; i++) {
+    const a = password.charCodeAt(i);
+    const b = password.charCodeAt(i + 1);
+    const c = password.charCodeAt(i + 2);
+    if (b === a + 1 && c === a + 2) return true;
+    if (b === a - 1 && c === a - 2) return true;
+  }
+  return false;
+}

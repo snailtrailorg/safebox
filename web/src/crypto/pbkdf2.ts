@@ -3,9 +3,9 @@
  *
  * 派生两条不同的密钥材料：
  *   - deriveKey() → AES-256 密钥，用于加密 masterKey（passwordWrapped）
- *   - deriveKeyHash() → 发给服务器的 password_hash（认证用）
+ *   - deriveKeyHash() → 发给服务器的 auth_key_hash（认证用）
  *
- * 两者使用不同的推导上下文，防止服务器 password_hash 被用于解密 passwordWrapped。
+ * 两者使用不同的推导上下文，防止服务器 auth_key_hash 被用于解密 passwordWrapped。
  * 与 Android CryptoManager.deriveKey() / deriveAuthHash() 完全一致。
  */
 import { PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH, SALT_LENGTH } from "../config/constants";
@@ -32,7 +32,7 @@ export async function deriveKey(
   );
 }
 
-/** 计算 PBKDF2 哈希的 Base64 字符串（用于发送给服务器的 password_hash）。
+/** 计算 PBKDF2 哈希的 Base64 字符串（用于发送给服务器的 auth_key_hash）。
  *  使用与 deriveKey 不同的 salt 域，防止服务器端的哈希被用于解密。 */
 export async function deriveKeyHash(
   password: string,
