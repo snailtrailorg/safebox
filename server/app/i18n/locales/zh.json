@@ -1,6 +1,7 @@
 {
   "verification_code_rate_limited": "验证码发送太频繁，请 {seconds} 秒后再试",
   "login_rate_limited": "登录尝试过于频繁，请 {seconds} 秒后再试",
+  "ip_rate_limited": "请求频率过高，请稍后再试",
   "verification_code_invalid": "验证码无效或已过期",
   "email_already_registered": "该邮箱已注册",
   "phone_already_registered": "该手机号已注册",
@@ -17,5 +18,9 @@
   "email_body_code": "您的验证码是：",
   "email_body_expiry": "验证码 {minutes} 分钟内有效。",
   "email_body_ignore": "如果您没有请求此验证码，请忽略此邮件。",
-  "sms_body": "[SafeBox] 您的验证码为 {code}，{minutes} 分钟内有效。"
+  "sms_body": "[SafeBox] 您的验证码为 {code}，{minutes} 分钟内有效。",
+  "recovery_code_invalid": "恢复码无效",
+  "recovery_already_pending": "恢复流程已在处理中，请勿重复操作",
+  "recovery_not_pending": "没有进行中的恢复流程",
+  "recovery_token_invalid": "链接无效或已过期"
 }

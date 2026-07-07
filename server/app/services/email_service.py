@@ -8,27 +8,39 @@ from app.config import settings
 from app.i18n import get_text
 
 
-async def send_verification_email(email: str, code: str, lang: str = "en") -> bool:
-    """发送邮件验证码。
-
-    Args:
-        email: 收件人邮箱
-        code: 验证码
-        lang: 语言代码 (zh/en)
-
-    Returns:
-        True 如果发送成功。
-    """
+async def _send_email(to: str, subject: str, html_body: str) -> bool:
+    """底层发送邮件。"""
     if not settings.smtp_username:
-        print(f"[DEV] 邮件未配置，验证码 {code} 应发送到 {email}")
+        print(f"[DEV] 邮件未配置，主题={subject} 应发送到 {to}")
         return True
 
-    minutes = settings.verification_code_expire_seconds // 60
     msg = MIMEMultipart()
     msg["From"] = settings.smtp_from
-    msg["To"] = email
-    msg["Subject"] = get_text("email_subject", lang)
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html"))
 
+    import asyncio
+    loop = asyncio.get_running_loop()
+
+    def _send():
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.starttls()
+            server.login(settings.smtp_username, settings.smtp_password)
+            server.sendmail(settings.smtp_from, to, msg.as_string())
+
+    try:
+        await loop.run_in_executor(None, _send)
+        return True
+    except Exception as e:
+        print(f"[EMAIL ERROR] {e}")
+        return False
+
+
+async def send_verification_email(email: str, code: str, lang: str = "en") -> bool:
+    """发送邮件验证码。"""
+    minutes = settings.verification_code_expire_seconds // 60
+    subject = get_text("email_subject", lang)
     body = f"""
     <html>
     <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
@@ -46,21 +58,69 @@ async def send_verification_email(email: str, code: str, lang: str = "en") -> bo
     </body>
     </html>
     """
-    msg.attach(MIMEText(body, "html"))
+    return await _send_email(email, subject, body)
 
-    # smtplib 是同步的，用 run_in_executor 包装
-    import asyncio
-    loop = asyncio.get_running_loop()
 
-    def _send():
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            server.login(settings.smtp_username, settings.smtp_password)
-            server.sendmail(settings.smtp_from, email, msg.as_string())
+async def send_recovery_alert(
+    user, event: str, accelerate_token: str = "", freeze_token: str = "",
+) -> bool:
+    """发送恢复码相关告警邮件。
 
-    try:
-        await loop.run_in_executor(None, _send)
-        return True
-    except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
+    event: "initiate" | "accelerate" | "freeze"
+    """
+    email = user.email
+    if not email:
         return False
+
+    base_url = settings.cors_origins.split(",")[0] if settings.cors_origins != "*" else "https://safebox.snailtrail.org"
+
+    if event == "initiate":
+        accelerate_url = f"{base_url}/recovery/accelerate?token={accelerate_token}"
+        freeze_url = f"{base_url}/recovery/freeze?token={freeze_token}"
+        subject = "SafeBox 安全告警：恢复码已用于重置密码"
+        body = f"""
+        <html>
+        <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>⚠️ 安全告警</h2>
+            <p>您的 SafeBox 恢复码已被用于发起密码重置。</p>
+            <p>新密码将在 <strong>24 小时冷却期</strong>后自动生效。</p>
+            <p style="margin: 20px 0;">
+                <a href="{accelerate_url}" style="display: inline-block; padding: 12px 24px;
+                   background: #4CAF50; color: white; text-decoration: none; border-radius: 6px;
+                   margin-right: 12px;">✅ 我是本人，立即恢复</a>
+                <a href="{freeze_url}" style="display: inline-block; padding: 12px 24px;
+                   background: #f44336; color: white; text-decoration: none; border-radius: 6px;">
+                   🛑 这不是我，立即冻结</a>
+            </p>
+            <p style="color: #666; font-size: 14px;">
+                如果不是您本人操作，请立即点击"冻结"按钮。冻结后旧密码保持不变。
+            </p>
+        </body>
+        </html>
+        """
+    elif event == "accelerate":
+        subject = "SafeBox：密码重置已确认"
+        body = """
+        <html>
+        <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>✅ 密码重置完成</h2>
+            <p>您的 SafeBox 新密码已通过加速通道激活。</p>
+            <p style="color: #666; font-size: 14px;">如果不是您本人操作，请立即联系客服。</p>
+        </body>
+        </html>
+        """
+    elif event == "freeze":
+        subject = "SafeBox：密码重置已冻结"
+        body = """
+        <html>
+        <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>🛑 密码重置已冻结</h2>
+            <p>您的 SafeBox 恢复操作已被冻结。旧密码保持不变，可正常登录。</p>
+            <p style="color: #666; font-size: 14px;">如果不是您本人操作，建议登录后修改密码。</p>
+        </body>
+        </html>
+        """
+    else:
+        return False
+
+    return await _send_email(email, subject, body)

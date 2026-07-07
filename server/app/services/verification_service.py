@@ -1,6 +1,8 @@
 """验证码服务：生成、存储（Redis）、验证。"""
 
 import secrets
+import time
+import uuid
 from datetime import timedelta
 
 import redis.asyncio as aioredis
@@ -64,22 +66,31 @@ LOGIN_LOCKOUT_SECONDS = 3600  # 5 次失败后锁定 1 小时
 LOGIN_RATE_LIMIT_DISABLED = 0  # 设为 0 可关闭限流（调试用）
 
 
-async def check_login_rate_limit(target: str, value: str) -> int:
-    """检查并记录登录失败频率。每次调用递增计数。
+async def get_login_wait(target: str, value: str) -> int:
+    """只读检查当前登录等待秒数。0=可尝试，不修改计数。
 
-    返回等待秒数，0=可尝试。
     第 1 次不限制，后续指数退避（1,2,4,8 秒），第 5 次锁定 1 小时。
     """
+    r = await _get_redis()
+    key = _login_fail_key(target, value)
+    count = await r.get(key)
+    if count is None:
+        return 0
+    count = int(count)
+    if count >= 6:
+        return LOGIN_LOCKOUT_SECONDS
+    if count >= 2:
+        return 1 << (count - 2)
+    return 0
+
+
+async def record_login_failure(target: str, value: str) -> None:
+    """登录验证失败后记录一次失败。"""
     r = await _get_redis()
     key = _login_fail_key(target, value)
     count = await r.incr(key)
     if count == 1:
         await r.expire(key, LOGIN_LOCKOUT_SECONDS)
-        return 0
-    if count >= 6:          # 第 5 次 incr 后 count=6 → 锁定
-        return LOGIN_LOCKOUT_SECONDS
-    # 指数退避：从第 2 次开始 1, 2, 4, 8
-    return 1 << (count - 2)
 
 
 async def clear_login_failures(target: str, value: str) -> None:
@@ -87,3 +98,29 @@ async def clear_login_failures(target: str, value: str) -> None:
     r = await _get_redis()
     key = _login_fail_key(target, value)
     await r.delete(key)
+
+
+# ── IP 频率限制（滑动窗口）─────────────────────────────
+
+IP_RATE_WINDOW = 3600       # 滑动窗口 1 小时
+IP_RATE_LIMIT_MAX = 500     # 单 IP 每小时最多请求次数
+
+
+async def check_ip_rate(ip: str) -> bool:
+    """检查 IP 请求频率。滑动窗口 1 小时，超限返回 True（拒绝本次请求）。
+
+    每个请求：移走窗口外旧记录 → ZCARD 检查当前计数 → ZADD 记录本次。
+    EXPIRE 兜底回收：IP 停止请求后 1 小时 key 自动消失。
+    """
+    if not ip:
+        return False
+    r = await _get_redis()
+    key = f"iprate:{ip}"
+    now = time.time()
+    await r.zremrangebyscore(key, 0, now - IP_RATE_WINDOW)
+    count = await r.zcard(key)
+    if count >= IP_RATE_LIMIT_MAX:
+        return True
+    await r.zadd(key, {str(uuid.uuid4()): now})
+    await r.expire(key, IP_RATE_WINDOW)
+    return False
