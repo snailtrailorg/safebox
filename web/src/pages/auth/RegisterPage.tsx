@@ -148,8 +148,8 @@ export function RegisterPage() {
       }
 
       navigate("/");
-    } catch (e: any) {
-      setToast({ message: e.message || t("auth.register.registerFailed"), type: "error" });
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : t("auth.register.registerFailed"), type: "error" });
     } finally {
       setLoading(false);
     }

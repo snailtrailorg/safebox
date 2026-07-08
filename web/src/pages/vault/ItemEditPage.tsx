@@ -127,8 +127,8 @@ export function ItemEditPage() {
 
       setToast({ message: t("vault.edit.saved"), type: "success" });
       setTimeout(() => navigate(`/item/${savedDid}`), 500);
-    } catch (e: any) {
-      setToast({ message: e.message || t("vault.edit.saveFailed"), type: "error" });
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : t("vault.edit.saveFailed"), type: "error" });
     } finally {
       setSaving(false);
     }

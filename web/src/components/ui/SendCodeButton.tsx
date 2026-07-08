@@ -3,7 +3,7 @@
  *
  * 点击发送后显示倒计时（默认 60s），倒计结束显示"重新发送"
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 interface SendCodeButtonProps {
@@ -41,6 +41,13 @@ export function SendCodeButton({ onClick, disabled, countdown = 60 }: SendCodeBu
       setSending(false);
     }
   };
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   const btnText = () => {
     if (sending) return t("common.sending");

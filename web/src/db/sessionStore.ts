@@ -39,12 +39,12 @@ export async function clearSession(): Promise<void> {
 
 export async function getAccessToken(): Promise<string | null> {
   const session = await getSession();
-  return session.accessToken || null;
+  return session.accessToken ?? null;
 }
 
 export async function getRefreshToken(): Promise<string | null> {
   const session = await getSession();
-  return session.refreshToken || null;
+  return session.refreshToken ?? null;
 }
 
 export async function updateTokens(

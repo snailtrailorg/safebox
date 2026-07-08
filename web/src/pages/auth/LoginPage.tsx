@@ -10,6 +10,7 @@ import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
 import { saveSession } from "../../db/sessionStore";
 import { deriveAuthKey } from "../../crypto/kdf";
+import { base64ToBytes } from "../../crypto/aes";
 import { GOOGLE_CLIENT_ID } from "../../config/constants";
 import type { LoginResponse } from "../../types/api";
 
@@ -118,7 +119,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const { password_salt: salt } = await apiClient.getSalt(email);
-      const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
+      const saltBytes = base64ToBytes(salt);
       const authKeyHash = await deriveAuthKey(password, saltBytes);
       const response = await apiClient.loginEmail({ email, auth_key_hash: authKeyHash });
       await saveSession({
@@ -130,8 +131,8 @@ export function LoginPage() {
         rsaPublicKey: response.rsa_public_key,
       });
       await handleLoginResponse(response, password);
-    } catch (e: any) {
-      setToast({ message: e.message || t("auth.login.loginFailed"), type: "error" });
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : t("auth.login.loginFailed"), type: "error" });
     } finally {
       setLoading(false);
     }
@@ -151,7 +152,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const { password_salt: salt } = await apiClient.getSalt(undefined, phone);
-      const saltBytes = new Uint8Array(atob(salt).split("").map(c => c.charCodeAt(0)));
+      const saltBytes = base64ToBytes(salt);
       const authKeyHash = await deriveAuthKey(phonePassword, saltBytes);
       const response = await apiClient.loginPhone({ phone, verification_code: code, auth_key_hash: authKeyHash });
       await saveSession({
@@ -163,8 +164,8 @@ export function LoginPage() {
         rsaPublicKey: response.rsa_public_key,
       });
       await handleLoginResponse(response, phonePassword);
-    } catch (e: any) {
-      setToast({ message: e.message || t("auth.login.loginFailed"), type: "error" });
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : t("auth.login.loginFailed"), type: "error" });
     } finally {
       setLoading(false);
     }
@@ -187,8 +188,8 @@ export function LoginPage() {
         rsaPublicKey: response.rsa_public_key,
       });
       await handleLoginResponse(response, googlePassword);
-    } catch (e: any) {
-      setToast({ message: e.message || t("auth.login.loginFailed"), type: "error" });
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : t("auth.login.loginFailed"), type: "error" });
     } finally {
       setLoading(false);
     }

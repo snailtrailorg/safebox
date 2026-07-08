@@ -64,7 +64,7 @@ export function ItemDetailPage() {
       if (!did) return;
       const found = await getItem(parseInt(did));
       if (cancelled) return;
-      setItem(found || null);
+      setItem(found ?? null);
       setLoading(false);
       if (found) {
         const name = await keyChain.decryptItemField(found.name, "name", found.type);

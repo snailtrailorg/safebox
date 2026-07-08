@@ -9,6 +9,7 @@
  * 与 Android CryptoManager.deriveKey() / deriveAuthHash() 完全一致。
  */
 import { PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH, SALT_LENGTH } from "../config/constants";
+import { bytesToBase64 } from "./aes";
 
 /** 生成随机盐 (32 字节) */
 export function generateSalt(): Uint8Array {
@@ -71,11 +72,4 @@ async function deriveBits(
   );
 }
 
-// Base64 工具
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
+

@@ -30,7 +30,8 @@ export function generatePassword(opts?: Partial<PasswordOptions>): string {
   if (options.includeSpecials) pool += SPECIALS;
   if (pool.length === 0) pool = LOWERCASE + DIGITS;
 
-  const chars = new Uint8Array(options.length);
+  // 用 Uint32Array + 取模 避免 Uint8Array % pool.length 的微小模偏差
+  const chars = new Uint32Array(options.length);
   crypto.getRandomValues(chars);
   let result = "";
   for (let i = 0; i < options.length; i++) {
