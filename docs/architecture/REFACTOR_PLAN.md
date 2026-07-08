@@ -140,8 +140,8 @@ async function encryptField(userKey, plaintext, fieldName, itemType?) {
 条目结构变更：
 
 ```typescript
-// v2 格式
-{ type: "login", encryption_version: 2,
+// v2 格式（纯 v2，无 encryption_version 字段）
+{ type: "login",
   name: { encrypted_key: "...", ciphertext: "..." },
   data: { encrypted_key: "...", ciphertext: "..." } }
 ```

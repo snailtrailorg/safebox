@@ -121,7 +121,6 @@ interface EncryptedItem {
   id: string;
   userId: string;
   type: string;
-  encryption_version: number;               // 1=RSA, 2=AES-GCM+ItemKey
   icon?: EncryptedField;
   name: EncryptedField;                     // AAD = "safebox:v2:item:name"
   description?: EncryptedField;
@@ -150,25 +149,19 @@ crypto.getRandomValues(nonce);
 
 12 字节随机 nonce 的碰撞概率：在 2^48 次加密操作后碰撞概率达到 2^-32。对于密码管理器条目数量（<10000），碰撞可忽略。
 
-### 解密回退策略
+### 解密策略
 
 ```typescript
 async function decryptItemField(
   userKey: CryptoKey,
-  rsaPrivateKey: CryptoKey,
   field: EncryptedField,
-  version: number,
+  fieldName: string,
+  itemType: string,
 ): Promise<string | null> {
-  if (version >= 2) {
-    const itemKey = await aesDecrypt(userKey, field.encrypted_key);
-    if (itemKey) {
-      const itemKeyKey = await importKey("raw", itemKey, "AES-GCM");
-      const result = await aesDecryptField(itemKeyKey, field.ciphertext, fieldName);
-      if (result !== null) return new TextDecoder().decode(result);
-    }
-  }
-  // 回退 RSA（encryption_version = 1 或 AES-GCM 解密失败时）
-  return rsaDecryptString(rsaPrivateKey, field.ciphertext);
+  const itemKey = await decryptItemKey(userKey, field.encrypted_key);
+  if (!itemKey) return null;
+  const result = await aesDecryptField(itemKey, field.ciphertext, fieldName, itemType);
+  return result !== null ? new TextDecoder().decode(result) : null;
 }
 ```
 
@@ -221,5 +214,5 @@ async function decryptItemField(
 6. **KDF 参数跟随账户可配置。**
 7. **Nonce 使用 12 字节安全随机数（crypto.getRandomValues），不可用计数器。**
 8. **User Key 在 JS 堆内存中。**
-9. **条目按 encryption_version 标记格式，解密时直接调度对应解密器，不靠 try-catch。**
+9. **所有条目统一 v2 加密格式（AES-GCM + Item Key + AAD），无 v1 RSA 回退。**
 10. **恢复码路径旧数据永不覆盖。** 冷却期内 pending_* 与正式字段共存，冻结即回滚。

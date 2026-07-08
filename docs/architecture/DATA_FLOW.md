@@ -153,7 +153,7 @@ Body: {target: "email" | "phone", value: "user@example.com",
                                 ciphertext = AES-256-GCM(plaintext, Item Key, AAD=fieldName)
 
                              ④ 加密后的结构:
-                                {type, icon?, encryption_version: 2,
+                                {type, icon?,
                                  name: {encrypted_key, ciphertext},
                                  data: {encrypted_key, ciphertext}, ...}
 
@@ -185,21 +185,15 @@ sync() → push dirty items
 ```typescript
 async function decryptField(
   field: EncryptedField,
-  version: number,              // 来自数据库字段，1=RSA, 2=AES-GCM+ItemKey
   userKey: CryptoKey,
-  rsaPrivateKey: CryptoKey,
   fieldName: string,
+  itemType: string,
 ): Promise<string | null> {
-  if (version === 2) {
-    // 新格式: Item Key → AES-GCM
-    const itemKeyRaw = await aesDecrypt(userKey, field.encrypted_key);
-    if (!itemKeyRaw) return null;
-    const itemKey = await crypto.subtle.importKey("raw", itemKeyRaw, "AES-GCM", false, ["decrypt"]);
-    const plaintext = await aesDecryptField(itemKey, field.ciphertext, fieldName);
-    if (plaintext) return new TextDecoder().decode(plaintext);
-  }
-  // 旧格式: RSA（encryption_version = 1）
-  return rsaDecryptString(rsaPrivateKey, field.ciphertext);
+  const itemKeyRaw = await aesDecrypt(userKey, field.encrypted_key);
+  if (!itemKeyRaw) return null;
+  const itemKey = await crypto.subtle.importKey("raw", itemKeyRaw, "AES-GCM", false, ["decrypt"]);
+  const plaintext = await aesDecryptField(itemKey, field.ciphertext, fieldName, itemType);
+  return plaintext ? new TextDecoder().decode(plaintext) : null;
 }
 ```
 
