@@ -21,7 +21,7 @@ if $WEB; then
     echo "▶  构建并推送 Web..."
     (cd web && npm run build)
     rsync -avz --delete web/dist/ "$SSH:~/safebox-web/"
-    ssh "$SSH" "sudo cp -r ~/safebox-web/* $DST/web/ && sudo chown -R safebox:safebox $DST/web && sudo systemctl reload httpd"
+    ssh "$SSH" "sudo cp -r ~/safebox-web/* $DST/web/ && sudo chown -R safebox:safebox $DST/web && sudo systemctl reload nginx"
 fi
 
 echo "▶  重启服务..."
