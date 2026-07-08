@@ -1,8 +1,12 @@
 """SafeBox 后端测试配置。"""
 
 import asyncio
+import os
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
+
+# 测试用 HMAC 密钥
+os.environ["SAFEBOX_RECOVERY_HMAC_KEY"] = "dGVzdC1obWFjLWtleS0zMi1ieXRlcy1sb25nISEh"
 
 import pytest
 import pytest_asyncio

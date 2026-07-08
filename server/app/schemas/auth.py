@@ -116,16 +116,6 @@ class ResetPasswordRequest(BaseModel):
     new_password_wrapped: str
 
 
-class RecoveryResetRequest(BaseModel):
-    """恢复码重置密码（无需邮箱验证码，恢复码本身证明身份）。"""
-    model_config = {"populate_by_name": True}
-    target: str = Field(..., pattern="^(phone|email)$")
-    value: str
-    new_auth_key_hash: str = Field(..., alias="new_password_hash")
-    new_password_salt: str
-    new_password_wrapped: str
-
-
 class ResetPasswordResponse(BaseModel):
     success: bool
     access_token: str | None = None

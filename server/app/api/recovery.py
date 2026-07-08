@@ -79,7 +79,8 @@ class FreezeRecoveryRequest(BaseModel):
 class RecoveryStatusResponse(BaseModel):
     status: str  # none | active | pending_activation | permanently_locked
     cooldown_expires_at: str | None = None
-    recovery_attempt_count: int = 0
+    monthly_initiation_count: int = 0
+    failed_attempt_count: int = 0
 
 
 class RevokeRecoveryRequest(BaseModel):
@@ -195,7 +196,7 @@ async def get_status(
     rc = result.scalar_one_or_none()
 
     if not rc:
-        return RecoveryStatusResponse(status="none", recovery_attempt_count=0)
+        return RecoveryStatusResponse(status="none")
 
     # 检查是否应自动激活
     if rc.status == "pending_activation":
@@ -205,13 +206,15 @@ async def get_status(
             if activated:
                 return RecoveryStatusResponse(
                     status=rc.status,
-                    recovery_attempt_count=rc.recovery_attempt_count,
+                    monthly_initiation_count=rc.monthly_initiation_count,
+                    failed_attempt_count=rc.failed_attempt_count,
                 )
 
     return RecoveryStatusResponse(
         status=rc.status,
         cooldown_expires_at=rc.cooldown_expires_at.isoformat() if rc.cooldown_expires_at else None,
-        recovery_attempt_count=rc.recovery_attempt_count,
+        monthly_initiation_count=rc.monthly_initiation_count,
+        failed_attempt_count=rc.failed_attempt_count,
     )
 
 

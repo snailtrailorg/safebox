@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     # Google OAuth
     google_client_id: str = ""
 
-    # CORS
+    # 恢复码
+    recovery_hmac_key: str = ""  # 32 字节 base64 编码，服务端 HMAC 密钥
     cors_origins: str = "*"
 
     # 同步

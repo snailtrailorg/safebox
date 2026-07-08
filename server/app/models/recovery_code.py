@@ -35,7 +35,9 @@ class RecoveryCode(Base):
     pending_setup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cooldown_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    recovery_attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    monthly_initiation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_attempt_last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

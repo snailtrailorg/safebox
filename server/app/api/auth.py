@@ -21,7 +21,6 @@ from app.schemas.auth import (
     LoginPhoneRequest,
     LoginResponse,
     LogoutRequest,
-    RecoveryResetRequest,
     RefreshTokenRequest,
     RefreshTokenResponse,
     RegisterDeviceRequest,
@@ -305,34 +304,6 @@ async def change_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
 
     user = await db.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
-
-    user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
-    user.password_salt = req.new_password_salt
-    keys = await get_user_keys(db, user.id)
-    if keys:
-        keys.password_wrapped = req.new_password_wrapped
-    await db.commit()
-
-    await revoke_all_user_tokens(db, user.id)
-    await db.commit()
-
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
-    return ResetPasswordResponse(
-        success=True, access_token=access_token, refresh_token=refresh_token,
-        password_salt=user.password_salt, password_wrapped=keys.password_wrapped if keys else None,
-        recovery_wrapped=keys.recovery_wrapped if keys else "",
-        encrypted_private=keys.encrypted_private if keys else "",
-        rsa_public_key=keys.rsa_public_key if keys else "",
-    )
-
-
-@router.post("/recovery-reset", response_model=ResetPasswordResponse)
-async def recovery_reset(req: RecoveryResetRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """恢复码重置密码（无需邮箱验证码，恢复码本身就是身份证明）。"""
-    user = await find_user_by_email(db, req.value) if req.target == "email" else await find_user_by_phone(db, req.value)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 

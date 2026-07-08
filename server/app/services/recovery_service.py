@@ -1,5 +1,6 @@
 """恢复码业务逻辑：生成、验证、发起恢复、加速、冻结。"""
 
+import base64
 import hashlib
 import hmac
 import json
@@ -19,8 +20,9 @@ from app.services.bip39 import generate_bip39_code
 
 # ── 常量 ────────────────────────────────────────────
 
-MAX_FAILED_ATTEMPTS = 5  # 连续失败 → permanently_locked
-MAX_MONTHLY_ATTEMPTS = 3  # 月发起次数 ≥ 3 → permanently_locked
+MAX_FAILED_ATTEMPTS = 5          # 24h 窗口内连续失败 → permanently_locked
+MAX_MONTHLY_INITIATIONS = 3      # 月发起次数 > 3 → permanently_locked
+FAILED_ATTEMPT_WINDOW_HOURS = 24  # 失败计数窗口
 COOLDOWN_HOURS = 24
 ACCELERATE_LINK_TTL_MINUTES = 15
 
@@ -30,13 +32,27 @@ def _recovery_signing_key() -> str:
     return getattr(settings, "recovery_signing_key", None) or settings.jwt_secret_key
 
 
+def _get_hmac_key() -> bytes:
+    """从环境变量解码服务端 HMAC 密钥。"""
+    key = settings.recovery_hmac_key
+    if not key:
+        raise RuntimeError("RECOVERY_HMAC_KEY is not configured")
+    return base64.b64decode(key)
+
+
+def normalize_mnemonic(mnemonic: str) -> str:
+    """规范化助记词：trim + lower + 单空格。"""
+    return " ".join(mnemonic.strip().lower().split())
+
+
 # ── 哈希与验证 ──────────────────────────────────────
 
 def hash_recovery_code(plaintext: str, salt: str) -> str:
-    """HMAC-SHA256(recovery_code_salt, plaintext) → hex digest。"""
-    return hmac.new(
-        salt.encode(), plaintext.encode(), hashlib.sha256
-    ).hexdigest()
+    """HMAC-SHA256(server_key, salt + normalized_mnemonic) → hex digest。"""
+    key = _get_hmac_key()
+    normalized = normalize_mnemonic(plaintext)
+    message = salt.encode() + normalized.encode("utf-8")
+    return hmac.new(key, message, hashlib.sha256).hexdigest()
 
 
 def verify_recovery_code(plaintext: str, salt: str, stored_hash: str) -> bool:
@@ -81,7 +97,8 @@ async def create_recovery_code(
         recovery_code_hash=code_hash,
         recovery_code_salt=salt,
         status="active",
-        recovery_attempt_count=0,
+        monthly_initiation_count=0,
+        failed_attempt_count=0,
     )
     db.add(rc)
     await db.flush()
@@ -93,7 +110,11 @@ async def create_recovery_code(
 async def find_valid_recovery_code(
     db: AsyncSession, user_id: UUID, plaintext: str,
 ) -> RecoveryCode | None:
-    """查找用户的有效恢复码并验证。失败时自动增加计数。"""
+    """查找用户的有效恢复码并验证。
+
+    失败时：24h 滑动窗口内递增失败计数，≥5 次永久锁定。
+    成功时：清零失败计数。
+    """
     result = await db.execute(
         select(RecoveryCode).where(
             RecoveryCode.user_id == user_id,
@@ -105,9 +126,25 @@ async def find_valid_recovery_code(
         return None
 
     if not verify_recovery_code(plaintext, rc.recovery_code_salt, rc.recovery_code_hash):
-        # 记录失败（在实际调用处计数）
+        now = datetime.now(timezone.utc)
+        # 24h 窗口：超过窗口期重置计数
+        if (
+            rc.failed_attempt_last_at is None
+            or (now - rc.failed_attempt_last_at).total_seconds() > FAILED_ATTEMPT_WINDOW_HOURS * 3600
+        ):
+            rc.failed_attempt_count = 1
+        else:
+            rc.failed_attempt_count += 1
+        rc.failed_attempt_last_at = now
+
+        if rc.failed_attempt_count >= MAX_FAILED_ATTEMPTS:
+            rc.status = "permanently_locked"
+        await db.flush()
         return None
 
+    # 验证成功，清零失败计数
+    rc.failed_attempt_count = 0
+    rc.failed_attempt_last_at = None
     return rc
 
 
@@ -131,10 +168,10 @@ async def initiate_recovery(
     rc.pending_wrapped_user_key = new_wrapped_user_key
     rc.pending_setup_at = now
     rc.cooldown_expires_at = now + timedelta(hours=COOLDOWN_HOURS)
-    rc.recovery_attempt_count += 1
+    rc.monthly_initiation_count += 1
 
-    # 月尝试次数 ≥ 3 → 永久锁定
-    if rc.recovery_attempt_count >= MAX_MONTHLY_ATTEMPTS:
+    # 月发起次数 > 3 → 永久锁定
+    if rc.monthly_initiation_count > MAX_MONTHLY_INITIATIONS:
         rc.status = "permanently_locked"
 
     await db.flush()

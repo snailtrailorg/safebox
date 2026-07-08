@@ -42,18 +42,20 @@ def test_hash_deterministic():
 
 
 def test_hash_case_sensitive():
+    """normalize 做 lower，大小写不敏感。"""
     code = "Test Code"
     salt = "salt"
     h1 = hash_recovery_code(code, salt)
     h2 = hash_recovery_code(code.lower(), salt)
-    assert h1 != h2
+    assert h1 == h2  # normalize 统一转小写
 
 
 def test_hash_whitespace_sensitive():
+    """normalize 做 trim + 单空格，多余空格不影响。"""
     salt = "salt"
     h1 = hash_recovery_code("a b", salt)
     h2 = hash_recovery_code("a  b", salt)
-    assert h1 != h2
+    assert h1 == h2  # normalize 合并空格
 
 
 def test_verify_constant_time():
