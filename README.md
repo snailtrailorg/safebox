@@ -23,8 +23,8 @@
 | 层 | 技术 |
 |---|---|
 | Android | Kotlin, Jetpack Compose, Room, Hilt, Retrofit |
-| Web | React 19, TypeScript, Vite 6, Web Crypto API, IndexedDB |
-| 后端 | Python FastAPI, SQLAlchemy (async), Alembic, PostgreSQL, Redis |
+| Web | React 19, TypeScript, Vite 6, Web Crypto API, IndexedDB (idb), react-router-dom, i18next |
+| 后端 | Python FastAPI, SQLAlchemy (async), Alembic, PyJWT, bcrypt, PostgreSQL, Redis |
 | 部署 | Nginx 反代, Gunicorn + Uvicorn, Systemd, Amazon Linux 2023 |
 
 ## 项目结构
@@ -48,14 +48,18 @@ safebox/
 │   └── tests/              # 40 tests
 ├── web/                    # React Web 客户端
 │   └── src/
+│       ├── components/     # 通用组件 (layout, ui)
 │       ├── crypto/         # PBKDF2, AES-GCM, RSA-OAEP, BIP39, KDF
 │       ├── keychain/       # keyChain 全局单例（User Key + Item Key 管理）
 │       ├── services/       # API, KeyManager (@deprecated), Sync
 │       ├── hooks/          # useAutoLock
 │       ├── db/             # IndexedDB (idb)
 │       ├── pages/          # auth, vault, settings
+│       ├── routes/         # 路由配置 + AuthGuard
 │       ├── config/         # 常量、条目类型
-│       ├── i18n/           # 国际化
+│       ├── i18n/           # 国际化 (en/zh)
+│       ├── types/          # TypeScript 类型定义 (api, domain)
+│       ├── utils/          # 工具函数 (base64, password, backup, format)
 │       └── __tests__/      # 111 tests
 ├── docs/architecture/      # 架构文档（v2 含 API Contract、数据流、密钥层次等）
 ├── DEPLOY.md               # 生产部署指南

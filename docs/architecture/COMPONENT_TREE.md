@@ -53,7 +53,7 @@
 |------|------|---------|-----------|
 | LoginPage | 三种登录方式 Tab，PBKDF2 密码哈希 | local state | GET /salt, POST /login/* |
 | RegisterPage | 三种注册方式 Tab，生成密钥并上传 | local state | POST /send-code, POST /register/* |
-| RecoveryPage | BIP39 恢复码验证 + 新密码重置 | local state | GET /salt, POST /recovery-reset |
+| RecoveryPage | BIP39 恢复码验证 + 新密码重置 | local state | GET /salt, POST /auth/recovery/initiate |
 | VaultListPage | 显示条目列表 + FAB 新建 | VaultContext | — |
 | ItemDetailPage | 条目详情 + 按压显示密码 | VaultContext + local | — |
 | ItemEditPage | 创建/编辑条目 | VaultContext + local | — |
@@ -72,7 +72,7 @@
 | Context | 状态 | 方法 |
 |---------|------|------|
 | AuthContext | authStatus (loading/guest/locked/ready) + userInfo | login(), logout(), lockAutoLock() |
-| VaultContext | vaultItems + searchQuery + isSyncing | addItem, updateItem, deleteItem, sync |
+| VaultContext | vaultItems + isSyncing + conflicts | saveItem, deleteItem, syncNow, resolveConflict, clearError |
 
 ---
 

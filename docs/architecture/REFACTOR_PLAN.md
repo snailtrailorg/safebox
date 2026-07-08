@@ -29,7 +29,7 @@ Stage 1.5 (P1 非阻塞)
   Step 10: 密码强度 12+ 含复杂度校验
 
 Wave 2 (P1) ─── 功能补全
-  Step 6: 恢复码 HKDF + 邮箱验证码保护 + 告警通知
+  Step 6: 恢复码机制（BIP39 助记词 + 服务端 HMAC 验证 + 24h 冷却期 + 加速通道 + 冻结回滚）
   Step 7: GET /salt 精简
   Step 8: change-password（含邮箱验证码）+ 敏感操作验证码保护
   Step 8.5: 注销账号增加邮箱验证码
@@ -58,7 +58,7 @@ export type KdfSettings =
   | { algorithm: "pbkdf2"; iterations: number }
   | { algorithm: "argon2id"; memory: number; iterations: number; parallelism: number };
 
-export const DEFAULT_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 100_000 };
+export const DEFAULT_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 600_000 };
 export const RECOMMENDED_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 600_000 };
 
 // 通过 Web Worker 执行 PBKDF2，避免主线程阻塞
@@ -223,18 +223,28 @@ function hasSequentialPattern(password: string): boolean {
 
 ## Wave 2
 
-### Step 6: 恢复码机制（服务端 HMAC 验证 + 冷却期 + 冻结）
+### Step 6: 恢复码机制（BIP39 助记词 + 服务端 HMAC 验证 + 24h 冷却期 + 加速通道 + 冻结回滚）
 
 **说明**：恢复码机制改用 BIP39 12 词 + 服务端 HMAC-SHA256 验证模式，替代 v1 的 BIP39 客户端解密 recoveryWrapped 方案。详见 `RECOVERY_MECHANISM.md`。
 
 **6a — 创建 recovery_codes 表**
 
+**HMAC 密钥设计**：恢复码哈希使用服务端密钥 `RECOVERY_HMAC_KEY`（环境变量，32 字节 base64 编码）作为 HMAC 密钥，salt 作为消息的一部分。这样即使数据库完全泄露，没有服务端密钥也无法离线验证恢复码。
+
+```python
+def hash_recovery_code(mnemonic: str, salt: str) -> str:
+    key = base64.b64decode(settings.recovery_hmac_key)
+    normalized = normalize_mnemonic(mnemonic)
+    message = salt.encode() + normalized.encode("utf-8")
+    return hmac.new(key, message, hashlib.sha256).hexdigest()
+```
+
 ```sql
 CREATE TABLE recovery_codes (
     id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id                   UUID REFERENCES users(id) ON DELETE CASCADE,
-    recovery_code_hash        VARCHAR(128) NOT NULL,
-    recovery_code_salt        VARCHAR(64) NOT NULL,
+    recovery_code_hash        VARCHAR(128) NOT NULL,   -- HMAC-SHA256(server_key, salt + normalized_mnemonic)
+    recovery_code_salt        VARCHAR(64) NOT NULL,    -- 随机盐值，作为 HMAC 消息的一部分（非 HMAC 密钥）
     status                    VARCHAR(32) NOT NULL DEFAULT 'active',
     pending_new_auth_key_hash VARCHAR(128),       -- 新密码的 auth_key_hash（加速通道验证用）
     pending_password_salt     VARCHAR(128),       -- 新密码 salt
@@ -242,7 +252,9 @@ CREATE TABLE recovery_codes (
     pending_wrapped_user_key  TEXT,               -- 用新密码派生的 key 包裹后的 User Key（恢复后解密保险库的核心数据）
     pending_setup_at          TIMESTAMPTZ,        -- 用户提交新密码的时间（冷却起始）
     cooldown_expires_at       TIMESTAMPTZ,        -- pending_setup_at + 24h
-    recovery_attempt_count    INTEGER NOT NULL DEFAULT 0,
+    failed_attempt_count       INTEGER NOT NULL DEFAULT 0,     -- 连续失败次数（24h 滑动窗口，成功后清零）
+    failed_attempt_last_at     TIMESTAMPTZ,                   -- 最后一次失败的时间（用于 24h 窗口判断）
+    monthly_initiation_count   INTEGER NOT NULL DEFAULT 0,    -- 当月成功发起恢复次数（每月 1 日重置）
     created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     consumed_at               TIMESTAMPTZ
 );
@@ -268,10 +280,52 @@ CREATE INDEX idx_recovery_codes_user ON recovery_codes(user_id, status);
 
 **6d — RecoveryPage 重写**
 
+恢复码页面包含三个子页面：生成展示页、恢复发起页、冷却期状态页。
+
+**生成展示页（安全设置页 → 生成恢复码）**：
+
+```typescript
+// 步骤 1：用户触发生成（需验证码 + 当前密码）
+async function handleGenerate() {
+  const resp = await apiClient.post("/auth/recovery/generate", {
+    verification_code: verifyCode,
+    current_auth_key_hash: await deriveAuthKey(currentPassword, salt, kdf),
+  });
+  // 服务端返回 12 个 BIP39 单词，仅此一次
+  setMnemonic(resp.recovery_code);  // 如 "abandon ability able about above absent absorb abstract accuse achieve acid acoustic"
+}
+
+// 步骤 2：卡片展示（3 行 × 4 词，便于抄写）
+// ┌─────────────────────────────────┐
+// │  1. abandon   2. ability   3. able    4. about    │
+// │  5. above     6. absent    7. absorb  8. abstract │
+// │  9. accuse   10. achieve  11. acid   12. acoustic │
+// └─────────────────────────────────┘
+
+// 步骤 3：二次确认（用户输入第 4 词和第 8 词）
+const words = mnemonic.split(" ");
+const expected1 = words[3];  // 第 4 个词
+const expected2 = words[7];  // 第 8 个词
+if (userInput1 !== expected1 || userInput2 !== expected2) {
+  setError("单词不匹配，请重新核对"); return;
+}
+// 确认通过 → 提示用户妥善保存 → 关闭展示
+
+// 规范化函数（用户输入恢复码时使用）
+function normalizeMnemonic(input: string): string {
+  return input.trim().toLowerCase().replace(/\s+/g, " ");
+}
+```
+
+**恢复发起页（登录页 → 忘记密码 → 输入恢复码）**：
+
 ```typescript
 // 用户输入恢复码 + 设置新密码（一次性完成）
 async function handleInitiateRecovery() {
+  const code = normalizeMnemonic(userInput);  // 规范化后提交
+
   // 1. 客户端用新密码派生新密钥，重新 wrap User Key
+  const newSalt = crypto.getRandomValues(new Uint8Array(32));
   const newPDK = await deriveKey(newPassword, newSalt, kdf);
   const newWrappedUserKey = await aesEncrypt(userKey, newPDK);
 
@@ -279,7 +333,7 @@ async function handleInitiateRecovery() {
   const resp = await apiClient.post("/auth/recovery/initiate", {
     recovery_code: code,
     pending_new_auth_key_hash: await deriveAuthKey(newPassword, newSalt, kdf),
-    pending_password_salt: newSalt,
+    pending_password_salt: bytesToBase64(newSalt),
     pending_kdf_settings: kdf,
     pending_wrapped_user_key: newWrappedUserKey,
   });
@@ -295,20 +349,86 @@ async function handleAccelerate(token, verifyCode) {
   // 新密码已激活，登录
 }
 
-// 冻结（无需登录）
+// 冻结（无需登录，签名链接一键回滚）
 async function handleFreeze(token) {
   await apiClient.post("/auth/recovery/freeze", {
     signed_token: token,
   });
-  // 旧密码保持不变
+  // 旧密码保持不变，pending_* 被丢弃
 }
 ```
+
+**冷却期状态页**：显示倒计时 + 加速/冻结操作入口。轮询 `GET /auth/recovery/status` 获取剩余时间。
 
 **6e — 告警通知**
 - initiate 时：邮件含两个核心链接（加速 + 冻结）
 - accelerate 时：确认邮件"新密码已激活"
 - freeze 时：确认邮件"冻结成功，旧密码保持不变"
 - 冷却自然结束时：发送"密码已重置"提示邮件
+
+**6f — 尝试次数限制（两个独立计数器）**
+
+恢复码系统维护两个独立的计数器，分别应对不同的攻击场景。
+
+**计数器 1：失败计数（防暴力枚举）**
+
+| 属性 | 值 |
+|------|----|
+| 统计对象 | 恢复码输入错误的次数（哈希不匹配） |
+| 窗口期 | 24 小时（无失败记录满 24 小时后自动归零） |
+| 阈值 | 同一恢复码连续失败 ≥ 5 次 |
+| 触发后果 | 恢复码状态 → `permanently_locked` |
+| 重置条件 | 任意一次成功验证后，立即重置为 0 |
+
+设计目的：防止攻击者通过批量尝试猜测恢复码（虽然 BIP39 12 词有 128-bit 熵，但加一道防线是深度防御的标准实践）。
+
+示例：
+```
+第1次错误 → 计数=1
+第2次错误 → 计数=2
+第3次错误 → 计数=3
+第4次错误 → 计数=4
+第5次正确 → 验证通过，计数重置为 0 → 进入冷却期
+
+第1次错误 → 计数=1
+... 超过 24 小时无任何失败记录 ...
+第2次错误 → 计数=1（24 小时窗口到期，自动归零后重新计数）
+```
+
+**计数器 2：月发起计数（防持久化骚扰）**
+
+| 属性 | 值 |
+|------|----|
+| 统计对象 | 恢复流程成功发起的次数（恢复码正确 → 提交新密码 → 进入冷却期） |
+| 重置周期 | 每月 1 日重置为 0 |
+| 阈值 | 同一恢复码月发起次数 > 3 次 |
+| 触发后果 | 恢复码状态 → `permanently_locked` |
+| 冻结/取消是否减少计数 | 不减少。冻结或取消只终止本次恢复流程，不撤销已消耗的月配额 |
+
+设计目的：防止攻击者持有恢复码后，通过反复发起恢复流程来骚扰用户（频繁发送告警邮件/短信，制造疲劳攻击）。
+
+示例：
+```
+第1次发起 → 用户冻结 → 计数=1（冻结不减少计数）
+第2次发起 → 用户冻结 → 计数=2
+第3次发起 → 用户冻结 → 计数=3
+第4次发起 → 计数已达到上限 → 恢复码永久锁定 → 攻击者无法继续骚扰
+```
+
+不统计以下场景：
+- 恢复码输入错误（那是"失败计数"管的事）
+- 加速通道验证码错误（那是验证码限流管的事）
+- 用户取消冷却期（那是"取消"操作，不是"发起"）
+- 用户点击冻结（那是"冻结"操作，不是"发起"）
+
+**两个计数器的分工总结**：
+
+| 计数器 | 防什么 | 统计什么 | 阈值 | 窗口/周期 |
+|--------|--------|---------|------|----------|
+| 失败计数 | 暴力枚举（猜） | 输入错误次数 | ≥ 5 次 | 24 小时滑动窗口 |
+| 月发起计数 | 持久化骚扰（烦） | 成功进入冷却期的次数 | > 3 次 | 每月 1 日重置 |
+
+为什么需要两个计数器？失败计数防"猜"，月计数防"烦"。攻击者即使拿不到数据，也可以通过反复触发告警来折磨用户，直到用户麻木或犯错。月计数在这个链条上画了一条红线——第 4 次，攻击者永久出局。
 
 
 ### Step 7: GET /salt 精简（同 v2.0）

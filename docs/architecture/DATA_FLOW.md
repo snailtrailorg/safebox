@@ -1,267 +1,232 @@
-# SafeBox 数据流文档
+# SafeBox 数据流 v2（目标设计）
 
-> 版本：v0.1（当前实现）
-> 覆盖路径：注册 / 登录 / 恢复 / 改密 / 注销
-> 每路径包含：前置条件 → 请求 → 处理 → 响应 → 后置条件
+> 版本: v2.7
+> v2.6 → v2.7 变更:
+>   - 同步冲突改为用户选择：保留本地版本或使用服务端版本（不再静默丢弃）
+>   - HMAC 计算引入服务端密钥（详见 RECOVERY_MECHANISM.md）
+>
+> v2.5 → v2.6 变更:
+>   - 恢复码路径改为"一次性完成所有操作"：initiate 时同时提交新密码，进入 pending_activation
+>   - 新增加速通道（accelerate）：验证码跳过剩余冷却
+>   - 冻结（freeze）操作：直接丢弃 pending_*，旧数据天然可用，零恢复成本
+>   - 移除 recovery-cancel 和 recovery-complete 端点（语义合并入 freeze 和自动激活）
+>   - 冷却期改为 24 小时
 
 ---
 
-## 路径 1：Email 注册
+## 路径 1：Email 注册（v2.5）
 
 ```
-用户                              Web 客户端                 FastAPI 服务端                Redis            PostgreSQL
-───                              ─────────                 ──────────────                ─────            ──────────
-  ① 填写邮箱 + 密码
-  ② 点击"获取验证码"
+用户                              Web 客户端                        FastAPI 服务端            Redis           PostgreSQL
+───                              ─────────                        ──────────────            ─────           ──────────
+① 填写邮箱 + 密码
+② 点击"获取验证码"
                                  ③ POST /auth/send-code
-                                    {target:"email", value}
-                                                             ④ check_ip_rate(client_ip)  → ZADD iprate:{ip}
-                                                             ⑤ check_rate_limit(email)   → GET vc_rl:email:{email}
-                                                             ⑥ IF ok: SETEX vc:email:{email}
-                                                             ⑦ send_verification_email()
-  ⑧ 收到验证码
-  ⑨ 输入验证码
-                                 ⑩ 生成密钥：
-                                    salt = generateSalt()
-                                    masterKey = new AES-256
-                                    passwordDerivedKey = PBKDF2(password, salt)
-                                    passwordHash = PBKDF2(password, salt+"auth")
-                                    rsaKeyPair = new RSA-4096
-                                    recoveryCode = BIP39 24-word
-                                    recoveryKey = SHA-256(recoveryCode)
-                                    passwordWrapped = AES-GCM(masterKey, passwordDerivedKey)
-                                    recoveryWrapped = AES-GCM(masterKey, recoveryKey)
-                                    encryptedPrivateKey = AES-GCM(masterKey, rsaPrivateKey)
+                                                                   ④ check_ip_rate
+                                                                   ⑤ check_rate_limit
+                                                                   ⑥ send_verification_email()
+⑦ 收到验证码
+⑧ 输入验证码
+                                 ⑨ 生成全部密钥:
+                                    password_salt = generateSalt()
+                                    kdf_settings = {algorithm, iterations}
+                                    User Key = generateAesKey()
+                                    passwordDerivedKey = KDF(password, password_salt, kdf_settings)
+                                    authKey = KDF(password, password_salt + "auth")
+                                    RSA key pair = generateRsaKeyPair()
+                                    passwordWrapped = AES-GCM(User Key, passwordDerivedKey)
+                                    encryptedPrivateKey = AES-GCM(User Key, rsaPrivateKey)
+                                    idempotency_key = crypto.randomUUID()
 
-                                 ⑪ POST /auth/register/email
-                                    {email, verification_code, password_hash, password_salt,
-                                     password_wrapped, recovery_wrapped, encrypted_private, rsa_public_key}
-                                                             ⑫ verify_and_consume(email)  → GETDEL vc:email:{email}
-                                                             ⑬ find_user_by_email()
-                                                             ⑭ clear_login_failures(email) → DEL loginfail:email:{email}
-                                                             ⑮ hash_password(client_hash) [bcrypt]
-                                                             ⑯ INSERT user + user_keys + user_device
-                                                             ⑰ create_access_token + create_refresh_token
-                                                                                              → INSERT token_families
-  ⑱ 收到响应 {access_token,     ← ⑱ 返回 {user_id, access_token, refresh_token}
-     refresh_token}
-  ⑲ saveSession → IndexedDB
-  ⑳ login() → AuthContext
-  ㉑ navigate("/")
-  ㉒ 显示恢复码 → 提示用户抄写
+                                 ⑩ POST /auth/register/email
+                                    {email, verification_code,
+                                     auth_key_hash, kdf_settings, password_salt,
+                                     password_wrapped,
+                                     encrypted_private, rsa_public_key,
+                                     idempotency_key}
+                                                                   ⑪ verify_and_consume(email)
+                                                                   ⑫ find_user_by_email()
+                                                                   ⑬ 检查 idempotency_key
+                                                                   ⑭ hash_auth_key() [bcrypt]
+                                                                   ⑮ INSERT user + user_keys + user_device
+                                                                   ⑯ create tokens
+⑰ 收到响应 → saveSession + login()
+⑱ 提示用户后续可在安全设置页生成恢复码
 ```
 
-### 前置条件
-- 邮箱没有被注册过（返回 409 如果已存在）
-- 验证码已发送且未过期（5 分钟有效）
-- 用户设备上 Web Crypto API 可用
-
-### 失败路径
-
-| 条件 | 错误码 | 说明 |
-|------|--------|------|
-| 验证码无效/过期 | 400 | GETDEL 返回 nil 或不匹配 |
-| 邮箱已注册 | 409 | find_user_by_email 返回非空 |
-| IP 超限 | 429 | check_ip_rate 返回 True |
-| 验证码发送超限 | 429 | check_rate_limit 返回 False |
-| 邮件发送失败 | 503 | send_verification_email 返回 False |
-
-### 后置条件
-- 客户端内存中有 masterKey / rsaPrivateKey
-- IndexedDB 中存有 session (email, passwordSalt, passwordWrapped, ...)
-- 服务端 DB 中创建新用户、密钥记录、设备记录、初始 token family
-- Redis 中的验证码已消费（GETDEL）
-- 该邮箱的登录失败记录已清除
+注意：注册时不再生成恢复码。恢复码由用户在安全设置页（已登录）主动生成。详情见 RECOVERY_MECHANISM.md。
 
 ---
 
-## 路径 2：Email 登录
+## 路径 2：Email 登录（v2.3）
 
-```
-用户                        Web 客户端                 FastAPI 服务端                Redis                PostgreSQL
-───                        ─────────                 ──────────────                ─────                ──────────
-  ① 输入邮箱 + 密码
-                            ② GET /auth/salt?email=michael%40...
-                                                                                     ← SELECT user.password_salt
-                            ③ passwordDerivedKey = PBKDF2(password, salt)
-                              passwordHash = PBKDF2(password, salt+"auth")
-                            ④ POST /auth/login/email
-                               {email, password_hash}
-                                                                  ⑤ check_ip_rate(client_ip) → ZADD iprate:{ip}
-                                                                  ⑥ get_login_wait(email)     → GET loginfail:email:{email}
-                                                                  ⑦ IF wait>0 → record_login_failure → 429
-                                                                  ⑧ find_user_by_email()      ← SELECT user + user_keys + user_devices
-                                                                  ⑨ IF not user: hash_password(虚假) + record_login_failure → 401
-                                                                  ⑩ verify_password(client_hash, stored_hash)
-                                                                  ⑪ IF fail: record_login_failure → 401
-                                                                  ⑫ clear_login_failures() → DEL loginfail:email:{email}
-                                                                  ⑬ create_access_token + create_refresh_token
-                                                                                                                                   → INSERT token_families
-                            ⑭ 收到响应 {access_token, refresh_token, password_wrapped, ...}
-                            ⑮ unlockWithPassword(password, passwordWrapped)
-                               → 解密得到 masterKey
-                            ⑯ loadRsaKeys() → 解密 RSA 私钥
-                            ⑰ saveSession → IndexedDB
-                            ⑱ login() → AuthContext
-                            ⑲ navigate("/")
-```
-
-### 前置条件
-- 邮箱已注册
-- 密码正确（以服务端 bcrypt 验证为准）
-- 未超过限流阈值（L1 email + L2 IP）
-
-### 失败路径
-
-| 条件 | 错误码 | 说明 |
-|------|--------|------|
-| IP 超限 | 429 | check_ip_rate → True |
-| email 限流中 | 429 | get_login_wait > 0 |
-| 邮箱不存在 | 401 | 恒等时间防止枚举（跑假 bcrypt） |
-| 密码错误 | 401 | bcrypt.checkpw 失败 |
-
-### 后置条件
-- 客户端内存：masterKey / RSA key pair
-- IndexedDB：新的 refresh token
-- 服务端：新的 token family 条目（旧 token 仍有效，直到 rotation 或 logout）
+（与 v2.2 相同，无变化）
 
 ---
 
-## 路径 3：恢复码重置密码
+## 路径 3：恢复码重置密码（v2.5 — 服务端 HMAC 验证 + 冷却期 + 冻结）
+
+**前置说明**：恢复码路径与 v1 完全不同。恢复码不再用于客户端密钥派生（不再有 recoveryKeyMaterial/recoveryEncKey/recoveryWrapped）。恢复码仅作为服务端凭据验证，验证通过后进入冷却期，冷却期满后用户设新密码。
+
+完整机制见 `RECOVERY_MECHANISM.md`。以下简述核心流程：
 
 ```
-用户                        Web 客户端                        FastAPI 服务端              Redis                PostgreSQL
-───                        ─────────                        ──────────────              ─────                ──────────
-① 输入邮箱 + BIP39 恢复码
-                            ② GET /auth/salt?email=...
-                            ③ unlockWithRecoveryCode(code, recoveryWrapped)
-                               → SHA-256(code) → recoveryKey
-                               → AES-GCM-Decrypt(recoveryWrapped, recoveryKey) → masterKey ✅
-                               → loadRsaKeys() → RSA 私钥
-                            ④ 提示：恢复到 masterKey 成功
-⑤ 输入新密码
-                            ⑥ 新 salt + 新 PBKDF2 → newDerivedKey + newHash
-                              newPasswordWrapped = AES-GCM(masterKey, newDerivedKey)
-                            ⑦ POST /auth/recovery-reset
-                               {target:"email", value, new_password_hash, new_password_salt, new_password_wrapped}
-                                                                                           ⑧ find_user_by_email()
-                                                                                           ⑨ hash_password() [bcrypt]
-                                                                                           ⑩ UPDATE user.password_hash/salt
-                                                                                              UPDATE user_keys.password_wrapped
-                                                                                           ⑪ revoke_all_user_tokens
-                                                                                           ⑫ create_access_token + create_refresh_token
-                            ⑬ 收到 {access_token, refresh_token, ...}
-                            ⑭ saveSession → IndexedDB
-                            ⑮ login() + navigate("/")
-```
+用户                          API                               MySQL                          Email/SMS
+────                          ───                               ─────                          ────────
 
-### 前置条件
-- BIP39 恢复码正确（能被 SHA-256 后解密 recoveryWrapped）
-- 邮箱已注册
-- 新密码强度 ≥ 8 字符
+阶段 2：发起恢复
+① 输入恢复码 + 设置新密码（一次性完成）
+                             ② POST /auth/recovery/initiate
+                                {recovery_code,
+                                 pending_new_auth_key_hash,
+                                 pending_password_salt,
+                                 pending_kdf_settings,
+                                 pending_password_wrapped}
+                                                              ③ HMAC-SHA256(server_key, salt + mnemonic) 比对
+                                                                 status → pending_activation
+                                                                 monthly_initiation_count +1
+                                                                 pending_setup_at = now()
+                                                                 cooldown_expires_at = now()+24h
+                                                                 注意：users.password_hash 不变！
+                                                              ④ return cooldown_expires_at
+                             ⑤ 前端显示 24h 倒计时
+                                                              ⑥ 多渠道告警（含两个链接）
+                                                                 链接 A: /accelerate（需验证码）
+                                                                 链接 B: /freeze（无需验证码）
 
-### 失败路径
+阶段 3-4：三个分支
+                             ⑦ 分支 A（加速通道）
+                                GET /auth/recovery/accelerate
+                                {signed_token}
+                                → 输入验证码
+                                → 验证码正确
+                                → pending_*→users/user_keys
+                                → consumed
 
-| 条件 | 错误码 | 说明 |
-|------|--------|------|
-| 恢复码错误 | 前端已拦截 | SHA-256→AES-GCM 解密失败，不请求 API |
-| 邮箱未注册 | 404（来自服务端） | find_user_by_email 返回 None |
-| 邮箱不存在 | 404 | |
+                             ⑧ 分支 B（冻结）
+                                POST /auth/recovery/freeze
+                                {signed_token}
+                                → 丢弃 pending_*
+                                → 状态回退 active
+                                → 旧密码不变（从未被覆盖）
 
-### 后置条件
-- 新密码已生效（可登录）
-- 旧 refresh token 全部作废（revoke_all_user_tokens）
-- masterKey 不变，RSA 私钥不变，所有条目不变
-- 新 token family 已创建
-
----
-
-## 路径 4：已登录改密
-
-```
-用户                        Web 客户端                        FastAPI 服务端              PostgreSQL
-───                        ─────────                        ──────────────              ──────────
-① 进入设置 → 改密页面
-② 输入当前密码 + 新密码
-                            ③ 当前密码 → PBKDF2(salt) → currentDerivedKey
-                               → decrypt(passwordWrapped) → masterKey ✅（确认当前密码正确）
-                            ④ 新密码 → PBKDF2(newSalt) → newDerivedKey + newHash
-                               newPasswordWrapped = AES-GCM(masterKey, newDerivedKey)
-                            ⑤ POST /auth/reset-password (需验证码)
-                               ========================
-                               实际应走：POST /auth/change-password (需当前密码)
-                               ========================
-```
-
-```
-注意：当前实现中，改密走的是 reset-password 端点（需要邮箱验证码）。
-这种做法不好——用户已登录，验证当前密码比发邮件更快更合理。
-Phase 3 重构时应改为：
-  POST /auth/change-password
-  鉴权: Bearer token
-  body: {current_password_hash, new_password_hash, new_password_salt, new_password_wrapped}
-  服务端验证 current_password_hash → 更新 → revoke all tokens → 新 token
+                             ⑨ 分支 C（自动激活）
+                                cooldown_expires_at 到期
+                                → pending_*→users/user_keys
+                                → consumed
 ```
 
 ---
 
-## 路径 5：注销账号
+## 路径 4：已登录改密（v2.3 — 增加验证码保护）
 
 ```
-用户                        Web 客户端                        FastAPI 服务端              PostgreSQL
-───                        ─────────                        ──────────────              ──────────
-① 设置 → 注销账号
-② 两次确认
-                            ③ DELETE /auth/account  (Bearer token)
-                                                                                           ④ DELETE user WHERE id=?
-                                                                                              (CASCADE → user_keys, user_devices,
-                                                                                               items, token_families)
-⑤ 收到 204
-⑥ clearSession → 清空 IndexedDB
-⑦ lock() → 清空内存密钥
-⑧ navigate("/login")
-```
+POST /auth/change-password
+Authorization: Bearer <access_token>
+Body: {target: "email" | "phone", value: "user@example.com",
+       verification_code: "123456",           ← 新增！需要验证码
+       current_auth_key_hash,
+       new_auth_key_hash, new_password_salt,
+       new_kdf_settings, new_password_wrapped}
 
-### 前置条件
-- 用户已登录（Bearer token 有效）
-- 两次确认（第一次输入"确认"，第二次 confirm dialog）
-
-### 后置条件
-- 服务端：该用户所有数据删除（CASCADE）
-- 客户端：IndexedDB 清空，内存密钥清空
-- 此时用旧邮箱无法登录（用户不存在），需重新注册
-
----
-
-## 路径 6：同步 Push/Pull
-
-```
-┌─── 用户创建/编辑/删除条目 ──────────────────────────┐
-│                                                      │
-│  ① VaultContext 更新本地 IndexedDB                   │
-│  ② 标记 is_dirty = True（等待同步）                  │
-│                                                      │
-│  ③ 前台/定时触发 sync()                              │
-│     ┌──────────────────┐                             │
-│     │ PUSH 本地改动     │── POST /sync/push          │
-│     │ 到服务端         │    {items: [{...}]}         │
-│     └──────────────────┘                     │       │
-│                                              │       │
-│     ┌──────────────────┐                     ▼       │
-│     │ PULL 服务端改动   │  ← POST /sync/push返回     │
-│     │ 到本地           │    含 merged items          │
-│     └──────────────────┘                             │
-│  ④ 更新 IndexedDB   已同步标志                       │
-│  ⑤ 更新 UI                                           │
-└──────────────────────────────────────────────────────┘
+服务端:
+  ① verify_and_consume(target, value, code)    ← 验证码在前
+  ② verify(user.auth_hash, current_auth_key_hash)  ← 当前密码在后
+  ③ 发送告警邮件/短信："您的密码已被修改"
+  ④ UPDATE user + user_keys
+  ⑤ revoke_all_tokens + create new
+  ⑥ return {access_token, refresh_token}
 ```
 
 ---
 
-## 数据流不变式
+## 路径 5：条目创建/编辑（v2.3 — Item Key）
 
-1. **密码 hash 永远不在网络上明文传输**。客户端 PBKDF2 后上送 hash。
-2. **masterKey 永不离开内存**。不上传、不写 IndexedDB、不序列化。
-3. **所有写入数据库前的数据都经过加密或哈希**。
-4. **失败路径不会留下半完成的状态**（注册失败不会创建用户，登录失败不会创建 token）。
-5. **限流检查在认证之前**。IP 和邮箱限流都发生在查询数据库之前。
+```
+用户                         Web 客户端
+───                         ─────────
+① 打开新条目表单
+② 填写 name, data
+                             ③ 生成 Item Key: generateAesKey()          ← 每条目一个
+                                encryptedItemKey = AES-GCM(User Key, Item Key)
+                                每个字段:
+                                ciphertext = AES-256-GCM(plaintext, Item Key, AAD=fieldName)
+
+                             ④ 加密后的结构:
+                                {type, icon?, encryption_version: 2,
+                                 name: {encrypted_key, ciphertext},
+                                 data: {encrypted_key, ciphertext}, ...}
+
+                             ⑤ IndexedDB.put(isDirty = true)
+                             ⑥ sync() → POST /sync/push
+```
+
+### 同步冲突处理（v2.6）
+
+```
+sync() → push dirty items
+  │
+  ├─ result.status === "conflict"
+  │   → 收集本地冲突信息（localDid, serverId, localUpdatedAt）
+  │   → 不调 markSynced，本地条目保持 dirty
+  │
+  └─ pull server changes
+      ├─ 服务端版本属于冲突条目？
+      │   → 不自动 upsert，加入 conflicts[]
+      │   → 返回给 VaultContext 显示冲突 UI
+      │
+      └─ 用户选择：
+          ├─ 保留本地 → markSynced(localDid, serverId)，下次 sync 重新 push 本地版本
+          └─ 使用服务端 → softDeleteItem(localDid)，下次 pull 写入服务端版本
+```
+
+### 解密流程
+
+```typescript
+async function decryptField(
+  field: EncryptedField,
+  version: number,              // 来自数据库字段，1=RSA, 2=AES-GCM+ItemKey
+  userKey: CryptoKey,
+  rsaPrivateKey: CryptoKey,
+  fieldName: string,
+): Promise<string | null> {
+  if (version === 2) {
+    // 新格式: Item Key → AES-GCM
+    const itemKeyRaw = await aesDecrypt(userKey, field.encrypted_key);
+    if (!itemKeyRaw) return null;
+    const itemKey = await crypto.subtle.importKey("raw", itemKeyRaw, "AES-GCM", false, ["decrypt"]);
+    const plaintext = await aesDecryptField(itemKey, field.ciphertext, fieldName);
+    if (plaintext) return new TextDecoder().decode(plaintext);
+  }
+  // 旧格式: RSA（encryption_version = 1）
+  return rsaDecryptString(rsaPrivateKey, field.ciphertext);
+}
+```
+
+---
+
+## 路径 6：注销账号（v2.3 — 增加验证码保护）
+
+```
+DELETE /auth/account
+Authorization: Bearer <access_token>
+Body: {target: "email", value: "user@example.com",
+       verification_code: "123456"}
+
+服务端:
+  ① verify_and_consume(target, value, code)
+  ② DELETE user ... CASCADE
+  ③ 发送告警邮件/短信
+```
+
+---
+
+## 数据流不变式（v2.4）
+
+1. **认证和加密分离** — Auth Key（PBKDF2(salt+"auth")）用于登录，User Key 用于加密。
+2. **换密码不重新加密条目数据** — 只重新 wrap User Key。
+3. **Item Key 独立于 User Key** — 条目共享时只需重新 wrap Item Key。
+4. **敏感操作必须邮箱/手机验证码** — 改密、注销账号均需验证码。
+5. **恢复码路径禁用验证码** — 恢复码本身验证不要求验证码（防死锁），验证码仅用于加速通道。
+6. **恢复码冷却期 24 小时 + 一次性完成** — 用户提交时一并设好新密码，冷却期满自动激活。冻结操作不修改旧密码数据，天然可回滚。
+

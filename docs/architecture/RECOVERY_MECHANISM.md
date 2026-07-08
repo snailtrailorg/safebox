@@ -1,9 +1,9 @@
 # SafeBox 恢复码机制完整规范
 
-> 版本：v2.2-final
+> 版本：v2.3-final
 > 状态：定稿
 > 适用范围：后端 API、前端交互、安全风控、客服流程
-> 关联文档：OVERALL_PLAN.md, DATA_FLOW.v2.md, API_CONTRACT.v2.md, REFACTOR_PLAN.md
+> 关联文档：OVERALL_PLAN.md, DATA_FLOW.md, API_CONTRACT.md, REFACTOR_PLAN.md
 
 ---
 
@@ -24,14 +24,16 @@
 
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `recovery_code_hash` | VARCHAR(128) | 恢复码的哈希值（加盐），绝不存储明文 |
-| `recovery_code_salt` | VARCHAR(64) | 该恢复码专用的盐值 |
+| `recovery_code_hash` | VARCHAR(128) | 恢复码的哈希值，HMAC-SHA256(server_key, salt + normalized_mnemonic)，绝不存储明文 |
+| `recovery_code_salt` | VARCHAR(64) | 该恢复码专用的盐值，作为 HMAC 消息的一部分（非 HMAC 密钥） |
 | `status` | VARCHAR(32) | `active` / `pending_activation` / `permanently_locked` / `consumed` |
 | `pending_new_auth_key_hash` | VARCHAR(128) | 用户设置的新密码哈希（用于加速通道验证） |
 | `pending_password_wrapped` | TEXT | 用新密钥加密后的 passwordWrapped（冷却期满后写入 user_keys） |
 | `pending_setup_at` | TIMESTAMPTZ | 用户提交新密码的时间（冷却起始） |
 | `cooldown_expires_at` | TIMESTAMPTZ | 冷却到期时间（pending_setup_at + 24h） |
-| `recovery_attempt_count` | INTEGER | 当月已发起恢复次数（每月 1 日重置为 0） |
+| `monthly_initiation_count` | INTEGER | 当月成功发起恢复次数（每月 1 日重置为 0） |
+| `failed_attempt_count` | INTEGER | 24 小时滑动窗口内的连续失败次数（成功后清零） |
+| `failed_attempt_last_at` | TIMESTAMPTZ | 最后一次失败的时间（用于 24h 窗口判断） |
 | `created_at` | TIMESTAMPTZ | 恢复码生成时间 |
 | `consumed_at` | TIMESTAMPTZ | 消耗时间 |
 
@@ -71,10 +73,13 @@ pending 字段（recovery_codes 表）:
 
 **生成逻辑**：
 1. 使用 `secrets.randbelow(2048)` 从 BIP39 2048 词表中均匀选取 12 个词，生成 132 bit 熵的恢复码明文。
-2. `recovery_code_hash = HMAC-SHA256(recovery_code_salt, plaintext)`。
+2. `recovery_code_hash = HMAC-SHA256(server_key, salt + normalized_mnemonic)`。
+   - `server_key` 为服务端环境变量 `RECOVERY_HMAC_KEY`（base64 编码的 32 字节随机密钥）。
+   - `salt` 作为 HMAC 消息的一部分，防止彩虹表攻击。
+   - 即使数据库完全泄露，没有 `server_key` 也无法离线验证恢复码（深度防御）。
 3. `status = active`。
 4. 如有历史恢复码存在，立即设置为 `permanently_locked`（一人一码）。
-5. `recovery_attempt_count = 0`。
+5. `monthly_initiation_count = 0, failed_attempt_count = 0`。
 
 ### 阶段 2：使用恢复码发起恢复（登录页）
 
@@ -82,7 +87,7 @@ pending 字段（recovery_codes 表）:
 
 **步骤 2.1：验证恢复码**
 - 用户输入恢复码明文。支持粘贴，不支持密码管理器自动填充。
-- 服务端 HMAC-SHA256 比对。
+- 服务端 HMAC-SHA256(server_key, salt + normalized_mnemonic) 比对。
 - 错误次数：≤ 5 次仅记录日志，≥ 5 次 → `permanently_locked`。
 
 **步骤 2.2：立即设置新 Master Password（一次性完成全部操作）**
@@ -94,7 +99,7 @@ pending 字段（recovery_codes 表）:
   - `status → pending_activation`
   - `pending_setup_at = now()`
   - `cooldown_expires_at = now() + 24h`
-  - `recovery_attempt_count + 1`
+  - `monthly_initiation_count + 1`
 - 保险库冻结，触发告警。
 
 **注意**：`users.password_hash` 和 `user_keys.password_wrapped` **此时不会被修改**。旧数据完整保留。
@@ -138,7 +143,7 @@ pending 字段（recovery_codes 表）:
 **冻结后的关键状态**：
 - 用户使用旧 Master Password 正常登录
 - 恢复码保持在 `active`，可再次使用（受月尝试次数限制）
-- `recovery_attempt_count` 已 +1，不因冻结而减少
+- `monthly_initiation_count` 已 +1，不因冻结而减少
 
 #### 分支 C：冷却期自然结束
 
@@ -213,6 +218,9 @@ cooldown_expires_at 到期
 
 | 原则 | 说明 |
 | :--- | :--- |
+| 服务端只存储哈希值，不存储明文 | 恢复码生成后仅返回一次，服务端只存 HMAC 哈希 |
+| 使用独立盐值，防止彩虹表攻击 | 每个恢复码有独立随机 salt，作为 HMAC 消息的一部分 |
+| HMAC 使用服务端密钥 | `server_key` 为环境变量，数据库泄露后攻击者无法离线验证候选恢复码（深度防御） |
 | 恢复码使用不需要验证码 | 最后逃生通道，绝对不要求验证码 |
 | 验证码只用于加速通道 | 加速器而非必需品，没有也能等冷却结束自动恢复 |
 | 一次性完成所有操作 | 用户输入恢复码的同时设好新密码，冷却结束自动激活 |
@@ -229,3 +237,4 @@ cooldown_expires_at 到期
 | v2.0-final | 2026-07-07 | 初始版本 |
 | v2.1-final | 2026-07-07 | 一次性完成所有操作；冷却期 24h；加速通道（需验证码）；冻结（无验证码）；自动激活 |
 | v2.2-final | 2026-07-07 | 纯文本格式化，变量名适配代码规范 |
+| v2.3-final | 2026-07-08 | 安全增强：HMAC 计算引入服务端密钥 server_key（深度防御，防止数据库泄露后离线破解） |

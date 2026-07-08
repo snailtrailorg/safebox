@@ -35,7 +35,7 @@ server/
 │   │
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   ├── auth.py              # 含 RecoveryResetRequest, ChangePasswordRequest
+│   │   ├── auth.py              # 含 ChangePasswordRequest, DeleteAccountRequest
 │   │   └── sync.py
 │   │
 │   ├── services/

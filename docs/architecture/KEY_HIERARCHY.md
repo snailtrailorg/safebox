@@ -1,179 +1,225 @@
-# SafeBox 密钥层次架构
+# SafeBox 密钥层次架构 v2（目标设计）
 
-> 版本: v0.1 (当前实现)
-> 对标参考: [REFERENCE.md](./REFERENCE.md)
-> 状态: 草稿 — 对应当前生产代码
-
----
-
-## 一、密钥总览
-
-```
-用户输入                     客户端生成
-───────────                 ─────────────
-主密码 (password)            salt (32 bytes 随机)
-                             masterKey (AES-256 随机)
-                             RSA-4096 key pair
-                             BIP39 24 词恢复码
-```
-
-### 所有密钥速查表
-
-| 密钥名称 | 类型 | 长度 | 谁生成 | 谁知道 | 存在哪里 | 用途 |
-|----------|------|------|--------|--------|---------|------|
-| masterKey | AES-256 | 256 bit | 客户端注册时 | 客户端内存 only | 内存（刷新生效） | 解密 RSA 私钥、解密文件条目 |
-| passwordDerivedKey | AES-256 | 256 bit | 客户端登录时派生 | 客户端 only | 不持久化 | 加密/解密 passwordWrapped |
-| passwordHash | base64 字符串 | 256 bit 输出 | 客户端登录时派生 | 客户端 + 服务端(bcrypt) | 服务端 user.password_hash | API 登录认证 |
-| recoveryKey | AES-256 | 256 bit | 客户端派生自 BIP39 码 | 客户端 only（知道 BIP39 码的人） | 不持久化 | 加密/解密 recoveryWrapped |
-| passwordWrapped | base64 密文 | ~原 masterKey + 28B | 客户端注册时生成 | —（密文） | 服务端 user_keys | 服务端代为保管的加密 masterKey |
-| recoveryWrapped | base64 密文 | ~原 masterKey + 28B | 客户端注册时生成 | —（密文） | 服务端 user_keys | 恢复码替代方案保管的加密 masterKey |
-| encryptedPrivateKey | base64 密文 | ~原 RSA 私钥 + 28B | 客户端注册时生成 | —（密文） | 服务端 user_keys | 服务端保管的加密 RSA 私钥 |
-| rsaPublicKey | base64 明文 | SPKI 格式 | 客户端注册时生成 | 公开 | 服务端 user_keys | 条目级加密 |
-| rsaPrivateKey | CryptoKey | 4096 bit | 客户端注册时生成 | 客户端内存 only | 内存（刷新生效） | 条目级解密 |
-| deviceWrapped | base64 密文 | 依设备公钥而定 | 客户端注册/添加设备时 | —（密文） | 服务端 user_devices | 跨设备共享 masterKey |
-| nonce (每次加密) | 随机 bytes | 96 bit | 每次加密时 | — | 前置在密文中 | AES-GCM IV |
+> 版本: v2.6
+> v2.5 → v2.6 变更:
+>   - 恢复码尝试次数拆分为双计数器：monthly_initiation_count + failed_attempt_count + failed_attempt_last_at
+>   - HMAC 计算引入服务端密钥 server_key（深度防御）
+>
+> v2.4 → v2.5 变更:
+>   - 恢复码路径更新为"一次性完成所有操作"模式：initiate 时一并提交新密码，进入 pending_activation
+>   - 新增 pending_new_auth_key_hash / pending_password_wrapped / pending_setup_at / cooldown_expires_at / recovery_attempt_count
+>   - 新增不变式 #10（恢复码路径旧数据永不覆盖）
+>   - 新增加速通道（accelerate）和冻结（freeze）分支
 
 ---
 
-## 二、密钥层次图
+## 一、设计原则
+
+1. **最小密钥暴露** — 每层密钥只做它该做的事，不暴露给下层。
+2. **可升级的密码学** — KDF 算法和迭代数可配置，支持无缝迁移。
+3. **对称优先** — 数据加密用对称密钥（认证加密 AEAD），非对称仅用于 key exchange。
+4. **零知识不变** — 服务端永远不知道任何密钥明文。
+5. **恢复路径安全等价** — 密码和恢复码两条路径对 User Key 的保护强度应一致。
+6. **逻辑分层 ≠ 内存隔离** — 密钥分层提供"换密码不解密条目"的操作隔离。
+7. **跨平台兼容优先** — 派生算法变更需同时评估 Android 端影响。无安全收益时保持兼容。
+8. **未来演化的预留** — 架构决策应向未来可能的条目共享留出扩展通道。
+
+---
+
+## 二、密钥层次图（v2.4）
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    用户层（可记忆/可备份）                   │
-│                                                         │
-│  主密码 (password)        BIP39 恢复码 (24 词)            │
-│                               │                          │
-│   PBKDF2(password, salt)      SHA-256(recoveryCode)      │
-│   PBKDF2(password, salt+"auth")                          │
-└──────────────────────┬──────────────────┬────────────────┘
-                       │                  │
-                 ┌─────▼──────┐    ┌──────▼──────┐
-                 │password    │    │recoveryKey  │
-                 │DerivedKey  │    │(AES-256)    │
-                 │(AES-256)   │    │             │
-                 └──────┬─────┘    └──────┬──────┘
-                        │                 │
-                        ▼ AES-GCM          ▼ AES-GCM
-                 ┌──────────────┐  ┌────────────────┐
-                 │password      │  │recovery        │
-                 │Wrapped       │  │Wrapped         │
-                 │(存服务端)     │  │(存服务端)       │
-                 └──────┬───────┘  └───────┬────────┘
-                        │                  │
-                        ▼ 解密              ▼ 解密
-                  ┌──────────────────────────────┐
-                  │          masterKey            │
-                  │       (AES-256, 随机)          │
-                  │   仅在客户端内存，永不持久化      │
-                  └──────────────┬───────────────┘
-                                 │
-                ┌────────────────┼────────────────┐
-                │                │                │
-        ┌───────▼──────┐  ┌─────▼──────┐  ┌──────▼───────┐
-        │AES-GCM 加密   │  │RSA 公钥    │  │AES-GCM 加密   │
-        │RSA 私钥       │  │条目级加密   │  │文件条目       │
-        │encrypted      │  │(分块)      │  │(AES-GCM)     │
-        │PrivateKey     │  │            │  │              │
-        └───────────────┘  └────────────┘  └──────────────┘
+用户层
+═══════════════════════════════════════════════════
+  主密码 (password)
+       │
+       │ PBKDF2(password_salt)
+       │ PBKDF2(password_salt+"auth")
+       │ (可配置迭代数)
+       │
+       ▼
+  passwordDerivedKey
+       │
+       │ AES-256-GCM (AAD)
+       ▼
+  ┌──────────────┐
+  │ password     │
+  │ WrappedKey   │
+  └──────┬───────┘
+         │
+         ▼ AES-GCM 解密
+═══════════════════════════════════════════════════
+密钥层（仅在客户端内存）
+═══════════════════════════════════════════════════
+                  │
+          ┌───────┴───────┐
+          │   User Key    │   AES-256, 随机生成
+          │ (AES-256)     │   加密 Item Key 链
+          └───────┬───────┘   改密时只重新 wrap
+                  │
+          ┌───────┴───────┐
+          │  Item Key 池   │   AES-256, 每条目一个随机
+          │ (AES-256)     │   User Key 包裹后存于条目记录
+          └───────┬───────┘   未来共享时只需重新 wrap Item Key
+                  │
+    ┌─────────────┼──────────────────┐
+    │             │                  │
+    ▼             ▼                  ▼
+┌──────────┐ ┌──────────┐  ┌──────────────┐
+│ RSA 私钥  │ │ 条目数据  │  │ 设备密钥      │
+│ (PKCS8)  │ │ AES-GCM │  │ (跨设备)     │
+│ User Key │ │ Item Key │  │ User Key     │
+│ 加密     │ │ + AAD   │  │ 加密         │
+└──────────┘ └──────────┘  └──────────────┘
+
+认证路径:
+  Auth Key = PBKDF2(password, password_salt + "auth", kdf_settings)
+  → base64 encode → 作为 auth_key_hash 发送给服务端验证
+  → 服务端做 bcrypt 二次哈希后存储
+  → 与 Android CryptoManager.kt 的 deriveAuthHash() 完全一致
+
+加密路径:
+  passwordDerivedKey = PBKDF2(password, password_salt, kdf_settings)
+  → AES-GCM-Decrypt(passwordWrapped, passwordDerivedKey) → User Key
+  → AES-GCM-Decrypt(encryptedItemKey, User Key) → Item Key
+  → AES-GCM-Decrypt(itemCiphertext, Item Key, AAD=fieldName) → 明文
+
+恢复码路径（服务端仅验证，不参与客户端密钥派生）:
+  恢复码 = BIP39 12 词（2048 词表，secrets.randbelow 选取）→  132 bit 熵
+  → 服务端 HMAC-SHA256 比对 recovery_code_hash
+  → 验证通过后进入 1h 冷却期
+  → 冷却期满后用户设置新密码
+  → 客户端用新密码重新派生 passwordDerivedKey
+  → 新密码重新 wrap User Key → 更新 passwordWrapped
 ```
 
 ---
 
-## 三、密钥生命周期
+## 三、完整密钥明细
 
-### 3.1 派生关系
-
-```
-passwordDerivedKey = PBKDF2-HMAC-SHA256(password, salt, 100K iterations)
-       ↓ derived length = 256 bit → importKey("AES-GCM")
-
-passwordHash = PBKDF2-HMAC-SHA256(password, salt + "auth", 100K iterations)
-       ↓ base64 encode → 发送给服务端 → 服务端再用 bcrypt 二次哈希
-
-recoveryKey = SHA-256(BIP39 mnemonic)
-       ↓ importKey("AES-GCM")
-
-masterKey = crypto.subtle.generateKey({name:"AES-GCM", length:256})
-```
-
-### 3.2 包装关系
-
-```
-# 密码包装：正常登录时使用
-passwordWrapped = AES-256-GCM-Encrypt(masterKey, passwordDerivedKey, AAD="safebox-aes")
-       ↓ 存服务端 user_keys.password_wrapped 字段
-
-# 恢复码包装：BIP39 恢复时使用
-recoveryWrapped = AES-256-GCM-Encrypt(masterKey, recoveryKey, AAD="safebox-aes")
-       ↓ 存服务端 user_keys.recovery_wrapped 字段
-
-# RSA 私钥包装：条目解密
-encryptedPrivateKey = AES-256-GCM-EncryptString(masterKey, rsaPrivateKey(exported PKCS8))
-       ↓ 存服务端 user_keys.encrypted_private 字段
-```
-
-### 3.3 内存生命周期
-
-```
-注册时:  generateKeys() → masterKey 进入内存
-登录时:  unlockWithPassword() → 解密 passwordWrapped → masterKey 进入内存
-恢复时:  unlockWithRecoveryCode() → 解密 recoveryWrapped → masterKey 进入内存
-锁定:    lock() → 清空 masterKey / rsaPrivateKey
-刷新/关闭标签页: 内存自然释放
-```
-
-### 3.4 服务端存储
-
-服务端只存加密后的 blob，对明文密钥永远零知识：
-
-| 字段 | 内容 | 服务端能否解密 |
-|------|------|--------------|
-| user.password_hash | bcrypt(客户端 passwordHash) | ❌ PBKDF2 + bcrypt 双层哈希 |
-| user_keys.password_wrapped | AES-GCM 密文 | ❌ 不知道 passwordDerivedKey |
-| user_keys.recovery_wrapped | AES-GCM 密文 | ❌ 不知道 recoveryKey |
-| user_keys.encrypted_private | AES-GCM 密文 | ❌ 不知道 masterKey |
-| user_keys.rsa_public_key | 明文 SPKI | ✅ 公钥，设计上应公开 |
+| 密钥 | 类型 | 长度 | 派生自 | 用途 | 生命周期 |
+|------|------|------|--------|------|---------|
+| User Key | 随机 AES | 256 bit | CSPRNG | 加密 Item Key + RSA 私钥 + 设备密钥 | 注册创建，改密不换 |
+| Auth Key | base64 | 256 bit | PBKDF2(password, salt+"auth") | 服务端登录认证 | 每次登录派生 |
+| passwordDerivedKey | AES key | 256 bit | PBKDF2(password, password_salt) | 包裹/解包 User Key | 登录时派生，不持久化 |
+| recoveryCode | BIP39 12 词 | 132 bit 熵 | 服务端生成（secrets.randbelow） | 服务端验证身份凭据，**不参与密钥派生** | 生成后下载备份，服务端只存 HMAC 哈希 |
+| **Item Key** | 随机 AES | 256 bit | CSPRNG | **加密单个条目数据** | **条目创建时随机生成** |
+| RSA key pair | RSA-4096 | 4096 bit | CSPRNG | 解密旧条目 + 未来共享 | 注册创建，不变 |
+| Device Key | 随机 AES | 256 bit | CSPRNG | 跨设备传输 User Key | 设备注册时随机 |
 
 ---
 
-## 四、与业界对比
+## 四、条目加密规范（v2.3）
 
-| 维度 | SafeBox 当前 | 1Password | Bitwarden | 评价 |
-|------|-------------|-----------|-----------|------|
-| 条目级加密 | RSA-4096 公钥直接加密（分块）| Vault Key（AES-256 对称） | User Key（AES-256 对称） | **偏离行业标准**。RSA 分块加密复杂且慢 |
-| 换密码是否需要重新加密条目 | ❌ 不需要（RSA 私钥不变） | ❌ 不需要 | ❌ 不需要 | ✅ 正确 |
-| 密码派生 KDF | PBKDF2 100K 固定 | PBKDF2 650K + Argon2 | PBKDF2 600K + Argon2id | 迭代数偏低且不可配置 |
-| 恢复码 KDF | SHA-256（单次） | HKDF（多 subkey） | N/A | SHA-256 缺乏 KDF 拉伸 |
-| 服务端零知识 | ✅ | ✅ | ✅ | 一致 |
-| Secret Key (第二因子) | ❌ 无 | ✅ | ❌ 无 | 与 Bitwarden 等价 |
-| Token rotation | ✅ | ❌ 不使用 | ❌ 不使用 | **超出业界标准** |
+### 加密格式
+
+每条条目拥有一个独立的随机 Item Key。User Key 包裹 Item Key，Item Key 加密条目内容。
+
+```typescript
+// 每条条目存储结构
+interface EncryptedItem {
+  id: string;
+  userId: string;
+  type: string;
+  encryption_version: number;               // 1=RSA, 2=AES-GCM+ItemKey
+  icon?: EncryptedField;
+  name: EncryptedField;                     // AAD = "safebox:v2:item:name"
+  description?: EncryptedField;
+  data: EncryptedField;                     // AAD = "safebox:v2:item:data:{type}"
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface EncryptedField {
+  encrypted_key: string;   // AES-GCM(User Key, Item Key) — Item Key 被 User Key 包裹
+  ciphertext: string;      // AES-GCM(plaintext, Item Key, AAD=fieldName)
+                           // 格式: base64(nonce(12) + ciphertext)
+}
+```
+
+### Nonce 生成策略
+
+```typescript
+// Nonce: 12 字节，由 crypto.getRandomValues() 安全随机数生成
+// 与密文绑定存储于 DB（nonce 前置在 ciphertext 中）
+// 不可使用计数器——多端离线创建条目时计数器无法同步
+const nonce = new Uint8Array(GCM_NONCE_LENGTH);
+crypto.getRandomValues(nonce);
+```
+
+12 字节随机 nonce 的碰撞概率：在 2^48 次加密操作后碰撞概率达到 2^-32。对于密码管理器条目数量（<10000），碰撞可忽略。
+
+### 解密回退策略
+
+```typescript
+async function decryptItemField(
+  userKey: CryptoKey,
+  rsaPrivateKey: CryptoKey,
+  field: EncryptedField,
+  version: number,
+): Promise<string | null> {
+  if (version >= 2) {
+    const itemKey = await aesDecrypt(userKey, field.encrypted_key);
+    if (itemKey) {
+      const itemKeyKey = await importKey("raw", itemKey, "AES-GCM");
+      const result = await aesDecryptField(itemKeyKey, field.ciphertext, fieldName);
+      if (result !== null) return new TextDecoder().decode(result);
+    }
+  }
+  // 回退 RSA（encryption_version = 1 或 AES-GCM 解密失败时）
+  return rsaDecryptString(rsaPrivateKey, field.ciphertext);
+}
+```
 
 ---
 
-## 五、当前代码中的密钥映射
+## 五、恢复码路径
 
-| 密钥 | 前端文件 | 后端文件 | 数据库字段 |
-|------|---------|---------|-----------|
-| masterKey | keyManager.ts:29, 内存变量 | — | 不持久化 |
-| passwordDerivedKey | pbkdf2.ts:21-33 deriveKey() | — | 不持久化 |
-| passwordHash | pbkdf2.ts:37-47 deriveKeyHash() | auth_service.py:17 hash_password() | user.password_hash |
-| passwordWrapped | keyManager.ts:81 | auth_service.py:148 | user_keys.password_wrapped |
-| recoveryKey | bip39.ts:28-43 recoveryCodeToKey() | — | 不持久化 |
-| recoveryWrapped | keyManager.ts:82 | auth_service.py:149 | user_keys.recovery_wrapped |
-| rsaPublicKey | rsa.ts:26-29 encodePublicKey() | —（直接存储） | user_keys.rsa_public_key |
-| rsaPrivateKey | rsa.ts:32-35 encodePrivateKey() | — | user_keys.encrypted_private |
-| deviceWrapped | keyManager.ts:92 | — | user_devices.device_wrapped |
+恢复码在 v2 中**不参与客户端密钥派生**。恢复码仅作为服务端验证凭据，使用 BIP39 12 词助记词（132 bit 熵），服务端存 HMAC-SHA256 哈希。
+
+```
+恢复码 = BIP39 12 词（secrets.randbelow(2048) 选取）→  132 bit 熵
+       │
+       POST /auth/recovery/initiate
+       │        同时提交新密码
+       ▼ 服务端
+  HMAC-SHA256(server_key, salt + normalized_input) VS recovery_code_hash
+       │
+       匹配 → pending_activation（24h 冷却期）
+       │        pending_new_auth_key_hash   ← 新密码哈希
+       │        pending_password_wrapped    ← 新 wrapped key
+       │        cooldown_expires_at = now + 24h
+       │
+       ├─ 加速通道: POST /auth/recovery/accelerate
+       │   验证码 + 签名链接 → 立即激活 → consumed
+       │
+       ├─ 冷却自然结束: cooldown_expires_at 到期
+       │   → pending_* 写入 users/user_keys → consumed
+       │
+       └─ 冻结: POST /auth/recovery/freeze
+           签名链接 → 丢弃 pending_* → 状态回退 active
+```
+
+完整流程见 `RECOVERY_MECHANISM.md`。
 
 ---
 
-## 六、不变式（Invariants）
+## 六、KDF 可配置性
 
-以下是重构时应始终满足的约束：
+（不变）
 
-1. **masterKey 永不离开客户端内存**。不上传、不写 IndexedDB、不持久化。
-2. **服务端永远不知道任何密钥的明文**。passwordHash 是 PBKDF2 再 bcrypt 的双层哈希。
-3. **BIP39 恢复码可以直接解密 vault**。这是设计决策（与 1Password 不同，后者需要双重验证）。
-4. **换密码只需要重新 encrypt passwordWrapped，不需要重新加密任何条目**。
-5. **passwordDerivedKey 和 recoveryKey 是两条独立路径到达同一个 masterKey**。
-6. **所有 AES-GCM 加密使用固定 AAD `safebox-aes`**，防止密文在字段间移动。
-7. **RSA-4096 是条目加密的唯一手段**（文件条目走 AES-GCM(masterKey) 例外）。
+---
+
+## 七、不变式（v2.3）
+
+1. **User Key 不直接加密条目数据。** 条目数据由 Item Key 加密，User Key 加密 Item Key。
+2. **换密码只重新 wrap User Key。** 所有 Item Key、条目数据、RSA 私钥不动。
+3. **每个密文有唯一 AAD。**
+4. **User Key extractable = true（Web Crypto API 约束）。**
+5. **认证和加密使用不同的 KDF 输入域。**
+6. **KDF 参数跟随账户可配置。**
+7. **Nonce 使用 12 字节安全随机数（crypto.getRandomValues），不可用计数器。**
+8. **User Key 在 JS 堆内存中。**
+9. **条目按 encryption_version 标记格式，解密时直接调度对应解密器，不靠 try-catch。**
+10. **恢复码路径旧数据永不覆盖。** 冷却期内 pending_* 与正式字段共存，冻结即回滚。
