@@ -3,6 +3,7 @@
  *
  * UserKeySet: 用户完整的密钥集合（内存中）
  * ItemKey: 条目级 AES-256 密钥（每条目一个随机 key）
+ * EncryptedField: v2 字段级加密结构
  */
 export interface UserKeySet {
   userKey: CryptoKey;         // AES-256-GCM，加密 Item Key 和 RSA 私钥
@@ -16,6 +17,8 @@ export interface ItemKey {
   encrypted: string;      // 用 User Key 包裹后的 Item Key，存于条目记录
 }
 
-// 加密格式版本: 1=RSA, 2=AES-GCM+ItemKey
-export const ENCRYPTION_VERSION_V1 = 1;
-export const ENCRYPTION_VERSION_V2 = 2;
+/** v2 字段级加密结构：每个字段独立加密，绑定 AAD */
+export interface EncryptedField {
+  encrypted_key: string;   // AES-GCM(User Key, Item Key) - base64
+  ciphertext: string;      // AES-GCM(plaintext, Item Key, AAD) - base64
+}

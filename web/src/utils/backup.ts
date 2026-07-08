@@ -7,7 +7,7 @@ import { deriveKey, generateSalt } from "../crypto/pbkdf2";
 import { aesEncrypt, aesDecrypt } from "../crypto/aes";
 import { getUserItems, upsertItem } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
-import type { Item } from "../types/domain";
+import type { Item, EncryptedField } from "../types/domain";
 
 const BACKUP_EXTENSION = ".safebox";
 
@@ -16,9 +16,9 @@ interface BackupPayload {
   items: Array<{
     type: string;
     icon: string | null;
-    name: string;
-    description: string | null;
-    data: string | null;
+    name: EncryptedField;
+    description: EncryptedField | null;
+    data: EncryptedField;
     createdAt: number;
     updatedAt: number;
   }>;

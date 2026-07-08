@@ -7,6 +7,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
 
+// v2 加密字段 mock（测试 DB 层逻辑，不测真实加密）
+function mockField(value: string) {
+  return { encrypted_key: "mock-key", ciphertext: value };
+}
+
 // ── DB 层测试 ────────────────────────────────────
 
 describe("IndexedDB — itemsStore", () => {
@@ -30,9 +35,9 @@ describe("IndexedDB — itemsStore", () => {
       uid: "test-user",
       type: "login",
       icon: null,
-      name: "test-item",
-      description: "test desc",
-      data: '{"username":"alice"}',
+      name: mockField("test-item"),
+      description: mockField("test desc"),
+      data: mockField('{"username":"alice"}'),
       serverId: null,
       version: 1,
       isDirty: true,
@@ -44,7 +49,7 @@ describe("IndexedDB — itemsStore", () => {
 
     const items = await getUserItems('test-user');
     expect(items.length).toBe(1);
-    expect(items[0].name).toBe("test-item");
+    expect(items[0].name).toEqual(mockField("test-item"));
     expect(items[0].type).toBe("login");
     expect(items[0].isDirty).toBe(true);
   });
@@ -55,9 +60,9 @@ describe("IndexedDB — itemsStore", () => {
       uid: "test-user",
       type: "login",
       icon: null,
-      name: "original",
+      name: mockField("original"),
       description: null,
-      data: null,
+      data: mockField(""),
       serverId: null,
       version: 1,
       isDirty: true,
@@ -71,9 +76,9 @@ describe("IndexedDB — itemsStore", () => {
       uid: "test-user",
       type: "login",
       icon: null,
-      name: "updated-name",
-      description: "new desc",
-      data: '{"package":"com.test"}',
+      name: mockField("updated-name"),
+      description: mockField("new desc"),
+      data: mockField('{"package":"com.test"}'),
       serverId: null,
       version: 2,
       isDirty: true,
@@ -84,8 +89,8 @@ describe("IndexedDB — itemsStore", () => {
 
     const { getItem } = await import("../db/itemsStore");
     const item = await getItem(did);
-    expect(item?.name).toBe("updated-name");
-    expect(item?.description).toBe("new desc");
+    expect(item?.name).toEqual(mockField("updated-name"));
+    expect(item?.description).toEqual(mockField("new desc"));
   });
 
   it("softDeleteItem marks item as deleted", async () => {
@@ -94,9 +99,9 @@ describe("IndexedDB — itemsStore", () => {
       uid: "test-user",
       type: "file",
       icon: null,
-      name: "to-delete",
+      name: mockField("to-delete"),
       description: null,
-      data: null,
+      data: mockField(""),
       serverId: null,
       version: 1,
       isDirty: true,
@@ -118,11 +123,11 @@ describe("IndexedDB — itemsStore", () => {
     const { upsertItem, getDirtyItems, markSynced } = await import("../db/itemsStore");
 
     const did1 = await upsertItem({
-      uid: "test-user", type: "login", icon: null, name: "dirty1", description: null, data: null,
+      uid: "test-user", type: "login", icon: null, name: mockField("dirty1"), description: null, data: mockField(""),
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
     const did2 = await upsertItem({
-      uid: "test-user", type: "login", icon: null, name: "dirty2", description: null, data: null,
+      uid: "test-user", type: "login", icon: null, name: mockField("dirty2"), description: null, data: mockField(""),
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
 
@@ -131,13 +136,13 @@ describe("IndexedDB — itemsStore", () => {
 
     const dirty = await getDirtyItems();
     expect(dirty.length).toBe(1);
-    expect(dirty[0].name).toBe("dirty2");
+    expect(dirty[0].name).toEqual(mockField("dirty2"));
   });
 
   it("markSynced sets isDirty=false and sets serverId", async () => {
     const { upsertItem, markSynced, getItem } = await import("../db/itemsStore");
     const did = await upsertItem({
-      uid: "test-user", type: "login", icon: null, name: "synced", description: null, data: null,
+      uid: "test-user", type: "login", icon: null, name: mockField("synced"), description: null, data: mockField(""),
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
 
@@ -150,20 +155,20 @@ describe("IndexedDB — itemsStore", () => {
   it("getUserItems returns items and they are non-empty", async () => {
     const { upsertItem, getUserItems } = await import("../db/itemsStore");
     await upsertItem({
-      uid: "test-user", type: "login", icon: null, name: "item-a", description: null, data: null,
+      uid: "test-user", type: "login", icon: null, name: mockField("item-a"), description: null, data: mockField(""),
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: 1000, createdAt: 1000,
     });
     // 短暂延迟确保时间戳不同
     await new Promise((r) => setTimeout(r, 10));
     await upsertItem({
-      uid: "test-user", type: "login", icon: null, name: "item-b", description: null, data: null,
+      uid: "test-user", type: "login", icon: null, name: mockField("item-b"), description: null, data: mockField(""),
       serverId: null, version: 1, isDirty: true, isDeleted: false, updatedAt: Date.now(), createdAt: Date.now(),
     });
 
     const items = await getUserItems('test-user');
     expect(items.length).toBe(2);
     // 按 updatedAt 倒序，item-b 应该在前（更新时间更晚）
-    expect(items[0].name).toBe("item-b");
+    expect(items[0].name).toEqual(mockField("item-b"));
   });
 });
 
@@ -316,12 +321,12 @@ describe("KeyManager", () => {
     const { keyManager } = await import("../services/keyManager");
     await keyManager.generateKeys("test");
 
-    const data = JSON.stringify({ username: "bob", password: "secret123" });
+    const data = JSON.stringify({ username: mockField("bob"), password: "secret123" });
     const encrypted = await keyManager.encryptItemData(data);
     expect(encrypted).not.toBeNull();
 
     const decrypted = await keyManager.decryptItemData(encrypted!);
-    expect(JSON.parse(decrypted!)).toEqual({ username: "bob", password: "secret123" });
+    expect(JSON.parse(decrypted!)).toEqual({ username: mockField("bob"), password: "secret123" });
   });
 
   it("lock clears all keys", async () => {

@@ -25,9 +25,7 @@ import {
   type KdfSettings,
   DEFAULT_KDF,
 } from "../crypto/kdf";
-import { rsaDecrypt, rsaEncrypt } from "../crypto/rsa";
-import type { UserKeySet, ItemKey } from "./types";
-import { ENCRYPTION_VERSION_V2 } from "./types";
+import type { UserKeySet, ItemKey, EncryptedField } from "./types";
 
 class KeyChain {
   private userKey: CryptoKey | null = null;
@@ -180,17 +178,15 @@ class KeyChain {
     plaintext: string,
     fieldName: string,
     itemType: string,
-    itemKey?: CryptoKey,  // 传入已有的 Item Key 或留空生成新的
-  ): Promise<{ encrypted_key: string; ciphertext: string; version: number }> {
-    const ik = itemKey ?? (await this.createItemKey()).key;
-    const raw = new Uint8Array(await crypto.subtle.exportKey("raw", ik));
-    const encryptedKey = await aesEncrypt(this.userKey!, raw);
+    itemKey?: ItemKey,
+  ): Promise<EncryptedField> {
+    const ik = itemKey ?? (await this.createItemKey());
     const aad = makeFieldAAD(fieldName, itemType);
     const nonce = new Uint8Array(12);
     crypto.getRandomValues(nonce);
     const ct = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
-      ik,
+      ik.key,
       new TextEncoder().encode(plaintext).buffer.slice(0) as ArrayBuffer,
     ) as ArrayBuffer;
     const ctView = new Uint8Array(ct);
@@ -198,9 +194,8 @@ class KeyChain {
     result.set(nonce, 0);
     result.set(ctView, nonce.length);
     return {
-      encrypted_key: encryptedKey,  // aesEncrypt 已经返回 base64
+      encrypted_key: ik.encrypted,
       ciphertext: this.bytesToBase64(result),
-      version: ENCRYPTION_VERSION_V2,
     };
   }
 
@@ -208,61 +203,24 @@ class KeyChain {
    * 解密条目字段（先试 v2 AES-GCM，失败回退 v1 RSA）
    */
   async decryptItemField(
-    field: { encrypted_key?: string; ciphertext: string },
+    field: EncryptedField,
     fieldName: string,
     itemType: string,
-    version?: number,
   ): Promise<string | null> {
-    // v2: Item Key + AES-GCM
-    if (version === ENCRYPTION_VERSION_V2 && field.encrypted_key) {
-      const itemKey = await this.decryptItemKey(field.encrypted_key);
-      if (itemKey) {
-        try {
-          const aad = makeFieldAAD(fieldName, itemType);
-          const data = this.base64ToBytes(field.ciphertext);
-          if (data.length >= 13) {
-            const nonce = data.slice(0, 12);
-            const ct = data.slice(12);
-            const pt = await crypto.subtle.decrypt(
-              { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
-              itemKey,
-              ct.buffer.slice(ct.byteOffset, ct.byteOffset + ct.byteLength) as ArrayBuffer,
-            ) as ArrayBuffer;
-            return new TextDecoder().decode(pt);
-          }
-        } catch {}
-      }
-    }
-    // v1: RSA（旧格式）
-    if (this.rsaPrivateKey) {
-      try {
-        return await rsaDecrypt(this.rsaPrivateKey, field.ciphertext);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  // ── v1 兼容：RSA 加密/解密（旧条目）───────────────
-
-  /** v1 格式：RSA 加密条目数据 */
-  async encryptItemData(plaintext: string): Promise<string | null> {
-    if (!this.rsaPublicKey) return null;
+    const itemKey = await this.decryptItemKey(field.encrypted_key);
+    if (!itemKey) return null;
     try {
-      const key = await this.decodePublicKey(this.rsaPublicKey);
-      if (!key) return null;
-      return rsaEncrypt(key, plaintext);
-    } catch {
-      return null;
-    }
-  }
-
-  /** v1 格式：RSA 解密条目数据 */
-  async decryptItemData(encoded: string): Promise<string | null> {
-    if (!this.rsaPrivateKey) return null;
-    try {
-      return rsaDecrypt(this.rsaPrivateKey, encoded);
+      const aad = makeFieldAAD(fieldName, itemType);
+      const data = this.base64ToBytes(field.ciphertext);
+      if (data.length < 13) return null;
+      const nonce = data.slice(0, 12);
+      const ct = data.slice(12);
+      const pt = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
+        itemKey,
+        ct.buffer.slice(ct.byteOffset, ct.byteOffset + ct.byteLength) as ArrayBuffer,
+      ) as ArrayBuffer;
+      return new TextDecoder().decode(pt);
     } catch {
       return null;
     }

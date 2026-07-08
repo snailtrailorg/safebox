@@ -45,6 +45,8 @@ export function ItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showSensitive, setShowSensitive] = useState(false);
   const [decryptedData, setDecryptedData] = useState<Record<string, string> | null>(null);
+  const [decryptedName, setDecryptedName] = useState("");
+  const [decryptedDesc, setDecryptedDesc] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
@@ -64,12 +66,22 @@ export function ItemDetailPage() {
       if (cancelled) return;
       setItem(found || null);
       setLoading(false);
-      if (found?.type === "file" && found.data) {
-        try {
-          const plain = await keyChain.decryptItemData(found.data);
-          if (!cancelled && plain) setDecryptedData(JSON.parse(plain));
-        } catch {
-          console.warn("Failed to decrypt file type item data, using raw data");
+      if (found) {
+        const name = await keyChain.decryptItemField(found.name, "name", found.type);
+        if (!cancelled) setDecryptedName(name || "");
+        if (found.description) {
+          const desc = await keyChain.decryptItemField(found.description, "description", found.type);
+          if (!cancelled) setDecryptedDesc(desc);
+        }
+        if (found.type === "file" && found.data) {
+          const plain = await keyChain.decryptItemField(found.data, "data", found.type);
+          if (!cancelled && plain) {
+            try {
+              setDecryptedData(JSON.parse(plain));
+            } catch {
+              setDecryptedData({});
+            }
+          }
         }
       }
     })();
@@ -79,19 +91,15 @@ export function ItemDetailPage() {
   const handleShowSensitive = async () => {
     if (!item?.data) return;
     if (!decryptedData) {
-      try {
-        const plain = await keyChain.decryptItemData(item.data);
-        if (plain) {
-          setDecryptedData(JSON.parse(plain));
-        } else {
-          setDecryptedData(JSON.parse(item.data));
-        }
-      } catch {
+      const plain = await keyChain.decryptItemField(item.data, "data", item.type);
+      if (plain) {
         try {
-          setDecryptedData(JSON.parse(item.data));
+          setDecryptedData(JSON.parse(plain));
         } catch {
-          setDecryptedData({ raw: item.data });
+          setDecryptedData({ raw: plain });
         }
+      } else {
+        setDecryptedData({ raw: "" });
       }
     }
     setShowSensitive(true);
@@ -182,16 +190,16 @@ export function ItemDetailPage() {
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
           <div style={{ fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.detail.name")}</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#333" }}>{item.name}</div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#333" }}>{decryptedName}</div>
         </div>
 
-        {item.description && (
+        {decryptedDesc !== null && (
           <div style={{
             background: "#fff", borderRadius: 10, padding: "1.25rem",
             boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
           }}>
             <div style={{ fontSize: "0.8rem", color: "#999", marginBottom: "0.25rem" }}>{t("vault.detail.notes")}</div>
-            <div style={{ fontSize: "0.95rem", color: "#555" }}>{item.description}</div>
+            <div style={{ fontSize: "0.95rem", color: "#555" }}>{decryptedDesc}</div>
           </div>
         )}
 

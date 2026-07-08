@@ -174,24 +174,6 @@ describe("KeyChain", () => {
     expect(rsaOk).toBe(false);
   });
 
-  it("encryptItemData / decryptItemData roundtrip (RSA v1)", async () => {
-    const keys = await keyChain.generateKeys("password");
-    await keyChain.loadRsaKeys(keys.encryptedPrivate, keys.rsaPublicKey);
-
-    const plaintext = JSON.stringify({ username: "alice", password: "secret123" });
-    const encrypted = await keyChain.encryptItemData(plaintext);
-    expect(encrypted).toBeTruthy();
-
-    const decrypted = await keyChain.decryptItemData(encrypted!);
-    expect(decrypted).toBe(plaintext);
-  });
-
-  it("decryptItemData returns null for invalid input", async () => {
-    await keyChain.generateKeys("password");
-    const result = await keyChain.decryptItemData("not-valid-data");
-    expect(result).toBeNull();
-  });
-
   it("encryptFileBlob / decryptFileBlob roundtrip", async () => {
     await keyChain.generateKeys("password");
     const original = new TextEncoder().encode("file content here").buffer;
@@ -210,18 +192,6 @@ describe("KeyChain", () => {
     keyChain.lock();
     expect(keyChain.isUnlocked).toBe(false);
     expect(keyChain.isRsaLoaded).toBe(false);
-  });
-
-  it("encryptItemData returns null when RSA not loaded", async () => {
-    keyChain.lock();
-    const result = await keyChain.encryptItemData("test");
-    expect(result).toBeNull();
-  });
-
-  it("decryptItemData returns null when RSA not loaded", async () => {
-    keyChain.lock();
-    const result = await keyChain.decryptItemData("test");
-    expect(result).toBeNull();
   });
 
   it("unlock → lock → unlock cycle works", async () => {

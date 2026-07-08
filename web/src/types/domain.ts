@@ -1,5 +1,8 @@
 /** 业务领域类型 */
 
+import type { EncryptedField } from "../keychain/types";
+export type { EncryptedField };
+
 export type ItemType = "login" | "card" | "identity" | "note" | "file";
 
 export interface Item {
@@ -7,11 +10,11 @@ export interface Item {
   uid: string;             // 用户 ID (serverUserId UUID)
   type: ItemType;
   icon: string | null;
-  name: string;            // RSA 加密的 Base64
-  description: string | null;
-  data: string | null;     // RSA 加密的 JSON Base64
+  name: EncryptedField;            // v2 AES-GCM + Item Key + AAD
+  description: EncryptedField | null;
+  data: EncryptedField;            // v2 AES-GCM + Item Key + AAD
   serverId: string | null;
-  version: number;
+  version: number;          // 同步版本号
   isDirty: boolean;
   isDeleted: boolean;
   updatedAt: number;       // epoch ms

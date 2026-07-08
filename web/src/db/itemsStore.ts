@@ -4,7 +4,7 @@
  */
 import { getDb } from "./database";
 import { getCurrentUserId } from "./sessionStore";
-import type { Item, ItemType } from "../types/domain";
+import type { Item, ItemType, EncryptedField } from "../types/domain";
 
 /** 获取用户的所有未删除条目（按更新时间倒序） */
 export async function getUserItems(uid: string): Promise<Item[]> {
@@ -125,9 +125,9 @@ export async function upsertFromServer(
   items: Array<{
     type: string;
     icon: string | null;
-    name: string;
-    description: string | null;
-    data: string | null;
+    name: EncryptedField;
+    description: EncryptedField | null;
+    data: EncryptedField;
     serverId: string | null;
     version: number;
     isDirty: boolean;

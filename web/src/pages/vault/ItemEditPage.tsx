@@ -44,22 +44,24 @@ export function ItemEditPage() {
       getItem(parseInt(did)).then(async (item) => {
         if (item) {
           setItemType(item.type);
-          setName(item.name);
-          setDescription(item.description || "");
+          const decName = await keyChain.decryptItemField(item.name, "name", item.type);
+          setName(decName || "");
+          if (item.description) {
+            const decDesc = await keyChain.decryptItemField(item.description, "description", item.type);
+            setDescription(decDesc || "");
+          } else {
+            setDescription("");
+          }
           if (item.data) {
-            try {
-              const plain = await keyChain.decryptItemData(item.data);
-              if (plain) {
-                setDataFields(JSON.parse(plain));
-              } else {
-                setDataFields(JSON.parse(item.data));
-              }
-            } catch {
+            const plain = await keyChain.decryptItemField(item.data, "data", item.type);
+            if (plain) {
               try {
-                setDataFields(JSON.parse(item.data));
+                setDataFields(JSON.parse(plain));
               } catch {
                 setDataFields({});
               }
+            } else {
+              setDataFields({});
             }
           }
         }
@@ -97,17 +99,18 @@ export function ItemEditPage() {
       }
 
       const dataJson = JSON.stringify(dataFields);
-      const encrypted = await keyChain.encryptItemData(dataJson);
-
+      const itemKey = await keyChain.createItemKey();
       const uid = await getCurrentUserId();
       const item: Item = {
         did: isEdit && did ? parseInt(did) : 0,
         uid,
         type: itemType,
         icon: null,
-        name: name.trim(),
-        description: description.trim() || null,
-        data: encrypted || dataJson,
+        name: await keyChain.encryptItemField(name.trim(), "name", itemType, itemKey),
+        description: description.trim()
+          ? await keyChain.encryptItemField(description.trim(), "description", itemType, itemKey)
+          : null,
+        data: await keyChain.encryptItemField(dataJson, "data", itemType, itemKey),
         serverId: null,
         version: 1,
         isDirty: true,

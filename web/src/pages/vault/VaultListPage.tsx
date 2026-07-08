@@ -10,7 +10,7 @@ import type { Item } from "../../types/domain";
 export function VaultListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { items, isLoading, error, deleteItem, clearError, conflicts, resolveConflict } = useVault();
+  const { items, itemNames, isLoading, error, deleteItem, clearError, conflicts, resolveConflict } = useVault();
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [swiping, setSwiping] = useState<number | null>(null);
@@ -40,7 +40,7 @@ export function VaultListPage() {
 
   const performDelete = async (item: Item) => {
     if (!item.did) return;
-    if (!confirm(t("vault.list.confirmDelete", { name: item.name }))) return;
+    if (!confirm(t("vault.list.confirmDelete", { name: item.did ? (itemNames[item.did] ?? "") : "" }))) return;
     setDeleting(item.did);
     try {
       await deleteItem(item.did);
@@ -87,6 +87,7 @@ export function VaultListPage() {
           </div>
           {conflicts.map((c) => {
             const localItem = items.find((i) => i.did === c.localDid);
+            const localName = localItem?.did ? (itemNames[localItem.did] ?? "") : "";
             return (
               <div key={c.localDid} style={{
                 borderTop: "1px solid #ffeaa7",
@@ -94,7 +95,7 @@ export function VaultListPage() {
                 marginTop: "0.5rem",
               }}>
                 <div style={{ fontSize: "0.9rem", marginBottom: "0.5rem", color: "#856404" }}>
-                  {localItem?.name ?? t("vault.conflict.unknownItem")}
+                  {localName || t("vault.conflict.unknownItem")}
                 </div>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <button
@@ -184,13 +185,8 @@ export function VaultListPage() {
                   <span style={{ fontSize: "1.5rem" }}>{typeInfo.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.name}
+                      {item.did ? (itemNames[item.did] ?? "") : ""}
                     </div>
-                    {item.description && (
-                      <div style={{ fontSize: "0.8rem", color: "#999", marginTop: "0.15rem" }}>
-                        {item.description}
-                      </div>
-                    )}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "#aaa" }}>
                     {typeInfo.label}

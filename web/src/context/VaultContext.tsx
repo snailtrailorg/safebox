@@ -6,10 +6,12 @@ import type { Item, ItemType, ConflictInfo } from "../types/domain";
 import { getUserItems, upsertItem, softDeleteItem, getItem, markSynced, softDeleteByServerId } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
 import { sync } from "../services/sync";
+import { keyChain } from "../keychain/keyChain";
 import { useAuth } from "./AuthContext";
 
 interface VaultState {
   items: Item[];
+  itemNames: Record<number, string>;
   isLoading: boolean;
   isSyncing: boolean;
   error: string | null;
@@ -31,17 +33,30 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const [state, setState] = useState<VaultState>({
     items: [],
+    itemNames: {},
     isLoading: false,
     isSyncing: false,
     error: null,
     conflicts: [],
   });
 
+  const decryptNames = useCallback(async (items: Item[]): Promise<Record<number, string>> => {
+    const names: Record<number, string> = {};
+    await Promise.all(items.map(async (item) => {
+      if (item.did) {
+        const name = await keyChain.decryptItemField(item.name, "name", item.type);
+        names[item.did] = name || "";
+      }
+    }));
+    return names;
+  }, []);
+
   const loadItems = useCallback(async (uid: string) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
       const items = await getUserItems(uid);
-      setState((s) => ({ ...s, items, isLoading: false }));
+      const itemNames = await decryptNames(items);
+      setState((s) => ({ ...s, items, itemNames, isLoading: false }));
     } catch (e) {
       setState((s) => ({
         ...s,
@@ -49,7 +64,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         error: e instanceof Error ? e.message : "加载失败",
       }));
     }
-  }, []);
+  }, [decryptNames]);
 
   const saveItemAction = useCallback(async (item: Item): Promise<number> => {
     const did = await upsertItem(item);
@@ -71,9 +86,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const result = await sync();
       const uid = await getCurrentUserId();
       const items = await getUserItems(uid);
+      const itemNames = await decryptNames(items);
       setState((s) => ({
         ...s,
         items,
+        itemNames,
         isSyncing: false,
         conflicts: result.conflicts,
       }));
@@ -84,7 +101,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         error: e instanceof Error ? e.message : "同步失败",
       }));
     }
-  }, []);
+  }, [decryptNames]);
 
   const resolveConflict = useCallback(async (conflict: ConflictInfo, keepLocal: boolean) => {
     if (keepLocal) {

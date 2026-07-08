@@ -10,7 +10,7 @@ import {
   softDeleteByServerId,
 } from "../db/itemsStore";
 import { getLastSyncTime, updateLastSyncTime } from "../db/sessionStore";
-import type { ConflictInfo } from "../types/domain";
+import type { ConflictInfo, EncryptedField } from "../types/domain";
 
 export interface SyncResult {
   pushed: number;
@@ -33,9 +33,9 @@ export async function sync(): Promise<SyncResult> {
         client_did: item.did ?? null,
         type: item.type,
         icon: item.icon,
-        name: item.name,
-        description: item.description,
-        data: item.data,
+        name: JSON.stringify(item.name),
+        description: item.description ? JSON.stringify(item.description) : null,
+        data: JSON.stringify(item.data),
         version: item.version,
         updated_at: new Date(item.updatedAt).toISOString(),
       })),
@@ -76,9 +76,9 @@ export async function sync(): Promise<SyncResult> {
     const toUpsert: Array<{
       type: string;
       icon: string | null;
-      name: string;
-      description: string | null;
-      data: string | null;
+      name: EncryptedField;
+      description: EncryptedField | null;
+      data: EncryptedField;
       serverId: string | null;
       version: number;
       isDirty: boolean;
@@ -106,9 +106,9 @@ export async function sync(): Promise<SyncResult> {
         toUpsert.push({
           type: remote.type,
           icon: remote.icon,
-          name: remote.name,
-          description: remote.description,
-          data: remote.data,
+          name: JSON.parse(remote.name) as EncryptedField,
+          description: remote.description ? JSON.parse(remote.description) as EncryptedField : null,
+          data: JSON.parse(remote.data ?? "{}") as EncryptedField,
           serverId: remote.server_id,
           version: remote.version,
           isDirty: false,
