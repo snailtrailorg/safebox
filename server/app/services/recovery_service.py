@@ -24,7 +24,7 @@ MAX_FAILED_ATTEMPTS = 5          # 24h 窗口内连续失败 → permanently_loc
 MAX_MONTHLY_INITIATIONS = 3      # 月发起次数 > 3 → permanently_locked
 FAILED_ATTEMPT_WINDOW_HOURS = 24  # 失败计数窗口
 COOLDOWN_HOURS = 24
-ACCELERATE_LINK_TTL_MINUTES = 15
+ACCELERATE_LINK_TTL_MINUTES = COOLDOWN_HOURS * 60  # 与冷却期一致
 
 
 def _recovery_signing_key() -> str:

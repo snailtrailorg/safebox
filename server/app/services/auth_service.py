@@ -57,7 +57,7 @@ async def create_user_with_keys(
     email: str | None,
     phone: str | None,
     google_id: str | None,
-    password: str,
+    password: str,  # 实际上是客户端派生的 auth_key_hash（PBKDF2 输出），不是原始密码
     client_password_salt: str,
     password_wrapped: str,
     recovery_wrapped: str,

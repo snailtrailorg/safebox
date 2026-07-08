@@ -77,7 +77,7 @@ async def get_login_wait(target: str, value: str) -> int:
     if count is None:
         return 0
     count = int(count)
-    if count >= 6:
+    if count >= 5:
         return LOGIN_LOCKOUT_SECONDS
     if count >= 2:
         return 1 << (count - 2)
@@ -114,13 +114,19 @@ async def check_ip_rate(ip: str) -> bool:
     """
     if not ip:
         return False
+    return await check_rate_key(f"iprate:{ip}")
+
+
+async def check_rate_key(key: str, window: int = IP_RATE_WINDOW, max_count: int = IP_RATE_LIMIT_MAX) -> bool:
+    """通用滑动窗口限流。超限返回 True（拒绝）。供中间件使用。"""
+    if not key:
+        return False
     r = await _get_redis()
-    key = f"iprate:{ip}"
     now = time.time()
-    await r.zremrangebyscore(key, 0, now - IP_RATE_WINDOW)
+    await r.zremrangebyscore(key, 0, now - window)
     count = await r.zcard(key)
-    if count >= IP_RATE_LIMIT_MAX:
+    if count >= max_count:
         return True
     await r.zadd(key, {str(uuid.uuid4()): now})
-    await r.expire(key, IP_RATE_WINDOW)
+    await r.expire(key, window)
     return False

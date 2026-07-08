@@ -32,8 +32,9 @@ async def _send_email(to: str, subject: str, html_body: str) -> bool:
     try:
         await loop.run_in_executor(None, _send)
         return True
-    except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
+    except (smtplib.SMTPException, OSError) as e:
+        import logging
+        logging.getLogger("safebox").exception(f"Email send failed: {e}")
         return False
 
 

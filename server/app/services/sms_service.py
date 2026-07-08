@@ -19,7 +19,8 @@ async def send_sms(phone: str, code: str, lang: str = "en") -> bool:
         True 如果发送成功。
     """
     if not settings.twilio_account_sid:
-        print(f"[DEV] 短信未配置，验证码 {code} 应发送到 {phone}")
+        import logging
+        logging.debug(f"[DEV] SMS not configured. Code {code} would be sent to {phone}")
         return True
 
     # 确保号码有 + 前缀
@@ -40,7 +41,7 @@ async def send_sms(phone: str, code: str, lang: str = "en") -> bool:
             resp = await client.post(url, data=body, auth=auth, timeout=10)
             data = resp.json()
             return data.get("status") in ("queued", "sent", "delivered")
-    except Exception as e:
+    except (httpx.HTTPError, httpx.TimeoutException) as e:
         import logging
-        logging.getLogger("safebox").error(f"SMS send failed: {e}")
+        logging.getLogger("safebox").exception(f"SMS send failed: {e}")
         return False

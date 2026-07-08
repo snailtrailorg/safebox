@@ -52,7 +52,6 @@ from app.services.email_service import send_verification_email
 from app.services.google_auth_service import verify_google_id_token
 from app.services.sms_service import send_sms
 from app.services.verification_service import (
-    check_ip_rate,
     check_rate_limit,
     clear_login_failures,
     generate_code,
@@ -63,11 +62,6 @@ from app.services.verification_service import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
-
-
-def _client_ip(request: Request) -> str:
-    """从请求头获取客户端真实 IP。优先 X-Real-IP（Nginx 设置），回退到直连地址。"""
-    return request.headers.get("x-real-ip") or request.client.host if request.client else ""
 
 
 def _t(request: Request, key: str, **kw: object) -> str:
@@ -104,9 +98,6 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
 async def send_code(req: SendCodeRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """发送验证码。60 秒内同一目标只能发一次。"""
     lang = get_lang(request.headers.get("Accept-Language"))
-    ip = _client_ip(request)
-    if await check_ip_rate(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=get_text("ip_rate_limited", lang))
     if not await check_rate_limit(req.target, req.value):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -203,9 +194,6 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
 
 @router.post("/login/email", response_model=LoginResponse)
 async def login_email(req: LoginEmailRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    ip = _client_ip(request)
-    if await check_ip_rate(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=_t(request, "ip_rate_limited"))
     wait = await get_login_wait("email", req.email)
     if wait > 0:
         await record_login_failure("email", req.email)
@@ -225,9 +213,6 @@ async def login_email(req: LoginEmailRequest, request: Request, db: AsyncSession
 
 @router.post("/login/phone", response_model=LoginResponse)
 async def login_phone(req: LoginPhoneRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    ip = _client_ip(request)
-    if await check_ip_rate(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=_t(request, "ip_rate_limited"))
     wait = await get_login_wait("phone", req.phone)
     if wait > 0:
         await record_login_failure("phone", req.phone)
@@ -248,15 +233,18 @@ async def login_phone(req: LoginPhoneRequest, request: Request, db: AsyncSession
 
 @router.post("/login/google", response_model=LoginResponse)
 async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    ip = _client_ip(request)
-    if await check_ip_rate(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=_t(request, "ip_rate_limited"))
     google_id = await verify_google_id_token(req.google_id_token)
     if not google_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "google_token_invalid"))
+    wait = await get_login_wait("google", google_id)
+    if wait > 0:
+        await record_login_failure("google", google_id)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=_t(request, "login_rate_limited", seconds=wait))
     user = await find_user_by_google_id(db, google_id)
     if not user:
+        await record_login_failure("google", google_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "google_not_registered"))
+    await clear_login_failures("google", google_id)
     return await _build_login_response(db, user)
 
 

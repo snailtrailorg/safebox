@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.api import api_router
 from app.config import settings
 from app.database import get_db
+from app.middleware.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -37,6 +38,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 速率限制（最后添加 = 最外层，请求最先经过）
+app.add_middleware(RateLimitMiddleware)
 
 app.include_router(api_router)
 
@@ -50,5 +53,7 @@ async def health():
             break
         return {"status": "ok"}
     except Exception:
+        import logging
+        logging.getLogger("safebox").exception("Health check failed")
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=503, content={"status": "unavailable"})

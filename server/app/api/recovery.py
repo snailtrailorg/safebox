@@ -239,11 +239,11 @@ async def accelerate(
 
     user = await db.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
     rc = await db.get(RecoveryCode, rc_id)
     if not rc or rc.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
     if rc.status != "pending_activation":
         raise HTTPException(
@@ -285,11 +285,11 @@ async def freeze(
 
     user = await db.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
     rc = await db.get(RecoveryCode, rc_id)
     if not rc or rc.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
     if rc.status != "pending_activation":
         raise HTTPException(

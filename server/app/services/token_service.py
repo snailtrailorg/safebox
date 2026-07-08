@@ -1,6 +1,7 @@
 """Token 服务：JWT 创建、refresh rotation、撤销。"""
 
 import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -80,7 +81,10 @@ async def verify_and_rotate_refresh_token(
     entry = result.scalar_one_or_none()
     if entry is None:
         return None
-    if entry.active_token_hash != _token_hash(token):
+    # Use hmac.compare_digest (not !=) to avoid timing side-channel attacks.
+    # The token hash is only reachable after JWT signature verification,
+    # but this is a defense-in-depth measure.
+    if not hmac.compare_digest(entry.active_token_hash, _token_hash(token)):
         await db.execute(sa_delete(TokenFamily).where(TokenFamily.user_id == user_id))
         await db.commit()
         return None

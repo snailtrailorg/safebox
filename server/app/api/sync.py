@@ -83,16 +83,18 @@ async def sync_push(
     results: list[SyncPushResult] = []
     new_items: list[Item] = []  # 新建的 Item 对象，flush 后取 ID
 
+    # 批量查询所有 client_did 对应的已有条目，避免 N+1 查询
+    all_dids = [i.client_did for i in req.items if i.client_did is not None]
+    if all_dids:
+        existing_result = await db.execute(
+            select(Item).where(and_(Item.user_id == user_id, Item.client_did.in_(all_dids)))
+        )
+        existing_map = {item.client_did: item for item in existing_result.scalars().all()}
+    else:
+        existing_map = {}
+
     for item_req in req.items:
-        if item_req.client_did is not None:
-            result = await db.execute(
-                select(Item).where(
-                    and_(Item.user_id == user_id, Item.client_did == item_req.client_did)
-                )
-            )
-            existing = result.scalar_one_or_none()
-        else:
-            existing = None
+        existing = existing_map.get(item_req.client_did) if item_req.client_did is not None else None
 
         if existing:
             client_updated_at = datetime.fromisoformat(item_req.updated_at) if item_req.updated_at else existing.updated_at
