@@ -148,7 +148,7 @@ Authorization: Bearer <admin_token>
 | 5 | POST | /auth/register/google | 无 | L2 | — |
 | 6 | POST | /auth/login/email | 无 | L1+L2 | — |
 | 7 | POST | /auth/login/phone | 无 | L1+L2 | — |
-| 8 | POST | /auth/login/google | 无 | L2 | — |
+| 8 | POST | /auth/login/google | 无 | L1+L2 | — |
 | 9 | POST | /auth/change-password | Bearer | L2 | +verification_code |
 | 10 | POST | /auth/reset-password | 无 | L2 | — |
 | 11 | POST | /auth/recovery/generate | Bearer | L2 | **v2.6** |

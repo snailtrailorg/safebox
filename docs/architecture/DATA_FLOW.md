@@ -22,9 +22,9 @@
 ① 填写邮箱 + 密码
 ② 点击"获取验证码"
                                  ③ POST /auth/send-code
-                                                                   ④ check_ip_rate
-                                                                   ⑤ check_rate_limit
-                                                                   ⑥ send_verification_email()
+                                   [中间件] check_rate_key（IP/user 滑动窗口）
+                                                                   ④ check_rate_limit（60s/目标）
+                                                                   ⑤ send_verification_email()
 ⑦ 收到验证码
 ⑧ 输入验证码
                                  ⑨ 生成全部密钥:
