@@ -151,6 +151,12 @@
       "typeAccount": "通用账户",
       "typeFile": "文件"
     },
+    "conflict": {
+      "title": "⚠️ 同步冲突",
+      "unknownItem": "未知条目",
+      "keepLocal": "保留本地版本",
+      "useServer": "使用服务端版本"
+    },
     "detail": {
       "title": "详情",
       "edit": "✏️ 编辑",

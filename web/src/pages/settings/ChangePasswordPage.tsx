@@ -57,9 +57,11 @@ export function ChangePasswordPage() {
       const newDerivedKey = await deriveKey(newPassword, newSalt);
       const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
 
-      const masterRaw = new Uint8Array(
-        await crypto.subtle.exportKey("raw", (keyChain as any).userKey)
-      );
+      const masterRaw = await keyChain.exportUserKeyRaw();
+      if (!masterRaw) {
+        setToast({ message: t("settings.unlockFailed"), type: "error" });
+        return;
+      }
       const newPasswordWrapped = await aesEncrypt(newDerivedKey, masterRaw);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 

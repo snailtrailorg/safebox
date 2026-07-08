@@ -151,6 +151,12 @@
       "typeAccount": "Account",
       "typeFile": "File"
     },
+    "conflict": {
+      "title": "⚠️ Sync Conflict",
+      "unknownItem": "Unknown item",
+      "keepLocal": "Keep Local Version",
+      "useServer": "Use Server Version"
+    },
     "detail": {
       "title": "Details",
       "edit": "✏️ Edit",

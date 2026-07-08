@@ -10,11 +10,20 @@ import {
   softDeleteByServerId,
 } from "../db/itemsStore";
 import { getLastSyncTime, updateLastSyncTime } from "../db/sessionStore";
+import type { ConflictInfo } from "../types/domain";
 
-export async function sync(): Promise<{ pushed: number; pulled: number; conflictCount: number }> {
+export interface SyncResult {
+  pushed: number;
+  pulled: number;
+  conflicts: ConflictInfo[];
+}
+
+export async function sync(): Promise<SyncResult> {
   let pushed = 0;
   let pulled = 0;
-  let conflictCount = 0;
+  const conflicts: ConflictInfo[] = [];
+  // 冲突条目的本地信息（push 阶段收集，pull 阶段匹配服务端版本）
+  const pendingConflicts: Array<{ localDid: number; serverId: string; localUpdatedAt: number }> = [];
 
   // 1. Push dirty items
   const dirtyItems = await getDirtyItems();
@@ -34,11 +43,14 @@ export async function sync(): Promise<{ pushed: number; pulled: number; conflict
 
     for (const [i, result] of pushResult.results.entries()) {
       if (result.status === "conflict") {
-        // 冲突：以服务端为准，标记本地已同步（下次 pull 拉服务端版本）
-        conflictCount++;
-        if (dirtyItems[i]?.did) {
-          await markSynced(dirtyItems[i].did!, dirtyItems[i].serverId || `conflict-${dirtyItems[i].did}`);
-          pushed++;
+        // 冲突：保留本地版本，等待 pull 阶段获取服务端版本后由用户选择
+        const local = dirtyItems[i];
+        if (local?.did && local.serverId) {
+          pendingConflicts.push({
+            localDid: local.did,
+            serverId: local.serverId,
+            localUpdatedAt: local.updatedAt,
+          });
         }
       } else if (
         (result.status === "created" || result.status === "updated") &&
@@ -55,6 +67,7 @@ export async function sync(): Promise<{ pushed: number; pulled: number; conflict
   let since = await getLastSyncTime();
   let hasMore = true;
   let lastServerTime = since;
+  const conflictServerIds = new Set(pendingConflicts.map((c) => c.serverId));
 
   while (hasMore) {
     const pullResult = await apiClient.pull(since, 100);
@@ -77,6 +90,17 @@ export async function sync(): Promise<{ pushed: number; pulled: number; conflict
         if (remote.server_id) {
           await softDeleteByServerId(remote.server_id);
           pulled++;
+        }
+      } else if (remote.server_id && conflictServerIds.has(remote.server_id)) {
+        // 冲突条目的服务端版本：不自动 upsert，等待用户选择
+        const local = pendingConflicts.find((c) => c.serverId === remote.server_id);
+        if (local) {
+          conflicts.push({
+            localDid: local.localDid,
+            serverId: remote.server_id,
+            localUpdatedAt: local.localUpdatedAt,
+            serverUpdatedAt: new Date(remote.updated_at).getTime(),
+          });
         }
       } else {
         toUpsert.push({
@@ -106,5 +130,5 @@ export async function sync(): Promise<{ pushed: number; pulled: number; conflict
     await updateLastSyncTime(lastServerTime);
   }
 
-  return { pushed, pulled, conflictCount };
+  return { pushed, pulled, conflicts };
 }

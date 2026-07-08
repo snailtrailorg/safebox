@@ -11,7 +11,7 @@ export type KdfSettings =
   | { algorithm: "pbkdf2"; iterations: number }
   | { algorithm: "argon2id"; memory: number; iterations: number; parallelism: number };
 
-export const DEFAULT_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 100_000 };
+export const DEFAULT_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 600_000 };
 export const RECOMMENDED_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 600_000 };
 
 /** 底层 deriveBits（可选 Web Worker，当前主线程实现） */

@@ -188,10 +188,6 @@ class ApiClient {
     return this.request("POST", "/auth/change-password", req, true);
   }
 
-  async recoveryReset(req: { target: string; value: string; new_auth_key_hash: string; new_password_salt: string; new_password_wrapped: string }): Promise<ResetPasswordResponse> {
-    return this.request("POST", "/auth/recovery-reset", req, true);
-  }
-
   // ── Recovery 端点 ─────────────────────────────────
 
   async generateRecovery(req: GenerateRecoveryRequest): Promise<GenerateRecoveryResponse> {

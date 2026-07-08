@@ -1,6 +1,6 @@
 /** 加密常量 — 与 Android CryptoManager.kt 完全一致 */
 
-export const PBKDF2_ITERATIONS = 100_000;
+export const PBKDF2_ITERATIONS = 600_000;
 export const PBKDF2_KEY_LENGTH = 256;
 export const SALT_LENGTH = 32;
 

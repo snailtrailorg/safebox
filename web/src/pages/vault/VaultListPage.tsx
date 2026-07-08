@@ -10,7 +10,7 @@ import type { Item } from "../../types/domain";
 export function VaultListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { items, isLoading, error, deleteItem, clearError } = useVault();
+  const { items, isLoading, error, deleteItem, clearError, conflicts, resolveConflict } = useVault();
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [swiping, setSwiping] = useState<number | null>(null);
@@ -74,6 +74,55 @@ export function VaultListPage() {
 
   return (
     <AppLayout title={t("vault.list.title")}>
+      {conflicts.length > 0 && (
+        <div style={{
+          background: "#fff3cd",
+          border: "1px solid #ffeaa7",
+          borderRadius: 10,
+          padding: "1rem",
+          marginBottom: "1rem",
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#856404" }}>
+            {t("vault.conflict.title")}
+          </div>
+          {conflicts.map((c) => {
+            const localItem = items.find((i) => i.did === c.localDid);
+            return (
+              <div key={c.localDid} style={{
+                borderTop: "1px solid #ffeaa7",
+                paddingTop: "0.5rem",
+                marginTop: "0.5rem",
+              }}>
+                <div style={{ fontSize: "0.9rem", marginBottom: "0.5rem", color: "#856404" }}>
+                  {localItem?.name ?? t("vault.conflict.unknownItem")}
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button
+                    onClick={() => resolveConflict(c, true)}
+                    style={{
+                      flex: 1, padding: "0.5rem", border: "1px solid #d39e00",
+                      background: "#fff", borderRadius: 6, cursor: "pointer",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {t("vault.conflict.keepLocal")}
+                  </button>
+                  <button
+                    onClick={() => resolveConflict(c, false)}
+                    style={{
+                      flex: 1, padding: "0.5rem", border: "1px solid #d39e00",
+                      background: "#fff", borderRadius: 6, cursor: "pointer",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {t("vault.conflict.useServer")}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {isLoading && items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "3rem 0", color: "#666" }}>
           <p>{t("common.loading")}</p>

@@ -18,6 +18,14 @@ export interface Item {
   createdAt: number;       // epoch ms
 }
 
+/** 同步冲突信息（本地版本与服务端版本不一致） */
+export interface ConflictInfo {
+  localDid: number;
+  serverId: string;
+  localUpdatedAt: number;   // epoch ms
+  serverUpdatedAt: number;  // epoch ms
+}
+
 export interface SessionData {
   accessToken: string;
   refreshToken: string;

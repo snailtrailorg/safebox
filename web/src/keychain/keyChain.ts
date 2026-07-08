@@ -121,6 +121,12 @@ class KeyChain {
     }
   }
 
+  /** 导出 User Key 的 raw bytes（供改密等场景使用）。未解锁时返回 null。 */
+  async exportUserKeyRaw(): Promise<Uint8Array | null> {
+    if (!this.userKey) return null;
+    return new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
+  }
+
   // ── RSA 密钥加载 ────────────────────────────────
 
   async loadRsaKeys(
@@ -183,7 +189,7 @@ class KeyChain {
     const nonce = new Uint8Array(12);
     crypto.getRandomValues(nonce);
     const ct = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
+      { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
       ik,
       new TextEncoder().encode(plaintext).buffer.slice(0) as ArrayBuffer,
     ) as ArrayBuffer;
@@ -218,7 +224,7 @@ class KeyChain {
             const nonce = data.slice(0, 12);
             const ct = data.slice(12);
             const pt = await crypto.subtle.decrypt(
-              { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
+              { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
               itemKey,
               ct.buffer.slice(ct.byteOffset, ct.byteOffset + ct.byteLength) as ArrayBuffer,
             ) as ArrayBuffer;
