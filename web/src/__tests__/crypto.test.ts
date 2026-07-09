@@ -5,8 +5,8 @@ import { describe, it, expect } from "vitest";
 import {
   generateSalt,
   deriveKey,
-  deriveKeyHash,
-} from "../crypto/pbkdf2";
+  deriveAuthKey,
+} from "../crypto/kdf";
 import {
   aesEncrypt,
   aesDecrypt,
@@ -29,7 +29,6 @@ import {
 } from "../crypto/rsa";
 import {
   generateRecoveryCode,
-  recoveryCodeToKey,
 } from "../crypto/bip39";
 import { BIP39_WORDS } from "../crypto/wordlist";
 
@@ -97,18 +96,18 @@ describe("PBKDF2", () => {
     expect(pt).toBeNull(); // 不同密钥应该解密失败
   });
 
-  it("deriveKeyHash produces base64 string", async () => {
+  it("deriveAuthKey produces base64 string", async () => {
     const salt = generateSalt();
-    const hash = await deriveKeyHash("password", salt);
+    const hash = await deriveAuthKey("password", salt);
     expect(typeof hash).toBe("string");
     expect(hash.length).toBeGreaterThan(0);
     expect(/^[A-Za-z0-9+/=]+$/.test(hash)).toBe(true);
   });
 
-  it("deriveKeyHash is deterministic", async () => {
+  it("deriveAuthKey is deterministic", async () => {
     const salt = generateSalt();
-    const h1 = await deriveKeyHash("test", salt);
-    const h2 = await deriveKeyHash("test", salt);
+    const h1 = await deriveAuthKey("test", salt);
+    const h2 = await deriveAuthKey("test", salt);
     expect(h1).toBe(h2);
   });
 });
@@ -336,43 +335,6 @@ describe("BIP39 Recovery Code", () => {
     const c2 = generateRecoveryCode();
     expect(c1).not.toBe(c2);
   });
-
-  it("recoveryCodeToKey produces valid AES key", async () => {
-    const code = "abandon ability able about above absent absorb abstract accuse acid acoustic acquire";
-    const key = await recoveryCodeToKey(code);
-    expect(key).toBeDefined();
-    expect(key.algorithm.name).toBe("AES-GCM");
-  });
-
-  it("recoveryCodeToKey is deterministic", async () => {
-    const code = "zoo zone zero zebra youth young you yellow year yard wrong write";
-    const key1 = await recoveryCodeToKey(code);
-    const key2 = await recoveryCodeToKey(code);
-    // Same code produces same key
-    const plaintext = new TextEncoder().encode("recovery test");
-    const ct = await aesEncrypt(key1, plaintext);
-    const pt = await aesDecrypt(key2, ct);
-    expect(new TextDecoder().decode(pt!)).toBe("recovery test");
-  });
-
-  it("recoveryCodeToKey normalizes case and whitespace", async () => {
-    const code1 = "  ABANDON ABILITY ABLE ABOUT ABOVE ABSENT ABSORB ABSTRACT ACCUSE ACID ACOUSTIC ACQUIRE  ";
-    const code2 = "abandon ability able about above absent absorb abstract accuse acid acoustic acquire";
-    const key1 = await recoveryCodeToKey(code1);
-    const key2 = await recoveryCodeToKey(code2);
-    const plaintext = new TextEncoder().encode("case test");
-    const ct = await aesEncrypt(key1, plaintext);
-    const pt = await aesDecrypt(key2, ct);
-    expect(new TextDecoder().decode(pt!)).toBe("case test");
-  });
-
-  it("different recovery codes produce different keys", async () => {
-    const k1 = await recoveryCodeToKey("abandon ability able about above absent absorb abstract accuse acid acoustic acquire");
-    const k2 = await recoveryCodeToKey("zoo zone zero zebra youth young you yellow year yard wrong write");
-    const ct = await aesEncryptString(k1, "test");
-    const pt = await aesDecryptString(k2, ct);
-    expect(pt).toBeNull();
-  });
 });
 
 // ── 跨模块集成测试 ───────────────────────────────
@@ -391,21 +353,16 @@ describe("Cross-module integration (matching Android KeyManager flow)", () => {
     const passwordWrapped = await aesEncrypt(derivedKey, new Uint8Array(masterRaw as ArrayBuffer));
     expect(passwordWrapped).toBeTruthy();
 
-    // Step 3: 用恢复码包装主密钥
-    const recoveryCode = generateRecoveryCode();
-    const recoveryKey = await recoveryCodeToKey(recoveryCode);
-    const recoveryWrapped = await aesEncrypt(recoveryKey, new Uint8Array(masterRaw as ArrayBuffer));
-
-    // Step 4: 用主密钥加密 RSA 私钥
+    // Step 3: 用主密钥加密 RSA 私钥
     const rsaPrivEncoded = await encodePrivateKey(rsaPair.privateKey);
     const encryptedPrivate = await aesEncryptString(masterKey, rsaPrivEncoded);
 
-    // Step 5: RSA 公钥
+    // Step 4: RSA 公钥
     const rsaPubEncoded = await encodePublicKey(rsaPair.publicKey);
 
     // ── 模拟用户重新登录 ─────────────────────────
 
-    // Step 6: 用密码解锁主密钥
+    // Step 5: 用密码解锁主密钥
     const reDerivedKey = await deriveKey(password, salt);
     const masterRaw2 = await aesDecrypt(reDerivedKey, passwordWrapped);
     expect(masterRaw2).not.toBeNull();
@@ -417,44 +374,17 @@ describe("Cross-module integration (matching Android KeyManager flow)", () => {
       ["encrypt", "decrypt"],
     );
 
-    // Step 7: 解密 RSA 私钥
+    // Step 6: 解密 RSA 私钥
     const rsaPrivDecrypted = await aesDecryptString(reMasterKey, encryptedPrivate);
     expect(rsaPrivDecrypted).not.toBeNull();
     const rePrivateKey = await decodePrivateKey(rsaPrivDecrypted!);
     expect(rePrivateKey).not.toBeNull();
 
-    // Step 8: 用 RSA 加密/解密条目数据
+    // Step 7: 用 RSA 加密/解密条目数据
     const itemData = JSON.stringify({ username: "alice", password: "s3cret!" });
     const encrypted = await rsaEncrypt(rsaPair.publicKey, itemData);
     expect(encrypted).not.toBeNull();
     const decrypted = await rsaDecrypt(rePrivateKey!, encrypted!);
     expect(JSON.parse(decrypted!)).toEqual({ username: "alice", password: "s3cret!" });
-  });
-
-  it("recovery code unlock flow", async () => {
-    // 注册阶段
-    const recoveryCode = "abandon ability able about above absent absorb abstract accuse acid acoustic acquire";
-    const recoveryKey = await recoveryCodeToKey(recoveryCode);
-    const masterKey = await generateAesKey();
-    const masterRaw = new Uint8Array(await crypto.subtle.exportKey("raw", masterKey) as ArrayBuffer);
-    const recoveryWrapped = await aesEncrypt(recoveryKey, masterRaw);
-
-    // 恢复阶段
-    const reRecoveryKey = await recoveryCodeToKey("  ABANDON ABILITY ABLE ABOUT ABOVE ABSENT ABSORB ABSTRACT ACCUSE ACID ACOUSTIC ACQUIRE  ");
-    const reMasterRaw = await aesDecrypt(reRecoveryKey, recoveryWrapped);
-    expect(reMasterRaw).not.toBeNull();
-    const reMasterKey = await crypto.subtle.importKey(
-      "raw",
-      reMasterRaw! as BufferSource,
-      "AES-GCM",
-      false,
-      ["encrypt", "decrypt"],
-    );
-
-    // 验证密钥一致
-    const testData = new TextEncoder().encode("recovery test data");
-    const ct = await aesEncrypt(masterKey, testData);
-    const pt = await aesDecrypt(reMasterKey, ct);
-    expect(new TextDecoder().decode(pt!)).toBe("recovery test data");
   });
 });

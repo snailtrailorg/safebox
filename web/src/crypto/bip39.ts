@@ -24,20 +24,4 @@ export function generateRecoveryCode(): string {
   return words.join(" ");
 }
 
-/** 恢复码 → AES 密钥（SHA-256 哈希） */
-export async function recoveryCodeToKey(
-  code: string,
-): Promise<CryptoKey> {
-  const normalized = code.trim().toLowerCase();
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(normalized),
-  );
-  return crypto.subtle.importKey(
-    "raw",
-    new Uint8Array(hash),
-    "AES-GCM",
-    false,
-    ["encrypt", "decrypt"],
-  );
-}
+

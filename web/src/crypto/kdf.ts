@@ -7,12 +7,21 @@
  * 认证路径: deriveAuthKey → PBKDF2(password, salt+"auth") → 与 Android 兼容
  * 加密路径: deriveKey → PBKDF2(password, salt) → 包裹/解包 User Key
  */
+import { SALT_LENGTH } from "../config/constants";
+
 export type KdfSettings =
   | { algorithm: "pbkdf2"; iterations: number }
   | { algorithm: "argon2id"; memory: number; iterations: number; parallelism: number };
 
 export const DEFAULT_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 600_000 };
 export const RECOMMENDED_KDF: KdfSettings = { algorithm: "pbkdf2", iterations: 600_000 };
+
+/** 生成随机盐 (32 字节) */
+export function generateSalt(): Uint8Array {
+  const salt = new Uint8Array(SALT_LENGTH);
+  crypto.getRandomValues(salt);
+  return salt;
+}
 
 /** 底层 deriveBits（可选 Web Worker，当前主线程实现） */
 async function deriveBits(

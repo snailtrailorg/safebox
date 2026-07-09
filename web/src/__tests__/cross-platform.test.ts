@@ -11,7 +11,7 @@
  * 4. 运行此测试验证 Web 端产生相同输出
  */
 import { describe, it, expect } from "vitest";
-import { deriveKeyHash } from "../crypto/pbkdf2";
+import { deriveAuthKey } from "../crypto/kdf";
 import {
   aesEncrypt,
   aesDecrypt,
@@ -21,7 +21,7 @@ import {
   bytesToBase64,
   base64ToBytes,
 } from "../crypto/aes";
-import { generateRecoveryCode, recoveryCodeToKey } from "../crypto/bip39";
+import { generateRecoveryCode } from "../crypto/bip39";
 
 // ── RFC 6070 PBKDF2 测试向量 ────────────────────
 
@@ -34,8 +34,8 @@ describe("PBKDF2 RFC 6070 test vectors", () => {
   it("deterministic output: same inputs = same hash", async () => {
     const password = "password";
     const salt = new Uint8Array([0x73, 0x61, 0x6c, 0x74]); // "salt"
-    const h1 = await deriveKeyHash(password, salt);
-    const h2 = await deriveKeyHash(password, salt);
+    const h1 = await deriveAuthKey(password, salt);
+    const h2 = await deriveAuthKey(password, salt);
     expect(h1).toBe(h2);
     expect(h1.length).toBeGreaterThan(0);
   });
@@ -43,8 +43,8 @@ describe("PBKDF2 RFC 6070 test vectors", () => {
   it("different passwords produce different hashes", async () => {
     const salt = new Uint8Array(32);
     crypto.getRandomValues(salt);
-    const h1 = await deriveKeyHash("password1", salt);
-    const h2 = await deriveKeyHash("password2", salt);
+    const h1 = await deriveAuthKey("password1", salt);
+    const h2 = await deriveAuthKey("password2", salt);
     expect(h1).not.toBe(h2);
   });
 
@@ -54,15 +54,15 @@ describe("PBKDF2 RFC 6070 test vectors", () => {
     const salt2 = new Uint8Array(32);
     crypto.getRandomValues(salt1);
     crypto.getRandomValues(salt2);
-    const h1 = await deriveKeyHash(password, salt1);
-    const h2 = await deriveKeyHash(password, salt2);
+    const h1 = await deriveAuthKey(password, salt1);
+    const h2 = await deriveAuthKey(password, salt2);
     expect(h1).not.toBe(h2);
   });
 
   it("hash output is valid Base64 with expected length", async () => {
     const salt = new Uint8Array(32);
     crypto.getRandomValues(salt);
-    const hash = await deriveKeyHash("test", salt);
+    const hash = await deriveAuthKey("test", salt);
     // 256 bits = 32 bytes → Base64 ≈ 44 chars
     expect(hash.length).toBe(44);
     expect(/^[A-Za-z0-9+/=]+$/.test(hash)).toBe(true);
@@ -128,30 +128,6 @@ describe("AES-256-GCM known answer tests", () => {
 // ── BIP39 恢复码兼容性 ───────────────────────────
 
 describe("BIP39 recovery code compatibility", () => {
-  it("same recovery code produces same key on repeated calls", async () => {
-    const code = generateRecoveryCode();
-    const key1 = await recoveryCodeToKey(code);
-    const key2 = await recoveryCodeToKey(code);
-
-    const testData = new TextEncoder().encode("recovery compatibility test");
-    const ct = await aesEncrypt(key1, testData);
-    const pt = await aesDecrypt(key2, ct);
-    expect(new TextDecoder().decode(pt!)).toBe("recovery compatibility test");
-  });
-
-  it("known recovery code produces deterministic key", async () => {
-    // 固定恢复码
-    const code = "abandon ability able about above absent absorb abstract accuse acid acoustic acquire";
-    const key1 = await recoveryCodeToKey(code);
-    const key2 = await recoveryCodeToKey(code);
-
-    // 两个 key 应该相同（通过加密/解密验证）
-    const plaintext = new TextEncoder().encode("deterministic");
-    const ct = await aesEncrypt(key1, plaintext);
-    const pt = await aesDecrypt(key2, ct);
-    expect(new TextDecoder().decode(pt!)).toBe("deterministic");
-  });
-
   it("word list is identical to Android CryptoManager.kt", async () => {
     const { BIP39_WORDS } = await import("../crypto/wordlist");
     // 验证词表特定位置的词与 Android 源码一致
@@ -198,7 +174,7 @@ describe("Android ↔ Web cross-platform verification", () => {
     const password = "cross-platform-test-password";
 
     const saltBytes = base64ToBytes(androidSalt);
-    const webHash = await deriveKeyHash(password, saltBytes);
+    const webHash = await deriveAuthKey(password, saltBytes);
     expect(webHash).toBe(androidHash);
   });
 
@@ -303,7 +279,7 @@ describe("Android ↔ Web cross-platform verification", () => {
     const expectedHex = "9ca2675d2f2477f566b10cf3dcf8f49a6147c95b5e75081bc8c87a3988494967";
     const recoveryCode = "abandon ability able about above absent absorb abstract accuse acid acoustic acquire";
 
-    // 直接计算 SHA-256（不通过 recoveryCodeToKey，因为其密钥不可导出）
+    // 直接计算 SHA-256 验证恢复码哈希一致性
     const hash = await crypto.subtle.digest(
       "SHA-256",
       new TextEncoder().encode(recoveryCode.trim().toLowerCase()),
@@ -312,27 +288,5 @@ describe("Android ↔ Web cross-platform verification", () => {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
     expect(webHex).toBe(expectedHex);
-  });
-
-  it("Web self-consistency: full key hierarchy is internally consistent", async () => {
-    // 无需 Android 向量：验证 Web 自己的密钥层级自洽
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("consistency-test");
-
-    // 用密码解锁
-    keyManager.lock();
-    const ok = await keyManager.unlockWithPassword("consistency-test", keys.passwordSalt, keys.passwordWrapped);
-    expect(ok).toBe(true);
-
-    // 加载 RSA 密钥
-    const rsaOk = await keyManager.loadRsaKeys(keys.encryptedPrivate, keys.rsaPublicKey);
-    expect(rsaOk).toBe(true);
-
-    // 加密/解密循环
-    const original = JSON.stringify({ test: "cross-platform", value: 42 });
-    const encrypted = await keyManager.encryptItemData(original);
-    expect(encrypted).not.toBeNull();
-    const decrypted = await keyManager.decryptItemData(encrypted!);
-    expect(JSON.parse(decrypted!)).toEqual({ test: "cross-platform", value: 42 });
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Web 客户端集成测试 — IndexedDB / KeyManager / API / 认证流程
+ * Web 客户端集成测试 — IndexedDB / API / 认证流程
  *
  * 注意：这些测试使用 fake-indexeddb 模拟浏览器 IndexedDB，
  * crypto.subtle 需要 Node 21+ 的原生 Web Crypto 支持。
@@ -247,99 +247,6 @@ describe("IndexedDB — sessionStore", () => {
   });
 });
 
-// ── KeyManager 集成测试 ──────────────────────────
-
-describe("KeyManager", () => {
-  it("generateKeys produces all required fields", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("test-password");
-    expect(keys.authKeyHash).toBeTruthy();
-    expect(keys.passwordSalt).toBeTruthy();
-    expect(keys.passwordWrapped).toBeTruthy();
-    expect(keys.recoveryWrapped).toBeTruthy();
-    expect(keys.encryptedPrivate).toBeTruthy();
-    expect(keys.rsaPublicKey).toBeTruthy();
-    expect(keys.recoveryCode).toBeTruthy();
-    expect(keys.recoveryCode.split(" ").length).toBe(12);
-    expect(keyManager.isUnlocked).toBe(true);
-    expect(keyManager.isRsaLoaded).toBe(true);
-    expect(keyManager.currentRecoveryCode).toBe(keys.recoveryCode);
-  });
-
-  it("unlockWithPassword roundtrip", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("my-password");
-    keyManager.lock();
-    expect(keyManager.isUnlocked).toBe(false);
-
-    const ok = await keyManager.unlockWithPassword("my-password", keys.passwordSalt, keys.passwordWrapped);
-    expect(ok).toBe(true);
-    expect(keyManager.isUnlocked).toBe(true);
-  });
-
-  it("unlockWithPassword fails with wrong password", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("correct");
-    keyManager.lock();
-    const ok = await keyManager.unlockWithPassword("wrong", keys.passwordSalt, keys.passwordWrapped);
-    expect(ok).toBe(false);
-  });
-
-  it("unlockWithRecoveryCode roundtrip", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("password");
-    const recoveryCode = keys.recoveryCode;
-    keyManager.lock();
-
-    const ok = await keyManager.unlockWithRecoveryCode(recoveryCode, keys.recoveryWrapped);
-    expect(ok).toBe(true);
-    expect(keyManager.isUnlocked).toBe(true);
-  });
-
-  it("unlockWithRecoveryCode fails with wrong code", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("password");
-    keyManager.lock();
-    const ok = await keyManager.unlockWithRecoveryCode("zoo zone zero zebra youth young you yellow year yard wrong write", keys.recoveryWrapped);
-    expect(ok).toBe(false);
-  });
-
-  it("loadRsaKeys after password unlock", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    const keys = await keyManager.generateKeys("test123");
-    const { encryptedPrivate, rsaPublicKey } = keys;
-    const { passwordSalt, passwordWrapped } = keys;
-
-    keyManager.lock();
-    await keyManager.unlockWithPassword("test123", passwordSalt, passwordWrapped);
-    const loaded = await keyManager.loadRsaKeys(encryptedPrivate, rsaPublicKey);
-    expect(loaded).toBe(true);
-    expect(keyManager.isRsaLoaded).toBe(true);
-  });
-
-  it("encryptItemData / decryptItemData roundtrip", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    await keyManager.generateKeys("test");
-
-    const data = JSON.stringify({ username: mockField("bob"), password: "secret123" });
-    const encrypted = await keyManager.encryptItemData(data);
-    expect(encrypted).not.toBeNull();
-
-    const decrypted = await keyManager.decryptItemData(encrypted!);
-    expect(JSON.parse(decrypted!)).toEqual({ username: mockField("bob"), password: "secret123" });
-  });
-
-  it("lock clears all keys", async () => {
-    const { keyManager } = await import("../services/keyManager");
-    await keyManager.generateKeys("test");
-    expect(keyManager.isUnlocked).toBe(true);
-    expect(keyManager.isRsaLoaded).toBe(true);
-
-    keyManager.lock();
-    expect(keyManager.isUnlocked).toBe(false);
-    expect(keyManager.isRsaLoaded).toBe(false);
-  });
-});
 
 // ── 密码生成器测试 ───────────────────────────────
 

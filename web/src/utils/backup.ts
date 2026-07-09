@@ -3,7 +3,7 @@
  *
  * 格式：JSON → AES-256-GCM(PBKDF2(backupPassword, salt)) → .safebox 文件
  */
-import { deriveKey, generateSalt } from "../crypto/pbkdf2";
+import { deriveKey, generateSalt } from "../crypto/kdf";
 import { aesEncrypt, aesDecrypt } from "../crypto/aes";
 import { getUserItems, upsertItem } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
