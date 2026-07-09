@@ -37,6 +37,11 @@ def set_engine(engine, session_factory):
 
 
 async def get_db() -> AsyncSession:
-    """FastAPI 依赖注入：每次请求提供一个数据库会话。"""
+    """FastAPI 依赖注入：每次请求提供一个数据库会话，请求结束自动 commit，异常回滚。"""
     async with get_session_factory()() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
