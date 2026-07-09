@@ -126,7 +126,8 @@ async def test_refresh_token(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_unauthorized_access(client: AsyncClient):
     resp = await client.get(f"/api/v1/sync/pull?since={SYNC_SINCE}")
-    assert resp.status_code == 401
+    # FastAPI HTTPBearer 无 Authorization 头时返回 403（有效但无效 token 返回 401）
+    assert resp.status_code == 403
 
 
 @pytest.mark.asyncio
