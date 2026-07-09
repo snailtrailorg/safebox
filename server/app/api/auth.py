@@ -82,14 +82,14 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
         user = await find_user_by_phone(db, phone)
 
     if user:
-        kdf = json.loads(user.kdf_settings) if user.kdf_settings else {"algorithm": "pbkdf2", "iterations": 100_000}
+        kdf = json.loads(user.kdf_settings) if user.kdf_settings else {"algorithm": "pbkdf2", "iterations": 600_000}
         return {
             "password_salt": user.password_salt,
             "kdf_settings": kdf,
         }
     # 用户不存在时返回随机 salt，防止枚举
     return {"password_salt": secrets.token_hex(16),
-            "kdf_settings": {"algorithm": "pbkdf2", "iterations": 100_000}}
+            "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600_000}}
 
 
 # ── 验证码 ──────────────────────────────────────────
