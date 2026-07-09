@@ -36,19 +36,18 @@ Authorization: Bearer <access_token>
 
 ```json
 // Request
-{"recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
- "pending_new_auth_key_hash": "...",        // 新密码的 bcrypt hash
- "pending_password_salt": "...",
- "pending_kdf_settings": {...},
- "pending_password_wrapped": "..."}          // 用新密码重新 wrap 后的 User Key
+{"target":"email","value":"user@example.com",
+ "recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
+ "new_auth_key_hash": "...",
+ "new_password_salt": "...",
+ "new_kdf_settings": {...},
+ "new_wrapped_user_key": "..."}          // 用新密码重新 wrap 后的 User Key
 
 // 200
-{"status": "pending_activation",
- "cooldown_expires_at": "2026-07-08T13:00:00Z",
- "cooldown_seconds": 86400}
-// 400 — 恢复码错误
-// 403 — 已有冷却期进行中
-// 429 — 连续错误达 5 次 + 当月已达 3 次 → permanently_locked
+{"cooldown_expires_at": "2026-07-08T13:00:00Z"}
+// 400 - 恢复码错误
+// 404 - 用户不存在
+// 429 - 连续错误达 5 次 + 当月已达 3 次 -> permanently_locked
 ```
 
 - 验证恢复码 → 写入 pending_* 字段 → 进入冷却期 → 多渠道告警
@@ -95,8 +94,7 @@ Authorization: Bearer <access_token>
 // Request
 {"signed_token": "一次性签名URL token"}
 
-// 200
-{"success": true, "rolled_back": true}
+// 204 No Content（无响应体）
 // 400 — token 无效/过期
 ```
 
