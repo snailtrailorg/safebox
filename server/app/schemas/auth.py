@@ -1,4 +1,4 @@
-"""认证相关的请求/响应 Schema。"""
+"""认证相关的请求/响应 Schema（模型 D 串行化）。"""
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -14,18 +14,20 @@ class SendCodeResponse(BaseModel):
     expires_in: int
 
 
-# ── 注册 ──────────────────────────────────────────
+# ── 注册（模型 D：K=PBKDF2(恢复码[+主密码])，encrypted_user_key=AES(K,UserKey)）──
 
 class RegisterEmailRequest(BaseModel):
     model_config = {"populate_by_name": True}
     email: EmailStr
     verification_code: str = Field(..., min_length=6, max_length=6)
-    auth_key_hash: str = Field(..., alias="password_hash")  # PBKDF2(password, salt+"auth") - 客户端已派生
-    password_salt: str
-    password_wrapped: str       # AES-256-GCM(masterKey, passwordDerivedKey)
-    encrypted_private: str      # AES-256-GCM(rsaPrivateKey, masterKey)
-    rsa_public_key: str
+    auth_key_hash: str = Field(..., alias="password_hash")  # PBKDF2(登录密码, login_salt+"auth") - 客户端已派生
+    login_salt: str                                         # 登录密码派生用盐
     kdf_settings: dict | None = None
+    encrypted_user_key: str                                 # AES(K, User Key)，K=PBKDF2(恢复码[+主密码],recovery_salt)
+    recovery_salt: str                                      # K 派生用盐
+    has_master_password: bool = False
+    recovery_code: str                                      # 恢复码明文（服务端接收一次，计算 HMAC hash 存储）
+    recovery_code_salt: str                                 # HMAC 验码用盐（服务端生成或客户端上传）
     device_name: str | None = None
     device_public_key: str = "web"
     device_wrapped: str = "web"
@@ -36,28 +38,32 @@ class RegisterPhoneRequest(BaseModel):
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
     verification_code: str = Field(..., min_length=6, max_length=6)
     auth_key_hash: str = Field(..., alias="password_hash")
-    password_salt: str
-    password_wrapped: str
-    encrypted_private: str
-    rsa_public_key: str
+    login_salt: str
     kdf_settings: dict | None = None
+    encrypted_user_key: str
+    recovery_salt: str
+    has_master_password: bool = False
+    recovery_code: str
+    recovery_code_salt: str
     device_name: str | None = None
-    device_public_key: str
-    device_wrapped: str
+    device_public_key: str = "web"
+    device_wrapped: str = "web"
 
 
 class RegisterGoogleRequest(BaseModel):
     model_config = {"populate_by_name": True}
     google_id_token: str
     auth_key_hash: str = Field(..., alias="password_hash")
-    password_salt: str
-    password_wrapped: str
-    encrypted_private: str
-    rsa_public_key: str
+    login_salt: str
     kdf_settings: dict | None = None
+    encrypted_user_key: str
+    recovery_salt: str
+    has_master_password: bool = False
+    recovery_code: str
+    recovery_code_salt: str
     device_name: str | None = None
-    device_public_key: str
-    device_wrapped: str
+    device_public_key: str = "web"
+    device_wrapped: str = "web"
 
 
 class RegisterResponse(BaseModel):
@@ -88,11 +94,10 @@ class LoginGoogleRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
-    # 密钥材料（客户端用来解密 masterKey）
-    password_salt: str = ""              # PBKDF2 salt，新设备登录时必需
-    password_wrapped: str | None = None
-    encrypted_private: str
-    rsa_public_key: str
+    login_salt: str                                    # 登录密码派生用盐（新设备登录时必需）
+    encrypted_user_key: str                            # AES(K, User Key)，换设备时解出 User Key
+    recovery_salt: str                                 # K 派生用盐
+    has_master_password: bool = False
     devices: list["DeviceInfo"] = []
 
 
@@ -102,28 +107,35 @@ class DeviceInfo(BaseModel):
     device_wrapped: str
 
 
-# ── 密码重置 ───────────────────────────────────────
+# ── 密码校验（/verify，语义1）──────────────────────
+
+class VerifyRequest(BaseModel):
+    auth_key_hash: str
+    password_version: int
+
+
+class VerifyResponse(BaseModel):
+    password_version: int
+    status: str = "ok"  # "ok" | "password_changed"
+
+
+# ── 改登录密码 ──────────────────────────────────────
 
 class ChangePasswordRequest(BaseModel):
-    """已登录改密：当前密码 + 验证码双因子 + 新密码材料。"""
+    """模型 D 改密：只改登录密码认证字段（authKey+login_salt+password_version），不改  K/User Key。"""
     model_config = {"populate_by_name": True}
     target: str = Field(..., pattern="^(phone|email)$")
     value: str
     verification_code: str = Field(..., min_length=6, max_length=6)
     current_auth_key_hash: str = Field(..., alias="current_password_hash")
     new_auth_key_hash: str = Field(..., alias="new_password_hash")
-    new_password_salt: str
-    new_password_wrapped: str
+    new_login_salt: str
 
 
 class ChangePasswordResponse(BaseModel):
     success: bool
     access_token: str | None = None
     refresh_token: str | None = None
-    password_salt: str | None = None
-    password_wrapped: str | None = None
-    encrypted_private: str | None = None
-    rsa_public_key: str | None = None
 
 
 # ── Token 刷新 ─────────────────────────────────────

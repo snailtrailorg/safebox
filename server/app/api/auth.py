@@ -34,6 +34,8 @@ from app.schemas.auth import (
     RegisterResponse,
     SendCodeRequest,
     SendCodeResponse,
+    VerifyRequest,
+    VerifyResponse,
 )
 from app.services.auth_service import (
     DEFAULT_KDF_SETTINGS,
@@ -77,11 +79,7 @@ def _t(request: Request, key: str, **kw: object) -> str:
 
 @router.get("/salt")
 async def get_salt(email: str | None = None, phone: str | None = None, db: AsyncSession = Depends(get_db)):
-    """获取用户密码 salt，用于客户端 PBKDF2 派生密钥。
-
-    防枚举：不存在用户返回由 target 派生的确定性 salt（HMAC(server_secret, target)），
-    与真实用户 salt 同为 base64(32 字节) 且稳定，攻击者无法通过稳定性/格式差异判断用户是否存在。
-    """
+    """返回 login_salt + kdf_settings + recovery_salt（换设备/恢复时客户端派生 K 用）。"""
     user = None
     if email:
         user = await find_user_by_email(db, email)
@@ -90,15 +88,18 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
 
     if user:
         kdf = json.loads(user.kdf_settings) if user.kdf_settings else DEFAULT_KDF_SETTINGS
+        keys = await get_user_keys(db, user.id)
         return {
-            "password_salt": user.password_salt,
+            "login_salt": user.login_salt or "",
             "kdf_settings": kdf,
+            "recovery_salt": keys.recovery_salt if keys else "",
+            "has_master_password": user.has_master_password or False,
         }
-    # 用户不存在：派生确定性 salt（稳定 + 格式与真实一致），防止枚举
     target = email or phone or ""
-    return {"password_salt": _derive_fake_salt(target),
-            "kdf_settings": DEFAULT_KDF_SETTINGS}
-
+    return {"login_salt": _derive_fake_salt(target),
+            "kdf_settings": DEFAULT_KDF_SETTINGS,
+            "recovery_salt": _derive_fake_salt(target),
+            "has_master_password": False}
 
 def _derive_fake_salt(target: str) -> str:
     """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。
@@ -146,12 +147,17 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
     # 清除该邮箱的历史登录失败计数（防止他人攻击导致的锁影响真正注册用户）
     await clear_login_failures("email", req.email)
 
+    # 服务端计算恢复码 HMAC hash 并存储
+    from app.services.recovery_service import hash_recovery_code
+    recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
+
     user = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
-        password=req.auth_key_hash, client_password_salt=req.password_salt,
-        password_wrapped=req.password_wrapped,
-        encrypted_private=req.encrypted_private, rsa_public_key=req.rsa_public_key,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
-        kdf_settings=req.kdf_settings)
+        auth_key_hash=req.auth_key_hash, login_salt=req.login_salt,
+        encrypted_user_key=req.encrypted_user_key, recovery_salt=req.recovery_salt,
+        has_master_password=req.has_master_password,
+        recovery_code_hash=recovery_hash, recovery_code_salt=req.recovery_code_salt,
+        kdf_settings=req.kdf_settings,
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
@@ -165,12 +171,16 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "phone_already_registered"))
 
+    from app.services.recovery_service import hash_recovery_code
+    recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
+
     user = await create_user_with_keys(db=db, email=None, phone=req.phone, google_id=None,
-        password=req.auth_key_hash, client_password_salt=req.password_salt,
-        password_wrapped=req.password_wrapped,
-        encrypted_private=req.encrypted_private, rsa_public_key=req.rsa_public_key,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
-        kdf_settings=req.kdf_settings)
+        auth_key_hash=req.auth_key_hash, login_salt=req.login_salt,
+        encrypted_user_key=req.encrypted_user_key, recovery_salt=req.recovery_salt,
+        has_master_password=req.has_master_password,
+        recovery_code_hash=recovery_hash, recovery_code_salt=req.recovery_code_salt,
+        kdf_settings=req.kdf_settings,
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
@@ -185,12 +195,16 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "google_already_registered"))
 
+    from app.services.recovery_service import hash_recovery_code
+    recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
+
     user = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
-        password=req.auth_key_hash, client_password_salt=req.password_salt,
-        password_wrapped=req.password_wrapped,
-        encrypted_private=req.encrypted_private, rsa_public_key=req.rsa_public_key,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
-        kdf_settings=req.kdf_settings)
+        auth_key_hash=req.auth_key_hash, login_salt=req.login_salt,
+        encrypted_user_key=req.encrypted_user_key, recovery_salt=req.recovery_salt,
+        has_master_password=req.has_master_password,
+        recovery_code_hash=recovery_hash, recovery_code_salt=req.recovery_code_salt,
+        kdf_settings=req.kdf_settings,
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
@@ -199,17 +213,17 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
 # ── 登录 ──────────────────────────────────────────
 
 async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
-    """构建登录响应（公共逻辑）。"""
+    """构建登录响应（公共逻辑）。模型 D：返回 encrypted_user_key + recovery_salt。"""
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     keys = await get_user_keys(db, user.id)
     devices = await get_user_devices(db, user.id)
     return LoginResponse(
         access_token=access_token, refresh_token=refresh_token,
-        password_salt=user.password_salt or "",
-        password_wrapped=keys.password_wrapped if keys else None,
-        encrypted_private=keys.encrypted_private if keys else "",
-        rsa_public_key=keys.rsa_public_key if keys else "",
+        login_salt=user.login_salt or "",
+        encrypted_user_key=keys.encrypted_user_key if keys else "",
+        recovery_salt=keys.recovery_salt if keys else "",
+        has_master_password=user.has_master_password or False,
         devices=[DeviceInfo(id=str(d.id), device_name=d.device_name, device_wrapped=d.device_wrapped) for d in devices],
     )
 
@@ -289,42 +303,56 @@ async def change_password(
     user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):
-    """已登录用户修改密码。需当前密码 + 验证码双因子。"""
+    """模型 D 改密：只改登录密码认证字段（authKey+login_salt+password_version），不改 K/User Key。"""
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
-    # 因子一：校验当前密码（先于消费验证码，防止仅凭被盗 access token 改密，
-    # 也避免当前密码错误时白白烧掉一次性验证码）
     if not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "current_password_wrong"))
 
-    # 因子二：邮箱/短信验证码
     if not await verify_and_consume(req.target, req.value, req.verification_code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
 
     user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
-    user.password_salt = req.new_password_salt
-    keys = await get_user_keys(db, user.id)
-    if keys:
-        keys.password_wrapped = req.new_password_wrapped
+    user.login_salt = req.new_login_salt
+    user.password_version += 1
     await db.commit()
 
     await revoke_all_user_tokens(db, user.id)
     await db.commit()
 
-    # 安全告警：改密成功通知用户
     await send_recovery_alert(user, "password_changed")
 
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
-    return ChangePasswordResponse(
-        success=True, access_token=access_token, refresh_token=refresh_token,
-        password_salt=user.password_salt, password_wrapped=keys.password_wrapped if keys else None,
-        encrypted_private=keys.encrypted_private if keys else "",
-        rsa_public_key=keys.rsa_public_key if keys else "",
-    )
+    return ChangePasswordResponse(success=True, access_token=access_token, refresh_token=refresh_token)
 
+
+
+# ── 密码校验（语义1：每次解锁服务端校验）──────────
+
+@router.post("/verify", response_model=VerifyResponse)
+async def verify_password(
+    req: VerifyRequest,
+    request: Request,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """语义1：每次解锁校验 authKey + password_version。
+    401 密码错误 / 409 密码已在别处修改 / 200 ok。
+    """
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
+
+    if not verify_auth_key(req.auth_key_hash, user.auth_key_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
+
+    if req.password_version != user.password_version:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "password_changed_elsewhere"))
+
+    return VerifyResponse(password_version=user.password_version, status="ok")
 
 # ── Token 刷新 ─────────────────────────────────────
 

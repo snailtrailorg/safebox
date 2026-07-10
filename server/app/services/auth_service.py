@@ -61,36 +61,54 @@ async def create_user_with_keys(
     email: str | None,
     phone: str | None,
     google_id: str | None,
-    password: str,  # 实际上是客户端派生的 auth_key_hash（PBKDF2 输出），不是原始密码
-    client_password_salt: str,
-    password_wrapped: str,
-    encrypted_private: str,
-    rsa_public_key: str,
-    device_name: str | None,
-    device_public_key: str,
-    device_wrapped: str,
-    kdf_settings: dict | None = None,
+    auth_key_hash: str,          # 客户端 PBKDF2 派生的 authKey（base64），服务端再 bcrypt
+    login_salt: str,             # 登录密码派生用盐
+    kdf_settings: dict | None,
+    encrypted_user_key: str,     # AES(K, User Key)，K = PBKDF2(恢复码[+主密码], recovery_salt)
+    recovery_salt: str,          # K 派生用盐
+    has_master_password: bool,
+    recovery_code_hash: str,    # HMAC(server_key, salt+mnemonic)
+    recovery_code_salt: str,    # HMAC 验码用盐
+    device_name: str | None = None,
+    device_public_key: str = "web",
+    device_wrapped: str = "web",
 ) -> User:
-    auth_key_hash = hash_auth_key(password)
+    """模型 D 注册：创建 user + user_keys + recovery_code + device。
+
+    服务端不存任何密码密文（无 password_wrapped）。
+    encrypted_user_key 用 K 包裹 User Key，K 不在服务器。
+    """
+    hashed_auth_key = hash_auth_key(auth_key_hash)
 
     user = User(
         email=email,
         phone=phone,
         google_id=google_id,
-        auth_key_hash=auth_key_hash,
-        password_salt=client_password_salt,
+        auth_key_hash=hashed_auth_key,
+        login_salt=login_salt,
         kdf_settings=json.dumps(kdf_settings or DEFAULT_KDF_SETTINGS),
+        password_version=0,
+        has_master_password=has_master_password,
     )
     db.add(user)
     await db.flush()
 
     keys = UserKeys(
         user_id=user.id,
-        password_wrapped=password_wrapped,
-        encrypted_private=encrypted_private,
-        rsa_public_key=rsa_public_key,
+        encrypted_user_key=encrypted_user_key,
+        recovery_salt=recovery_salt,
     )
     db.add(keys)
+
+    from app.models.recovery_code import RecoveryCode
+    rc = RecoveryCode(
+        user_id=user.id,
+        recovery_code_hash=recovery_code_hash,
+        recovery_code_salt=recovery_code_salt,
+        status="active",
+        failed_attempt_count=0,
+    )
+    db.add(rc)
 
     device = UserDevice(
         user_id=user.id,

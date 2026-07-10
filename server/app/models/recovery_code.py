@@ -13,12 +13,11 @@ from app.database import Base
 class RecoveryCode(Base):
     """用户恢复码。一人一码，服务端 HMAC-SHA256 哈希存储。
 
-    状态机（v2 重设计，登录零写入）：
-      - active：正常，可发起恢复
-      - cooldown：恢复中，账户锁定（新旧密码均不可登录），cooldown_until 到期后可登录
-      - permanently_locked：永久锁定（失败≥5 / 月发起>3 / 主动作废）
-    initiate 时正式字段直接写新密码，旧密码存 rollback_* 供 freeze 回滚。
-    accelerate / freeze / 冷却后首次登录成功 时清 rollback_*。
+    模型 D（串行化）：
+      - 恢复码是 K 的种子（与主密码一起派生 K），永久不重生成，无月配额。
+      - 恢复只改登录密码认证字段（authKey/login_salt），不改 K/User Key/encrypted_user_key。
+      - 冷却期保留（邮箱/手机告警 + accelerate/freeze 二次确认）。
+      - rollback 只存旧登录密码（authKey hash + login_salt），不存密钥包裹（K 不变，无需回滚密钥）。
     """
 
     __tablename__ = "recovery_codes"
@@ -35,16 +34,15 @@ class RecoveryCode(Base):
         String(32), nullable=False, default="active"
     )  # active | cooldown | permanently_locked
 
-    # 冷却到期时间（登录门：now < cooldown_until 则拒绝登录）
+    # 冷却到期时间（登录门 + 数据访问门：now < cooldown_until 则拒绝）
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # 旧密码副本（initiate 时存，freeze 回滚用；accelerate/freeze/冷却后首次登录成功时清）
+    # 旧登录密码副本（initiate confirm 时存，freeze 回滚用；accelerate/freeze/冷却后首次登录成功时清）
+    # 注：不存 rollback_wrapped_user_key（K/User Key 不变，无需回滚密钥包裹）
     rollback_auth_key_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    rollback_password_salt: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    rollback_kdf_settings: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
-    rollback_wrapped_user_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rollback_login_salt: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    monthly_initiation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # failed_attempt_count 保留（≥5 永久锁定防暴力枚举）；monthly_initiation_count 删除（恢复码永久不重生成，无配额）
     failed_attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_attempt_last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -55,5 +53,4 @@ class RecoveryCode(Base):
     pending_initiate_token: Mapped[str | None] = mapped_column(String(128), nullable=True)  # sha256(token)
     pending_initiate_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     pending_new_auth_key_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    pending_new_password_salt: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    pending_new_kdf_settings: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
+    pending_new_login_salt: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,8 +24,10 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
     google_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     auth_key_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
-    password_salt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    login_salt: Mapped[str | None] = mapped_column(Text, nullable=True)  # 登录密码派生用盐
     kdf_settings: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
+    password_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 改登录密码+1，多设备同步用
+    has_master_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否设了主密码
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -49,11 +51,9 @@ class UserKeys(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True
     )
-    password_wrapped: Mapped[str] = mapped_column(Text)
-    recovery_wrapped: Mapped[str | None] = mapped_column(Text, nullable=True)  # 恢复码包裹的 User Key（数据恢复用）
-    recovery_salt: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 恢复码派生密钥的盐
-    encrypted_private: Mapped[str] = mapped_column(Text)
-    rsa_public_key: Mapped[str] = mapped_column(Text)
+    # 模型 D 串行化：K = PBKDF2(恢复码[+主密码], recovery_salt)，K 不存服务器
+    encrypted_user_key: Mapped[str] = mapped_column(Text)  # AES(K, User Key raw)，K 不在服务器
+    recovery_salt: Mapped[str] = mapped_column(Text)  # K 派生用盐（注册时客户端生成）
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

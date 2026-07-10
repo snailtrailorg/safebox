@@ -30,7 +30,6 @@ from app.services.bip39 import generate_bip39_code
 # ── 常量 ────────────────────────────────────────────
 
 MAX_FAILED_ATTEMPTS = 5          # 24h 窗口内连续失败 -> permanently_locked
-MAX_MONTHLY_INITIATIONS = 3      # 月发起次数 > 3 -> permanently_locked
 FAILED_ATTEMPT_WINDOW_HOURS = 24  # 失败计数窗口
 COOLDOWN_HOURS = 24
 ACCELERATE_LINK_TTL_MINUTES = COOLDOWN_HOURS * 60  # 与冷却期一致
@@ -105,7 +104,6 @@ async def create_recovery_code(
         recovery_code_hash=code_hash,
         recovery_code_salt=salt,
         status="active",
-        monthly_initiation_count=0,
         failed_attempt_count=0,
     )
     db.add(rc)
@@ -171,11 +169,10 @@ async def _get_user_keys(db: AsyncSession, user_id: UUID) -> UserKeys | None:
 
 
 def _clear_rollback(rc: RecoveryCode) -> None:
-    """清空旧密码副本（accelerate/freeze/登录成功后调用）。"""
+    """清空旧登录密码副本（accelerate/freeze/登录成功后调用）。
+    模型 D：K/User Key 不变，只回滚登录密码认证字段。"""
     rc.rollback_auth_key_hash = None
-    rc.rollback_password_salt = None
-    rc.rollback_kdf_settings = None
-    rc.rollback_wrapped_user_key = None
+    rc.rollback_login_salt = None
 
 
 # ── 发起恢复 ────────────────────────────────────────
@@ -185,8 +182,7 @@ def _clear_pending_initiate(rc: RecoveryCode) -> None:
     rc.pending_initiate_token = None
     rc.pending_initiate_at = None
     rc.pending_new_auth_key_hash = None
-    rc.pending_new_password_salt = None
-    rc.pending_new_kdf_settings = None
+    rc.pending_new_login_salt = None
 
 
 INITIATE_TOKEN_TTL_MINUTES = 15  # 两步 initiate：步骤1 到步骤2 的最大间隔
@@ -199,29 +195,25 @@ async def initiate_recovery_step1(
     rc: RecoveryCode,
     user: User,
     new_auth_key_hash: str,
-    new_password_salt: str,
-    new_kdf_settings: dict,
+    new_login_salt: str,
 ) -> tuple[str, str, str]:
     """验证恢复码通过后，建"待确认"态（不改正式字段、不进冷却）。
 
-    返回 (initiate_token, recovery_wrapped, recovery_salt)。
-    恢复码验证（HMAC + 失败计数）由调用方在 find_valid_recovery_code 中完成。
+    Returns (initiate_token, encrypted_user_key, recovery_salt).
+    客户端用 recovery_salt + 恢复码[+主密码]派生 K，解 encrypted_user_key 拿 User Key，
+    用新登录密码重包 K（cached_K）后调 confirm。
     """
-    # 生成随机 token（plaintext 返回客户端，sha256 存 DB 防泄露重放）
     token = secrets.token_hex(32)
     rc.pending_initiate_token = hashlib.sha256(token.encode()).hexdigest()
     rc.pending_initiate_at = datetime.now(timezone.utc)
-    # 暂存新密码（步骤2 confirm 用）
     rc.pending_new_auth_key_hash = new_auth_key_hash
-    rc.pending_new_password_salt = new_password_salt
-    rc.pending_new_kdf_settings = json.dumps(new_kdf_settings)
+    rc.pending_new_login_salt = new_login_salt
     await db.flush()
 
-    # 返回 recovery_wrapped（客户端用它 + 恢复码派生密钥解旧 User Key，本地重包）
     keys = await _get_user_keys(db, user.id)
-    recovery_wrapped = keys.recovery_wrapped if keys else None
-    recovery_salt_out = keys.recovery_salt if keys else None
-    return (token, recovery_wrapped or "", recovery_salt_out or "")
+    eu_key = keys.encrypted_user_key if keys else ""
+    rec_salt = keys.recovery_salt if keys else ""
+    return (token, eu_key, rec_salt)
 
 
 # ── 两步 initiate：步骤 2（确认 + 真正发起）────────────
@@ -231,10 +223,11 @@ async def confirm_recovery(
     rc: RecoveryCode,
     user: User,
     token: str,
-    new_wrapped_user_key: str,
-):
-    """验 token + 真正发起恢复：写正式 + 存 rollback + 进冷却 + 清待确认态。
+) -> bool:
+    """验 token + 真正发起恢复：写正式登录密码 + 存 rollback + 进冷却 + 清待确认态。
 
+    模型 D：只改登录密码认证字段（authKey+login_salt+password_version），
+    不改 K/User Key/encrypted_user_key（K 不变，数据不动）。
     token 错误/过期 -> false；成功 -> true + cooldown_until 被写入 rc。
     """
     now = datetime.now(timezone.utc)
@@ -246,7 +239,6 @@ async def confirm_recovery(
     # 2. 时效检查（15min）
     if rc.pending_initiate_at is None:
         return False
-    # 归一到 aware UTC（SQLite 兼容）
     pending_at = rc.pending_initiate_at
     if pending_at.tzinfo is None:
         pending_at = pending_at.replace(tzinfo=timezone.utc)
@@ -255,33 +247,23 @@ async def confirm_recovery(
         await db.flush()
         return False
 
-    # 3. 存旧值到 rollback_*（供 freeze 回滚）
-    keys = await _get_user_keys(db, user.id)
+    # 3. 存旧登录密码到 rollback_*（供 freeze 回滚）
     rc.rollback_auth_key_hash = user.auth_key_hash
-    rc.rollback_password_salt = user.password_salt
-    rc.rollback_kdf_settings = user.kdf_settings
-    rc.rollback_wrapped_user_key = keys.password_wrapped if keys else None
+    rc.rollback_login_salt = user.login_salt
 
-    # 4. 写正式字段 = 新密码（用步骤1暂存）
+    # 4. 写正式 = 新登录密码（用步骤1暂存）
     user.auth_key_hash = rc.pending_new_auth_key_hash
-    user.password_salt = rc.pending_new_password_salt
-    if rc.pending_new_kdf_settings:
-        user.kdf_settings = rc.pending_new_kdf_settings
-    if keys:
-        keys.password_wrapped = new_wrapped_user_key
+    user.login_salt = rc.pending_new_login_salt
+    user.password_version += 1
 
-    # 5. 进冷却 + 计次
+    # 5. 进冷却
     rc.status = "cooldown"
     rc.cooldown_until = now + timedelta(hours=COOLDOWN_HOURS)
-    rc.monthly_initiation_count += 1
-    if rc.monthly_initiation_count > MAX_MONTHLY_INITIATIONS:
-        rc.status = "permanently_locked"
 
     # 6. 清待确认态
     _clear_pending_initiate(rc)
     await db.flush()
     return True
-
 
 # ── 加速：立即解除冷却（用户确认用新密码）──────────
 
@@ -299,17 +281,12 @@ async def accelerate_recovery(db: AsyncSession, rc: RecoveryCode, user: User) ->
 # ── 冻结：回滚到旧密码 ─────────────────────────────
 
 async def freeze_recovery(db: AsyncSession, rc: RecoveryCode, user: User) -> None:
-    """冻结：正式字段回滚 = rollback_*，status -> active，清 rollback。"""
+    """冻结：回滚登录密码认证字段 = rollback_*（K/User Key 不变），status -> active。"""
     if rc.rollback_auth_key_hash:
         user.auth_key_hash = rc.rollback_auth_key_hash
-    if rc.rollback_password_salt:
-        user.password_salt = rc.rollback_password_salt
-    if rc.rollback_kdf_settings:
-        user.kdf_settings = rc.rollback_kdf_settings
-    keys = await _get_user_keys(db, user.id)
-    if keys and rc.rollback_wrapped_user_key:
-        keys.password_wrapped = rc.rollback_wrapped_user_key
-
+    if rc.rollback_login_salt:
+        user.login_salt = rc.rollback_login_salt
+    user.password_version += 1
     rc.status = "active"
     rc.cooldown_until = None
     _clear_rollback(rc)
