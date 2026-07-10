@@ -184,7 +184,7 @@ class KeyChain {
     if (!this.userKey) return null;
     const bytes = await aesDecrypt(this.userKey, encoded);
     if (!bytes) return null;
-    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   }
 
   lock(): void { this.userKey = null; }
