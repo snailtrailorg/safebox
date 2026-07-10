@@ -49,7 +49,7 @@ export function RecoveryPage() {
         value: email,
         recovery_code: recoveryCode,
         new_auth_key_hash: newAuthKeyHash,
-        new_password_salt: saltBase64,
+        new_login_salt: saltBase64,
       });
 
       // 3. 用恢复码派生密钥解 recovery_wrapped 拿【旧 User Key】（零知识：服务端拿不到）

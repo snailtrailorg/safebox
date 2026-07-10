@@ -48,7 +48,7 @@ export async function deriveKey(
   password: string, salt: Uint8Array, settings: KdfSettings = DEFAULT_KDF,
 ): Promise<CryptoKey> {
   const bits = await deriveBits(password, salt, settings, 256);
-  return crypto.subtle.importKey("raw", bits.buffer.slice(bits.byteOffset, bits.byteOffset + bits.byteLength) as ArrayBuffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", bits.buffer.slice(bits.byteOffset, bits.byteOffset + bits.byteLength) as ArrayBuffer, "AES-GCM", true, ["encrypt", "decrypt"]);
 }
 
 /** deriveAuthKey — 派生登录认证 key hash（与 Android CryptoManager.kt 兼容）

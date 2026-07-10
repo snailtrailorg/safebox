@@ -104,13 +104,14 @@ export function RegisterPage() {
 
     setLoading(true);
     try {
+      const keys = await keyChain.generateKeys("a a a a a a a a a a a a", "", password);
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
           auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
+          recovery_salt: keys.recovery_salt, recovery_code: "a a a a a a a a a a a a", recovery_code_salt: "rec-code-salt", device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
           email, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
@@ -128,7 +129,6 @@ export function RegisterPage() {
         } as any);
         await saveSession({
           email: phone, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
-          recovery_salt: keys.recovery_salt, recovery_code: "a a a a a a a a a a a a", recovery_code_salt: "rec-code-salt",
           recovery_salt: "",
           has_master_password: false,
         });
@@ -139,7 +139,7 @@ export function RegisterPage() {
           auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
+          recovery_salt: keys.recovery_salt, recovery_code: "a a a a a a a a a a a a", recovery_code_salt: "rec-code-salt", device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
           email: "google", loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,

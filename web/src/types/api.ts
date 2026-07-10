@@ -28,8 +28,19 @@ export interface RegisterEmailRequest {
 export interface RegisterPhoneRequest extends RegisterEmailRequest {
   phone: string;
 }
-export interface RegisterGoogleRequest extends RegisterEmailRequest {
+export interface RegisterGoogleRequest {
   google_id_token: string;
+  auth_key_hash: string;
+  login_salt: string;
+  encrypted_user_key: string;
+  recovery_salt: string;
+  kdf_settings?: Record<string, unknown>;
+  has_master_password?: boolean;
+  recovery_code: string;
+  recovery_code_salt: string;
+  device_name?: string;
+  device_public_key?: string;
+  device_wrapped?: string;
 }
 export interface RegisterResponse {
   user_id: string;

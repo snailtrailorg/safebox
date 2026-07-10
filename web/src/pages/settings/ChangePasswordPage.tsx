@@ -74,8 +74,7 @@ export function ChangePasswordPage() {
         verification_code: verifyCode,
         current_auth_key_hash: currentAuthKeyHash,
         new_auth_key_hash: newAuthKeyHash,
-        new_password_salt: saltBase64,
-        new_password_wrapped: newPasswordWrapped,
+        new_login_salt: saltBase64,
       });
 
       await saveSession({

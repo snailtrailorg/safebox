@@ -47,7 +47,9 @@ class KeyChain {
 
     // loginDerivedKey = PBKDF2(登录密码, loginSalt) - 本地缓存 K
     const loginDerivedKey = await deriveKey(loginPassword, loginSalt);
-    const cached_K = await aesEncrypt(loginDerivedKey, userKeyRaw);  // K 不存服务器，只存本地
+    // cached_K = AES(loginDerivedKey, K)，K 是派生的主密钥，不在服务器
+    const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
+    const cached_K = await aesEncrypt(loginDerivedKey, kRaw);
 
     // authKey - 服务端认证
     const authKeyHash = await deriveAuthKey(loginPassword, loginSalt);
@@ -182,7 +184,7 @@ class KeyChain {
     if (!this.userKey) return null;
     const bytes = await aesDecrypt(this.userKey, encoded);
     if (!bytes) return null;
-    return null;
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   }
 
   lock(): void { this.userKey = null; }
