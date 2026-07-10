@@ -108,7 +108,7 @@
                                 {signed_token}
                                 -> 回滚 rollback_*
                                 → 状态回退 active
-                                → 旧密码不变（从未被覆盖）
+                                → 旧密码恢复（回滚 rollback_*）
 
                              ⑨ 分支 C（冷却到期+首次登录）
                                 cooldown_until 到期

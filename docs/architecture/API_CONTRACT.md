@@ -75,16 +75,13 @@ Authorization: Bearer <access_token>
 {"signed_token": "一次性签名URL token",
  "verification_code": "123456"}
 
-// 200
-{"success": true, "activated": true}
+// 204 No Content（无响应体）
 // 400 — token 无效/过期 / 验证码错误
 ```
 
-- 验证签名 token（15 分钟有效，一次性）
+- 验证签名 token（TTL 与冷却期一致 24h；一次性由状态机保证：操作后 status=active，重放返回 409）
 - 验证码（5 次/小时，10 次/天）
 - 通过后：清 rollback_*，status=active（新密码已生效）
-- `status → active`，保险库解冻
-- 前端引导用户生成新恢复码
 
 ### `POST /auth/recovery/freeze`
 
@@ -101,7 +98,7 @@ Authorization: Bearer <access_token>
 - 正式字段回滚 = rollback_*，清 rollback_*
 - `status → active`
 - `monthly_initiation_count` 保持不变（已 +1 不减少）
-- 旧密码不变（从未被覆盖）
+- 旧密码恢复（正式字段回滚 = rollback_*）
 
 ### `POST /auth/recovery/revoke`
 

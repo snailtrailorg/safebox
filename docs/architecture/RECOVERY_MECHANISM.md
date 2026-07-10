@@ -35,7 +35,7 @@
 | `pending_initiate_token` / `pending_initiate_at` | | 两步 initiate 待确认态（step1 存，step2 用后清，15min 过期）|
 | `pending_new_*` | | step1 暂存新密码材料（step2 写正式后清）|
 | user_keys.`recovery_wrapped` / `recovery_salt` | | 恢复码派生密钥包裹的 User Key（generate 时存，数据恢复用）|
-| `monthly_initiation_count` | INTEGER | 成功发起恢复次数（+1/次，>3 永久锁定；月度重置待实现） |
+| `monthly_initiation_count` | INTEGER | 成功发起恢复次数（+1/次，>3 永久锁定；生成新码时重置为 0，一人一码） |
 | `failed_attempt_count` | INTEGER | 24 小时滑动窗口内的连续失败次数（成功后清零） |
 | `failed_attempt_last_at` | TIMESTAMPTZ | 最后一次失败的时间（用于 24h 窗口判断） |
 | `created_at` | TIMESTAMPTZ | 恢复码生成时间 |
@@ -137,7 +137,7 @@ step2 POST /confirm（initiate_token + new_wrapped_user_key）:
   -> 用户使用旧 Master Password 登录
 ```
 
-冻结后：恢复码保持 `active` 可再次使用（受月发起次数限制）；`monthly_initiation_count` 已 +1，不因冻结减少。
+冻结后：恢复码保持 `active` 可再次使用（受发起次数限制）；`monthly_initiation_count` 已 +1，不因冻结减少。
 
 #### 分支 C：冷却期自然结束 + 首次登录
 
@@ -173,7 +173,7 @@ cooldown_until 到期
          └── POST /auth/recovery/freeze（签名 token，无需验证码）
               -> 回滚正式=rollback_* + 清 rollback -> active（旧密码恢复）
 
-  active -> permanently_locked（月发起 >3 次，或连续失败 ≥5 次，或主动作废）
+  active -> permanently_locked（发起 >3 次，或连续失败 ≥5 次，或主动作废）
 ```
 
 ---
@@ -201,7 +201,7 @@ cooldown_until 到期
 | TC-03 | freeze | 正式字段回滚旧密码，旧密码可登录，新密码失效 |
 | TC-04 | freeze 后用旧密码登录 | 登录成功 |
 | TC-05 | 恢复码连续输入错误 5 次 | permanently_locked |
-| TC-06 | 月发起恢复 >3 次 | permanently_locked |
+| TC-06 | 发起恢复 >3 次 | permanently_locked |
 | TC-07 | 冷却期内登录（新或旧密码） | 403 账户冷却中 |
 | TC-08 | 冷却期内攻击者使用同一恢复码再次发起 | 409 流程已在处理中 |
 

@@ -50,7 +50,7 @@ from app.services.auth_service import (
     verify_and_rotate_refresh_token,
     verify_auth_key,
 )
-from app.services.email_service import send_verification_email
+from app.services.email_service import send_recovery_alert, send_verification_email
 from app.services.google_auth_service import verify_google_id_token
 from app.services.recovery_service import clear_rollback_after_login, is_in_cooldown
 from app.services.sms_service import send_sms
@@ -312,6 +312,9 @@ async def change_password(
 
     await revoke_all_user_tokens(db, user.id)
     await db.commit()
+
+    # 安全告警：改密成功通知用户
+    await send_recovery_alert(user, "password_changed")
 
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)

@@ -65,9 +65,9 @@
 | 撤销 | 已登录用户主动作废旧码 | `POST /auth/recovery/revoke` |
 | 状态查询 | 返回状态 + cooldown 剩余时间 + 双计数器 | `GET /auth/recovery/status` |
 | 失败计数（24h 窗口） | HTTPS 验证失败递增，≥5 次永久锁定，成功后清零 | `find_valid_recovery_code` |
-| 月发起计数 | 成功进入冷却期递增，>3 次永久锁定，冻结不减少 | `initiate_recovery` |
+| 发起计数 | confirm 成功后递增，>3 次永久锁定，冻结不减少；生成新码时重置 | `initiate_recovery` |
 | 加速链接 TTL | 与冷却期一致（`COOLDOWN_HOURS * 60`），防止不一致 | `sign_recovery_token` |
-| 签名链接 | JWT HS256，15 分钟或与冷却期一致 | `sign_recovery_token` / `verify_recovery_token` |
+| 签名链接 | JWT HS256，TTL 与冷却期一致（24h）；一次性由状态机保证（操作后 status 变，重放 409） | `sign_recovery_token` / `verify_recovery_token` |
 | 多渠道告警 | initiate/accelerate/freeze 3 场景告警邮件 | `send_recovery_alert` |
 | 客服解锁 | 管理员端点，核身后发送重置链接 | `POST /admin/recovery/unlock` |
 
@@ -266,7 +266,7 @@
 
 **应用场景**：
 - 用户恢复码连续输错 5 次 -> permanently_locked，自助无法恢复
-- 用户月发起恢复超 3 次 -> permanently_locked
+- 用户发起恢复超 3 次 -> permanently_locked
 - 用户丢失恢复码 + 邮箱/手机不可用 -> 最后逃生通道
 - 客服通过身份核验（如身份证、注册信息）后调用此端点解锁
 - 系统发送 24h 有效重置链接到用户邮箱，用户生成新恢复码

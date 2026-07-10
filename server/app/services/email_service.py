@@ -67,7 +67,7 @@ async def send_recovery_alert(
 ) -> bool:
     """发送恢复码相关告警邮件。
 
-    event: "initiate" | "accelerate" | "freeze"
+    event: "initiate" | "accelerate" | "freeze" | "password_changed"
     """
     email = user.email
     if not email:
@@ -118,6 +118,19 @@ async def send_recovery_alert(
             <h2>🛑 密码重置已冻结</h2>
             <p>您的 SafeBox 恢复操作已被冻结。旧密码保持不变，可正常登录。</p>
             <p style="color: #666; font-size: 14px;">如果不是您本人操作，建议登录后修改密码。</p>
+        </body>
+        </html>
+        """
+    elif event == "password_changed":
+        subject = "SafeBox 安全告警：密码已修改"
+        body = """
+        <html>
+        <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>🔐 安全告警</h2>
+            <p>您的 SafeBox 主密码已被修改。</p>
+            <p style="color: #666; font-size: 14px;">
+                如果不是您本人操作，请立即通过恢复码恢复账户。
+            </p>
         </body>
         </html>
         """

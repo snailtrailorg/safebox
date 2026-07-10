@@ -307,6 +307,31 @@ async def test_change_password(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_change_password_sends_security_alert(client: AsyncClient):
+    """改密成功后发送安全告警邮件（M11）。"""
+    from unittest.mock import patch, AsyncMock
+
+    resp = await client.post("/api/v1/auth/register/email", json={
+        **REGISTER_PAYLOAD, "email": "cpalert@safebox.example.com",
+    })
+    token = resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch("app.api.auth.send_recovery_alert", new_callable=AsyncMock) as mock_alert:
+        resp = await client.post("/api/v1/auth/change-password", json={
+            "target": "email", "value": "cpalert@safebox.example.com",
+            "verification_code": "123456",
+            "current_auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
+            "new_auth_key_hash": "new_hash", "new_password_salt": "new_salt",
+            "new_password_wrapped": "new_wrapped",
+        }, headers=headers)
+        assert resp.status_code == 200
+        # 告警已发送，event=password_changed
+        mock_alert.assert_awaited_once()
+        assert mock_alert.call_args[0][1] == "password_changed"
+
+
+@pytest.mark.asyncio
 async def test_change_password_wrong_current(client: AsyncClient):
     """当前密码错误时改密被拒（401），且不改动 auth_key_hash。"""
     resp = await client.post("/api/v1/auth/register/email", json={
