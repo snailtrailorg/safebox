@@ -223,7 +223,7 @@ curl -s -X POST $BASE/api/v1/auth/recovery/initiate \
     "new_wrapped_user_key":"new_wrapped"
   }'
 ```
-**预期**：200，返回 `cooldown_expires_at`（24h 后）
+**预期**：200，返回 `cooldown_until`（24h 后）
 
 > 注意：`freeze_token` 不在响应中返回，只通过告警邮件发送。dev 模式邮件未配置时无法测试 TC-22。
 

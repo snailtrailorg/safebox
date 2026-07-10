@@ -80,21 +80,18 @@ export interface LoginResponse {
   devices: DeviceInfo[];
 }
 
-export interface ResetPasswordRequest {
+/** 已登录改密：当前密码 + 验证码双因子 + 新密码材料。 */
+export interface ChangePasswordRequest {
   target: "phone" | "email";
   value: string;
   verification_code: string;
+  current_auth_key_hash: string;
   new_auth_key_hash: string;
   new_password_salt: string;
   new_password_wrapped: string;
 }
 
-/** 已登录改密：在重置字段之外额外携带当前密码派生的 auth key，供服务端二次校验。 */
-export interface ChangePasswordRequest extends ResetPasswordRequest {
-  current_auth_key_hash: string;
-}
-
-export interface ResetPasswordResponse {
+export interface ChangePasswordResponse {
   success: boolean;
   access_token?: string;
   refresh_token?: string;
@@ -130,6 +127,8 @@ export interface GenerateRecoveryRequest {
   value: string;
   verification_code: string;
   current_auth_key_hash: string;
+  recovery_wrapped: string;   // 恢复码派生密钥包裹的 User Key（客户端用恢复码明文派生）
+  recovery_salt: string;
 }
 
 export interface GenerateRecoveryResponse {
@@ -143,11 +142,21 @@ export interface InitiateRecoveryRequest {
   new_auth_key_hash: string;
   new_password_salt: string;
   new_kdf_settings: Record<string, unknown>;
-  new_wrapped_user_key: string;
 }
 
 export interface InitiateRecoveryResponse {
-  cooldown_expires_at: string;
+  recovery_wrapped: string;   // 客户端用恢复码派生密钥解出旧 User Key，本地重包后调 confirm
+  recovery_salt: string;
+  initiate_token: string;     // 步骤2 confirm 用（15min）
+}
+
+export interface ConfirmRecoveryRequest {
+  initiate_token: string;
+  new_wrapped_user_key: string;  // 旧 User Key 用新密码重包（User Key 不换，数据不动）
+}
+
+export interface ConfirmRecoveryResponse {
+  cooldown_until: string;
 }
 
 export interface AccelerateRecoveryRequest {
@@ -160,9 +169,10 @@ export interface FreezeRecoveryRequest {
 }
 
 export interface RecoveryStatusResponse {
-  status: string;
-  cooldown_expires_at: string | null;
-  recovery_attempt_count: number;
+  status: string;  // none | active | cooldown | permanently_locked
+  cooldown_until: string | null;
+  monthly_initiation_count?: number;
+  failed_attempt_count?: number;
 }
 
 export interface RevokeRecoveryRequest {

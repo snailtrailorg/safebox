@@ -63,6 +63,8 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('password_wrapped', sa.Text(), nullable=False),
+    sa.Column('recovery_wrapped', sa.Text(), nullable=True),
+    sa.Column('recovery_salt', sa.String(length=128), nullable=True),
     sa.Column('encrypted_private', sa.Text(), nullable=False),
     sa.Column('rsa_public_key', sa.Text(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

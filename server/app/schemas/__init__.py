@@ -1,4 +1,6 @@
 from app.schemas.auth import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
     DeviceInfo,
     LoginEmailRequest,
     LoginGoogleRequest,
@@ -12,8 +14,6 @@ from app.schemas.auth import (
     RegisterGoogleRequest,
     RegisterPhoneRequest,
     RegisterResponse,
-    ResetPasswordRequest,
-    ResetPasswordResponse,
     SendCodeRequest,
     SendCodeResponse,
 )
@@ -33,7 +33,7 @@ __all__ = [
     "RegisterResponse",
     "LoginEmailRequest", "LoginPhoneRequest", "LoginGoogleRequest",
     "LoginResponse", "DeviceInfo",
-    "ResetPasswordRequest", "ResetPasswordResponse",
+    "ChangePasswordRequest", "ChangePasswordResponse",
     "RefreshTokenRequest", "RefreshTokenResponse",
     "RegisterDeviceRequest", "RegisterDeviceResponse",
     "SyncItemRequest", "SyncItemResponse",

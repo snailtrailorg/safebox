@@ -1,4 +1,13 @@
-"""恢复码业务逻辑：生成、验证、发起恢复、加速、冻结。"""
+"""恢复码业务逻辑：生成、验证、发起恢复、加速、冻结。
+
+状态机（v2 重设计，登录零写入）：
+  initiate  -> 正式字段写新密码 + rollback_* 存旧值 + status=cooldown
+  accelerate-> status=active + 清 rollback（用户确认新密码，回滚窗口关闭）
+  freeze    -> 正式字段回滚 = rollback_* + status=active + 清 rollback
+  冷却到期  -> 无动作（时间到了）
+  登录      -> 纯读：now < cooldown_until 则拒绝；否则正常验证
+               首次新密码登录成功 -> 清 rollback（押后，清不掉无害）
+"""
 
 import base64
 import hashlib
@@ -20,8 +29,8 @@ from app.services.bip39 import generate_bip39_code
 
 # ── 常量 ────────────────────────────────────────────
 
-MAX_FAILED_ATTEMPTS = 5          # 24h 窗口内连续失败 → permanently_locked
-MAX_MONTHLY_INITIATIONS = 3      # 月发起次数 > 3 → permanently_locked
+MAX_FAILED_ATTEMPTS = 5          # 24h 窗口内连续失败 -> permanently_locked
+MAX_MONTHLY_INITIATIONS = 3      # 月发起次数 > 3 -> permanently_locked
 FAILED_ATTEMPT_WINDOW_HOURS = 24  # 失败计数窗口
 COOLDOWN_HOURS = 24
 ACCELERATE_LINK_TTL_MINUTES = COOLDOWN_HOURS * 60  # 与冷却期一致
@@ -48,7 +57,7 @@ def normalize_mnemonic(mnemonic: str) -> str:
 # ── 哈希与验证 ──────────────────────────────────────
 
 def hash_recovery_code(plaintext: str, salt: str) -> str:
-    """HMAC-SHA256(server_key, salt + normalized_mnemonic) → hex digest。"""
+    """HMAC-SHA256(server_key, salt + normalized_mnemonic) -> hex digest。"""
     key = _get_hmac_key()
     normalized = normalize_mnemonic(plaintext)
     message = salt.encode() + normalized.encode("utf-8")
@@ -77,12 +86,11 @@ def generate_recovery_code_salt() -> str:
 async def create_recovery_code(
     db: AsyncSession, user_id: UUID,
 ) -> tuple[str, RecoveryCode]:
-    """为用户生成新恢复码。如有旧码则标记为 permanently_locked。"""
-    # 锁定旧码
+    """为用户生成新恢复码。如有旧码（active/cooldown）则标记为 permanently_locked。"""
     result = await db.execute(
         select(RecoveryCode).where(
             RecoveryCode.user_id == user_id,
-            RecoveryCode.status.in_(["active", "pending_activation"]),
+            RecoveryCode.status.in_(["active", "cooldown"]),
         )
     )
     for old in result.scalars().all():
@@ -110,7 +118,7 @@ async def create_recovery_code(
 async def find_valid_recovery_code(
     db: AsyncSession, user_id: UUID, plaintext: str,
 ) -> RecoveryCode | None:
-    """查找用户的有效恢复码并验证。
+    """查找用户的 active 恢复码并验证。
 
     失败时：24h 滑动窗口内递增失败计数，≥5 次永久锁定。
     成功时：清零失败计数。
@@ -128,7 +136,7 @@ async def find_valid_recovery_code(
     if not verify_recovery_code(plaintext, rc.recovery_code_salt, rc.recovery_code_hash):
         now = datetime.now(timezone.utc)
         # 24h 窗口：超过窗口期重置计数。
-        # last_at 归一到 aware UTC——PostgreSQL 返回 aware，SQLite 返回 naive，
+        # last_at 归一到 aware UTC--PostgreSQL 返回 aware，SQLite 返回 naive，
         # 不归一会在 aware - naive 相减时抛 TypeError。
         last_at = rc.failed_attempt_last_at
         if last_at is not None and last_at.tzinfo is None:
@@ -155,78 +163,200 @@ async def find_valid_recovery_code(
     return rc
 
 
+# ── 内部：UserKeys 查询 ────────────────────────────
+
+async def _get_user_keys(db: AsyncSession, user_id: UUID) -> UserKeys | None:
+    result = await db.execute(select(UserKeys).where(UserKeys.user_id == user_id))
+    return result.scalar_one_or_none()
+
+
+def _clear_rollback(rc: RecoveryCode) -> None:
+    """清空旧密码副本（accelerate/freeze/登录成功后调用）。"""
+    rc.rollback_auth_key_hash = None
+    rc.rollback_password_salt = None
+    rc.rollback_kdf_settings = None
+    rc.rollback_wrapped_user_key = None
+
+
 # ── 发起恢复 ────────────────────────────────────────
 
-async def initiate_recovery(
+def _clear_pending_initiate(rc: RecoveryCode) -> None:
+    """清空两步 initiate 的待确认态（confirm 成功后或过期后调用）。"""
+    rc.pending_initiate_token = None
+    rc.pending_initiate_at = None
+    rc.pending_new_auth_key_hash = None
+    rc.pending_new_password_salt = None
+    rc.pending_new_kdf_settings = None
+
+
+INITIATE_TOKEN_TTL_MINUTES = 15  # 两步 initiate：步骤1 到步骤2 的最大间隔
+
+
+# ── 两步 initiate：步骤 1（验证恢复码 + 建待确认态）────
+
+async def initiate_recovery_step1(
     db: AsyncSession,
     rc: RecoveryCode,
+    user: User,
     new_auth_key_hash: str,
     new_password_salt: str,
     new_kdf_settings: dict,
+) -> tuple[str, str, str]:
+    """验证恢复码通过后，建"待确认"态（不改正式字段、不进冷却）。
+
+    返回 (initiate_token, recovery_wrapped, recovery_salt)。
+    恢复码验证（HMAC + 失败计数）由调用方在 find_valid_recovery_code 中完成。
+    """
+    # 生成随机 token（plaintext 返回客户端，sha256 存 DB 防泄露重放）
+    token = secrets.token_hex(32)
+    rc.pending_initiate_token = hashlib.sha256(token.encode()).hexdigest()
+    rc.pending_initiate_at = datetime.now(timezone.utc)
+    # 暂存新密码（步骤2 confirm 用）
+    rc.pending_new_auth_key_hash = new_auth_key_hash
+    rc.pending_new_password_salt = new_password_salt
+    rc.pending_new_kdf_settings = json.dumps(new_kdf_settings)
+    await db.flush()
+
+    # 返回 recovery_wrapped（客户端用它 + 恢复码派生密钥解旧 User Key，本地重包）
+    keys = await _get_user_keys(db, user.id)
+    recovery_wrapped = keys.recovery_wrapped if keys else None
+    recovery_salt_out = keys.recovery_salt if keys else None
+    return (token, recovery_wrapped or "", recovery_salt_out or "")
+
+
+# ── 两步 initiate：步骤 2（确认 + 真正发起）────────────
+
+async def confirm_recovery(
+    db: AsyncSession,
+    rc: RecoveryCode,
+    user: User,
+    token: str,
     new_wrapped_user_key: str,
-) -> RecoveryCode:
-    """进入冷却期：写入 pending_* 字段，status → pending_activation。"""
+):
+    """验 token + 真正发起恢复：写正式 + 存 rollback + 进冷却 + 清待确认态。
+
+    token 错误/过期 -> false；成功 -> true + cooldown_until 被写入 rc。
+    """
     now = datetime.now(timezone.utc)
 
-    rc.status = "pending_activation"
-    rc.pending_new_auth_key_hash = new_auth_key_hash
-    rc.pending_password_salt = new_password_salt
-    rc.pending_kdf_settings = json.dumps(new_kdf_settings)
-    rc.pending_wrapped_user_key = new_wrapped_user_key
-    rc.pending_setup_at = now
-    rc.cooldown_expires_at = now + timedelta(hours=COOLDOWN_HOURS)
-    rc.monthly_initiation_count += 1
+    # 1. 验 token（常量时间防侧信道）
+    expected = hashlib.sha256(token.encode()).hexdigest()
+    if not hmac.compare_digest(rc.pending_initiate_token or "", expected):
+        return False
+    # 2. 时效检查（15min）
+    if rc.pending_initiate_at is None:
+        return False
+    # 归一到 aware UTC（SQLite 兼容）
+    pending_at = rc.pending_initiate_at
+    if pending_at.tzinfo is None:
+        pending_at = pending_at.replace(tzinfo=timezone.utc)
+    if (now - pending_at).total_seconds() > INITIATE_TOKEN_TTL_MINUTES * 60:
+        _clear_pending_initiate(rc)
+        await db.flush()
+        return False
 
-    # 月发起次数 > 3 → 永久锁定
+    # 3. 存旧值到 rollback_*（供 freeze 回滚）
+    keys = await _get_user_keys(db, user.id)
+    rc.rollback_auth_key_hash = user.auth_key_hash
+    rc.rollback_password_salt = user.password_salt
+    rc.rollback_kdf_settings = user.kdf_settings
+    rc.rollback_wrapped_user_key = keys.password_wrapped if keys else None
+
+    # 4. 写正式字段 = 新密码（用步骤1暂存）
+    user.auth_key_hash = rc.pending_new_auth_key_hash
+    user.password_salt = rc.pending_new_password_salt
+    if rc.pending_new_kdf_settings:
+        user.kdf_settings = rc.pending_new_kdf_settings
+    if keys:
+        keys.password_wrapped = new_wrapped_user_key
+
+    # 5. 进冷却 + 计次
+    rc.status = "cooldown"
+    rc.cooldown_until = now + timedelta(hours=COOLDOWN_HOURS)
+    rc.monthly_initiation_count += 1
     if rc.monthly_initiation_count > MAX_MONTHLY_INITIATIONS:
         rc.status = "permanently_locked"
 
+    # 6. 清待确认态
+    _clear_pending_initiate(rc)
     await db.flush()
-    return rc
+    return True
 
 
-# ── 激活（加速通道或冷却自然结束）──────────────────
+# ── 加速：立即解除冷却（用户确认用新密码）──────────
 
-async def activate_recovery(
-    db: AsyncSession, rc: RecoveryCode, user: User,
-) -> None:
-    """将 pending_* 写入 users/user_keys，status → consumed。"""
-    user.auth_key_hash = rc.pending_new_auth_key_hash
-    user.password_salt = rc.pending_password_salt
-    if rc.pending_kdf_settings:
-        user.kdf_settings = rc.pending_kdf_settings  # M3：恢复激活时同步 KDF 设置
+async def accelerate_recovery(db: AsyncSession, rc: RecoveryCode, user: User) -> None:
+    """加速通道：清冷却 + 清 rollback（回滚窗口关闭），新密码已生效。
 
-    # 更新 UserKeys
-    result = await db.execute(
-        select(UserKeys).where(UserKeys.user_id == user.id)
-    )
-    keys = result.scalar_one_or_none()
-    if keys and rc.pending_wrapped_user_key:
-        keys.password_wrapped = rc.pending_wrapped_user_key
-
-    rc.status = "consumed"
-    rc.consumed_at = datetime.now(timezone.utc)
-    await db.flush()
-
-
-# ── 冻结 ────────────────────────────────────────────
-
-async def freeze_recovery(db: AsyncSession, rc: RecoveryCode) -> None:
-    """丢弃 pending_* 字段，status 回退 active。旧密码保持不变。"""
+    accelerate 后 status=active，可用新密码登录。
+    """
     rc.status = "active"
-    rc.pending_new_auth_key_hash = None
-    rc.pending_password_salt = None
-    rc.pending_kdf_settings = None
-    rc.pending_wrapped_user_key = None
-    rc.pending_setup_at = None
-    rc.cooldown_expires_at = None
+    rc.cooldown_until = None
+    _clear_rollback(rc)
     await db.flush()
+
+
+# ── 冻结：回滚到旧密码 ─────────────────────────────
+
+async def freeze_recovery(db: AsyncSession, rc: RecoveryCode, user: User) -> None:
+    """冻结：正式字段回滚 = rollback_*，status -> active，清 rollback。"""
+    if rc.rollback_auth_key_hash:
+        user.auth_key_hash = rc.rollback_auth_key_hash
+    if rc.rollback_password_salt:
+        user.password_salt = rc.rollback_password_salt
+    if rc.rollback_kdf_settings:
+        user.kdf_settings = rc.rollback_kdf_settings
+    keys = await _get_user_keys(db, user.id)
+    if keys and rc.rollback_wrapped_user_key:
+        keys.password_wrapped = rc.rollback_wrapped_user_key
+
+    rc.status = "active"
+    rc.cooldown_until = None
+    _clear_rollback(rc)
+    await db.flush()
+
+
+# ── 登录门 + 押后清理 ──────────────────────────────
+
+async def is_in_cooldown(db: AsyncSession, user_id: UUID) -> bool:
+    """登录门（纯读）：用户恢复处于冷却期且未到期 -> 拒绝登录。
+
+    冷却已到期（now >= cooldown_until）则放行（status 仍为 cooldown，由登录成功后清理）。
+    """
+    result = await db.execute(
+        select(RecoveryCode).where(RecoveryCode.user_id == user_id)
+    )
+    rc = result.scalar_one_or_none()
+    if not rc or rc.status != "cooldown" or not rc.cooldown_until:
+        return False
+    until = rc.cooldown_until
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return until > datetime.now(timezone.utc)
+
+
+async def clear_rollback_after_login(db: AsyncSession, user_id: UUID) -> None:
+    """冷却后首次新密码登录成功时清理 rollback（押后，清不掉无害）。
+
+    将 status 置 active、清 cooldown_until 与 rollback。若未执行（如网络中断），
+    下次登录重试；即便永不执行，rollback 留存也无害（不影响功能/安全）。
+    """
+    result = await db.execute(
+        select(RecoveryCode).where(RecoveryCode.user_id == user_id)
+    )
+    rc = result.scalar_one_or_none()
+    if not rc or rc.rollback_auth_key_hash is None:
+        return
+    rc.status = "active"
+    rc.cooldown_until = None
+    _clear_rollback(rc)
+    await db.commit()
 
 
 # ── 签名链接（加速/冻结用）─────────────────────────
 
 def sign_recovery_token(payload: dict, expires_minutes: int = ACCELERATE_LINK_TTL_MINUTES) -> str:
-    """签发一次性恢复操作 token（加速或冻结）。"""
+    """签发恢复操作 token（加速或冻结）。"""
     expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
     payload["exp"] = expire
     payload["iat"] = datetime.now(timezone.utc)
@@ -239,20 +369,3 @@ def verify_recovery_token(token: str) -> dict | None:
         return jwt.decode(token, _recovery_signing_key(), algorithms=["HS256"])
     except jwt.InvalidTokenError:
         return None
-
-
-# ── 检查冷却期到期并自动激活 ────────────────────────
-
-async def check_and_auto_activate(
-    db: AsyncSession, rc: RecoveryCode, user: User,
-) -> bool:
-    """如果冷却期已结束，自动激活。返回 True 表示已激活。"""
-    if (
-        rc.status == "pending_activation"
-        and rc.cooldown_expires_at
-        and rc.cooldown_expires_at <= datetime.now(timezone.utc)
-    ):
-        await activate_recovery(db, rc, user)
-        await db.commit()
-        return True
-    return False

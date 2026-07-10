@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.i18n import get_lang, get_text
-from app.middleware import get_current_user_id
+from app.middleware import get_current_user_id, require_not_in_cooldown
 from app.models import User, UserDevice
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ChangePasswordResponse,
     DeleteAccountRequest,
     DeviceInfo,
     LoginEmailRequest,
@@ -31,8 +32,6 @@ from app.schemas.auth import (
     RegisterGoogleRequest,
     RegisterPhoneRequest,
     RegisterResponse,
-    ResetPasswordRequest,
-    ResetPasswordResponse,
     SendCodeRequest,
     SendCodeResponse,
 )
@@ -53,6 +52,7 @@ from app.services.auth_service import (
 )
 from app.services.email_service import send_verification_email
 from app.services.google_auth_service import verify_google_id_token
+from app.services.recovery_service import clear_rollback_after_login, is_in_cooldown
 from app.services.sms_service import send_sms
 from app.services.verification_service import (
     check_rate_limit,
@@ -226,10 +226,15 @@ async def login_email(req: LoginEmailRequest, request: Request, db: AsyncSession
         hash_auth_key(req.auth_key_hash)
         await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
+    # 恢复冷却期：账户锁定，拒绝登录（纯读，零写入）
+    if await is_in_cooldown(db, user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
     if not verify_auth_key(req.auth_key_hash, user.auth_key_hash):
         await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
     await clear_login_failures("email", req.email)
+    # 冷却已结束且新密码登录成功 -> 清理 rollback（押后，清不掉无害）
+    await clear_rollback_after_login(db, user.id)
     return await _build_login_response(db, user)
 
 
@@ -246,10 +251,15 @@ async def login_phone(req: LoginPhoneRequest, request: Request, db: AsyncSession
         hash_auth_key(req.auth_key_hash)
         await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
+    # 恢复冷却期：账户锁定，拒绝登录（纯读，零写入）
+    if await is_in_cooldown(db, user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
     if not verify_auth_key(req.auth_key_hash, user.auth_key_hash):
         await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
     await clear_login_failures("phone", req.phone)
+    # 冷却已结束且新密码登录成功 -> 清理 rollback（押后，清不掉无害）
+    await clear_rollback_after_login(db, user.id)
     return await _build_login_response(db, user)
 
 
@@ -272,40 +282,11 @@ async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSessi
 
 # ── 密码重置 ───────────────────────────────────────
 
-@router.post("/reset-password", response_model=ResetPasswordResponse)
-async def reset_password(req: ResetPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    if not await verify_and_consume(req.target, req.value, req.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
-
-    user = await find_user_by_email(db, req.value) if req.target == "email" else await find_user_by_phone(db, req.value)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
-
-    user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
-    user.password_salt = req.new_password_salt
-    keys = await get_user_keys(db, user.id)
-    if keys:
-        keys.password_wrapped = req.new_password_wrapped
-    await db.commit()
-
-    await revoke_all_user_tokens(db, user.id)
-    await db.commit()
-
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
-    return ResetPasswordResponse(
-        success=True, access_token=access_token, refresh_token=refresh_token,
-        password_salt=user.password_salt, password_wrapped=keys.password_wrapped if keys else None,
-        encrypted_private=keys.encrypted_private if keys else "",
-        rsa_public_key=keys.rsa_public_key if keys else "",
-    )
-
-
-@router.post("/change-password", response_model=ResetPasswordResponse)
+@router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     req: ChangePasswordRequest,
     request: Request,
-    user_id: UUID = Depends(get_current_user_id),
+    user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):
     """已登录用户修改密码。需当前密码 + 验证码双因子。"""
@@ -334,7 +315,7 @@ async def change_password(
 
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
-    return ResetPasswordResponse(
+    return ChangePasswordResponse(
         success=True, access_token=access_token, refresh_token=refresh_token,
         password_salt=user.password_salt, password_wrapped=keys.password_wrapped if keys else None,
         encrypted_private=keys.encrypted_private if keys else "",
@@ -364,7 +345,7 @@ async def logout(user_id: UUID = Depends(get_current_user_id), db: AsyncSession 
 # ── 设备注册 ─────────────────────────────────────
 
 @router.post("/register-device", response_model=RegisterDeviceResponse)
-async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(require_not_in_cooldown), db: AsyncSession = Depends(get_db)):
     device = UserDevice(user_id=user_id, device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     db.add(device)
     await db.commit()
@@ -378,7 +359,7 @@ async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(ge
 async def delete_account(
     req: DeleteAccountRequest,
     request: Request,
-    user_id: UUID = Depends(get_current_user_id),
+    user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):
     """注销账号。需验证码确认。"""

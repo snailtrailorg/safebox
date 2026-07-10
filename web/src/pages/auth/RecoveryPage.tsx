@@ -6,7 +6,7 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
 import { deriveKey, deriveAuthKey, DEFAULT_KDF } from "../../crypto/kdf";
-import { generateAesKey, aesEncrypt } from "../../crypto/aes";
+import { aesEncrypt, aesDecrypt, base64ToBytes } from "../../crypto/aes";
 import type { KdfSettings } from "../../crypto/kdf";
 
 export function RecoveryPage() {
@@ -40,27 +40,36 @@ export function RecoveryPage() {
       const newDerivedKey = await deriveKey(newPassword, newSalt);
       const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
       const newKdf: KdfSettings = DEFAULT_KDF;
-
-      // 2. 生成 User Key 并包装（新密码 → 新 User Key）
-      const newUserKey = await generateAesKey();
-      const userKeyRaw = new Uint8Array(
-        await crypto.subtle.exportKey("raw", newUserKey)
-      );
-      const newWrappedUserKey = await aesEncrypt(newDerivedKey, userKeyRaw);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      // 3. 一次性提交恢复码 + 新密码
-      const resp = await apiClient.initiateRecovery({
+      // 2. 步骤1：验证恢复码，拿 recovery_wrapped + initiate_token
+      const step1 = await apiClient.initiateRecovery({
         target: "email",
         value: email,
         recovery_code: recoveryCode,
         new_auth_key_hash: newAuthKeyHash,
         new_password_salt: saltBase64,
         new_kdf_settings: newKdf,
+      });
+
+      // 3. 用恢复码派生密钥解 recovery_wrapped 拿【旧 User Key】（零知识：服务端拿不到）
+      const recoverySaltBytes = base64ToBytes(step1.recovery_salt);
+      const recoveryDerivedKey = await deriveKey(recoveryCode, recoverySaltBytes);
+      const oldUserKeyRaw = await aesDecrypt(recoveryDerivedKey, step1.recovery_wrapped);
+      if (!oldUserKeyRaw) {
+        throw new Error(t("auth.recovery.recoverFailed"));
+      }
+
+      // 4. 用新密码重新包裹【旧 User Key】（User Key 不换，数据不动）
+      const newWrappedUserKey = await aesEncrypt(newDerivedKey, oldUserKeyRaw);
+
+      // 5. 步骤2：confirm 提交重包结果（写正式 + 进冷却 + 吊销旧 token）
+      const step2 = await apiClient.confirmRecovery({
+        initiate_token: step1.initiate_token,
         new_wrapped_user_key: newWrappedUserKey,
       });
 
-      setCooldownUntil(resp.cooldown_expires_at);
+      setCooldownUntil(step2.cooldown_until);
       setToast({
         message: t("auth.recovery.cooldownStarted"),
         type: "success",

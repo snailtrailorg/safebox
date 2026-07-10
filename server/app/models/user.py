@@ -50,6 +50,8 @@ class UserKeys(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True
     )
     password_wrapped: Mapped[str] = mapped_column(Text)
+    recovery_wrapped: Mapped[str | None] = mapped_column(Text, nullable=True)  # 恢复码包裹的 User Key（数据恢复用）
+    recovery_salt: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 恢复码派生密钥的盐
     encrypted_private: Mapped[str] = mapped_column(Text)
     rsa_public_key: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(

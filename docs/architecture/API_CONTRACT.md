@@ -5,8 +5,8 @@
 >   - 恢复码端点新增 /auth/recovery/accelerate（加速通道）
 >   - /auth/recovery/initiate 请求体增加 pending 字段（一次性提交新密码）
 >   - /auth/recovery/cancel 移除（合并入 freeze 语义，用户主动停止不需 cancel 端点）
->   - /auth/recovery/confirm 移除（合并入 accelerate 和自动激活）
->   - 新增 pending_new_auth_key_hash / pending_password_wrapped / pending_setup_at / cooldown_expires_at / monthly_initiation_count / failed_attempt_count / failed_attempt_last_at 字段
+>   - /auth/recovery/confirm 恢复（两步 initiate 的步骤2：验 token + 提交重包的 User Key）
+>   - 新增 cooldown_until / rollback_* 字段；initiate 即写正式字段（新密码）+ 存旧密码副本
 
 ---
 
@@ -44,15 +44,15 @@ Authorization: Bearer <access_token>
  "new_wrapped_user_key": "..."}          // 用新密码重新 wrap 后的 User Key
 
 // 200
-{"cooldown_expires_at": "2026-07-08T13:00:00Z"}
+{"cooldown_until": "2026-07-08T13:00:00Z"}
 // 400 - 恢复码错误
 // 404 - 用户不存在
 // 429 - 连续错误达 5 次 + 当月已达 3 次 -> permanently_locked
 ```
 
-- 验证恢复码 → 写入 pending_* 字段 → 进入冷却期 → 多渠道告警
+- 验证恢复码 -> 正式字段写新密码 + rollback_* 存旧密码 -> 进入冷却期 -> 多渠道告警
 - `users.password_hash` 和 `user_keys.password_wrapped` **不变**
-- 冻结时直接丢弃 pending_*，旧数据天然可用（零恢复成本）
+- 冻结时正式字段回滚 = rollback_*，旧密码恢复
 
 ### `GET /auth/recovery/status`
 
@@ -60,7 +60,7 @@ Authorization: Bearer <access_token>
 
 ```json
 // 200
-{"status": "active" | "pending_activation" | "consumed" | "permanently_locked",
+{"status": "none" | "active" | "cooldown" | "permanently_locked",
  "cooldown_remaining_seconds": 86400,
  "monthly_initiation_count": 1,
  "failed_attempt_count": 0}
@@ -82,8 +82,8 @@ Authorization: Bearer <access_token>
 
 - 验证签名 token（15 分钟有效，一次性）
 - 验证码（5 次/小时，10 次/天）
-- 通过后：pending_* → 写入 `users.password_hash` / `user_keys.password_wrapped`
-- `status → consumed`，保险库解冻
+- 通过后：清 rollback_*，status=active（新密码已生效）
+- `status → active`，保险库解冻
 - 前端引导用户生成新恢复码
 
 ### `POST /auth/recovery/freeze`
@@ -98,7 +98,7 @@ Authorization: Bearer <access_token>
 // 400 — token 无效/过期
 ```
 
-- 丢弃 pending_* 字段（物理删除）
+- 正式字段回滚 = rollback_*，清 rollback_*
 - `status → active`
 - `monthly_initiation_count` 保持不变（已 +1 不减少）
 - 旧密码不变（从未被覆盖）
@@ -148,7 +148,6 @@ Authorization: Bearer <admin_token>
 | 7 | POST | /auth/login/phone | 无 | L1+L2 | — |
 | 8 | POST | /auth/login/google | 无 | L1+L2 | — |
 | 9 | POST | /auth/change-password | Bearer | L2 | +verification_code |
-| 10 | POST | /auth/reset-password | 无 | L2 | — |
 | 11 | POST | /auth/recovery/generate | Bearer | L2 | **v2.6** |
 | 12 | POST | /auth/recovery/initiate | 无 | L2 | **v2.6** |
 | 13 | GET | /auth/recovery/status | 无 | L2 | **v2.6** |

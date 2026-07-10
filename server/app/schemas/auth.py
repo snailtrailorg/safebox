@@ -104,25 +104,19 @@ class DeviceInfo(BaseModel):
 
 # ── 密码重置 ───────────────────────────────────────
 
-class ResetPasswordRequest(BaseModel):
+class ChangePasswordRequest(BaseModel):
+    """已登录改密：当前密码 + 验证码双因子 + 新密码材料。"""
     model_config = {"populate_by_name": True}
     target: str = Field(..., pattern="^(phone|email)$")
     value: str
     verification_code: str = Field(..., min_length=6, max_length=6)
+    current_auth_key_hash: str = Field(..., alias="current_password_hash")
     new_auth_key_hash: str = Field(..., alias="new_password_hash")
     new_password_salt: str
     new_password_wrapped: str
 
 
-class ChangePasswordRequest(ResetPasswordRequest):
-    """已登录改密：在重置字段之外额外要求当前密码（PBKDF2 auth key），服务端二次校验。
-
-    与 reset-password（忘密码路径，凭恢复码/验证码，无当前密码）区分开。
-    """
-    current_auth_key_hash: str = Field(..., alias="current_password_hash")
-
-
-class ResetPasswordResponse(BaseModel):
+class ChangePasswordResponse(BaseModel):
     success: bool
     access_token: str | None = None
     refresh_token: str | None = None

@@ -23,5 +23,6 @@
   "recovery_code_invalid": "Invalid recovery code.",
   "recovery_already_pending": "Recovery is already in progress. Please wait for the cooldown to expire.",
   "recovery_not_pending": "No recovery process is currently pending.",
+  "account_in_cooldown": "Account is in recovery cooldown. Please try again later.",
   "recovery_token_invalid": "Invalid or expired recovery link."
 }

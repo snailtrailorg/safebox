@@ -6,9 +6,9 @@
 >   - HMAC 计算引入服务端密钥 server_key（深度防御）
 >
 > v2.4 → v2.5 变更:
->   - 恢复码路径更新为"一次性完成所有操作"模式：initiate 时一并提交新密码，进入 pending_activation
->   - 新增 pending_new_auth_key_hash / pending_password_wrapped / pending_setup_at / cooldown_expires_at / recovery_attempt_count
->   - 新增不变式 #10（恢复码路径旧数据永不覆盖）
+>   - 恢复码路径更新为"一次性完成所有操作"模式：initiate 时一并提交新密码，进入 cooldown
+>   - 新增 cooldown_until / rollback_* 字段；initiate 即写正式字段（新密码）+ 存旧密码副本（rollback_*）
+>   - 新增不变式 #10（恢复码副本回滚）
 >   - 新增加速通道（accelerate）和冻结（freeze）分支
 
 ---
@@ -179,19 +179,19 @@ async function decryptItemField(
        ▼ 服务端
   HMAC-SHA256(server_key, salt + normalized_input) VS recovery_code_hash
        │
-       匹配 → pending_activation（24h 冷却期）
-       │        pending_new_auth_key_hash   ← 新密码哈希
-       │        pending_password_wrapped    ← 新 wrapped key
-       │        cooldown_expires_at = now + 24h
+       匹配 → cooldown（24h 冷却期）
+       │        正式字段 = 新密码（auth_key_hash/salt/kdf/password_wrapped 即写）
+       │        rollback_* = 旧密码（供 freeze 回滚）
+       │        cooldown_until = now + 24h
        │
        ├─ 加速通道: POST /auth/recovery/accelerate
-       │   验证码 + 签名链接 → 立即激活 → consumed
+       │   验证码 + 签名链接 → 立即激活 → active
        │
-       ├─ 冷却自然结束: cooldown_expires_at 到期
-       │   → pending_* 写入 users/user_keys → consumed
+       ├─ 冷却自然结束 + 首次新密码登录
+       │   -> 登录门放行 + 清 rollback -> active
        │
        └─ 冻结: POST /auth/recovery/freeze
-           签名链接 → 丢弃 pending_* → 状态回退 active
+           签名 token -> 回滚 rollback_* -> 状态 active
 ```
 
 完整流程见 `RECOVERY_MECHANISM.md`。
@@ -215,4 +215,4 @@ async function decryptItemField(
 7. **Nonce 使用 12 字节安全随机数（crypto.getRandomValues），不可用计数器。**
 8. **User Key 在 JS 堆内存中。**
 9. **所有条目统一 v2 加密格式（AES-GCM + Item Key + AAD），无 v1 RSA 回退。**
-10. **恢复码路径旧数据永不覆盖。** 冷却期内 pending_* 与正式字段共存，冻结即回滚。
+10. **恢复码副本回滚。** initiate 写正式=新密码 + rollback_*=旧密码副本；freeze 回滚 rollback_*。

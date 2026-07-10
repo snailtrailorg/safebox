@@ -6,10 +6,10 @@
 >   - HMAC 计算引入服务端密钥（详见 RECOVERY_MECHANISM.md）
 >
 > v2.5 → v2.6 变更:
->   - 恢复码路径改为"一次性完成所有操作"：initiate 时同时提交新密码，进入 pending_activation
+>   - 恢复码路径改为"一次性完成所有操作"：initiate 时同时提交新密码，进入 cooldown
 >   - 新增加速通道（accelerate）：验证码跳过剩余冷却
->   - 冻结（freeze）操作：直接丢弃 pending_*，旧数据天然可用，零恢复成本
->   - 移除 recovery-cancel 和 recovery-complete 端点（语义合并入 freeze 和自动激活）
+>   - 冻结（freeze）操作：正式字段回滚 = rollback_*，旧密码恢复
+>   - 移除 recovery-cancel 和 recovery-complete 端点（freeze 回滚旧密码；冷却到期用新密码登录）
 >   - 冷却期改为 24 小时
 
 ---
@@ -78,17 +78,17 @@
 ① 输入恢复码 + 设置新密码（一次性完成）
                              ② POST /auth/recovery/initiate
                                 {recovery_code,
-                                 pending_new_auth_key_hash,
-                                 pending_password_salt,
-                                 pending_kdf_settings,
-                                 pending_password_wrapped}
+                                 new_auth_key_hash,
+                                 new_password_salt,
+                                 new_kdf_settings,
+                                 new_wrapped_user_key}
                                                               ③ HMAC-SHA256(server_key, salt + mnemonic) 比对
-                                                                 status → pending_activation
+                                                                 status → cooldown
                                                                  monthly_initiation_count +1
-                                                                 pending_setup_at = now()
-                                                                 cooldown_expires_at = now()+24h
-                                                                 注意：users.password_hash 不变！
-                                                              ④ return cooldown_expires_at
+                                                                 (副本 rollback_* 已存)
+                                                                 cooldown_until = now()+24h
+                                                                 注意：users 正式字段已写新密码！
+                                                              ④ return cooldown_until
                              ⑤ 前端显示 24h 倒计时
                                                               ⑥ 多渠道告警（含两个链接）
                                                                  链接 A: /accelerate（需验证码）
@@ -100,20 +100,20 @@
                                 {signed_token}
                                 → 输入验证码
                                 → 验证码正确
-                                → pending_*→users/user_keys
-                                → consumed
+                                -> 清 rollback -> active
+                                → active
 
                              ⑧ 分支 B（冻结）
                                 POST /auth/recovery/freeze
                                 {signed_token}
-                                → 丢弃 pending_*
+                                -> 回滚 rollback_*
                                 → 状态回退 active
                                 → 旧密码不变（从未被覆盖）
 
-                             ⑨ 分支 C（自动激活）
-                                cooldown_expires_at 到期
-                                → pending_*→users/user_keys
-                                → consumed
+                             ⑨ 分支 C（冷却到期+首次登录）
+                                cooldown_until 到期
+                                -> 清 rollback -> active
+                                → active
 ```
 
 ---
@@ -222,5 +222,5 @@ Body: {target: "email", value: "user@example.com",
 3. **Item Key 独立于 User Key** — 条目共享时只需重新 wrap Item Key。
 4. **敏感操作必须邮箱/手机验证码** — 改密、注销账号均需验证码。
 5. **恢复码路径禁用验证码** — 恢复码本身验证不要求验证码（防死锁），验证码仅用于加速通道。
-6. **恢复码冷却期 24 小时 + 一次性完成** — 用户提交时一并设好新密码，冷却期满自动激活。冻结操作不修改旧密码数据，天然可回滚。
+6. **恢复码冷却期 24 小时 + 一次性完成** — 用户提交时一并设好新密码，冷却到期后用新密码登录即生效。冻结回滚旧密码（rollback_*）。
 

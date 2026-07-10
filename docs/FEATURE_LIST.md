@@ -57,18 +57,18 @@
 | 常量时间比较 | `hmac.compare_digest` | `verify_recovery_code` |
 | normalize 助记词 | trim + lower + 单空格 | `normalize_mnemonic` |
 | 发起恢复 | 一次性提交恢复码 + 新密码，进入 24h 冷却期 | `POST /auth/recovery/initiate` |
-| 冷却期 24h | cooldown_expires_at = now + 24h，pending_* 字段与原数据共存 | `initiate_recovery` |
+| 冷却期 24h | cooldown_until = now+24h；正式字段=新密码、rollback_*=旧密码副本；账户锁定 | `initiate_recovery` |
 | 加速通道 | 验证码 + 签名链接跳过剩余冷却，立即激活 | `POST /auth/recovery/accelerate` |
-| 冻结 | 签名链接回滚，丢弃 pending_*，旧密码不变 | `POST /auth/recovery/freeze` |
-| 冻结 = 天然回滚 | 旧数据从未覆盖，丢弃 pending_* 即可 | `freeze_recovery` |
-| 自动激活 | cooldown_expires_at 到期自动写 pending_* 到正式字段 | `check_and_auto_activate` |
+| 冻结 | 签名 token 回滚正式=rollback_*，旧密码恢复 | `POST /auth/recovery/freeze` |
+| 冻结回滚 | 正式字段回滚 = rollback_*（旧密码副本） | `freeze_recovery` |
+| 冷却后登录 | cooldown_until 到期后用新密码登录即生效（登录门放行，零写入） | `is_in_cooldown` / `clear_rollback_after_login` |
 | 撤销 | 已登录用户主动作废旧码 | `POST /auth/recovery/revoke` |
 | 状态查询 | 返回状态 + cooldown 剩余时间 + 双计数器 | `GET /auth/recovery/status` |
 | 失败计数（24h 窗口） | HTTPS 验证失败递增，≥5 次永久锁定，成功后清零 | `find_valid_recovery_code` |
 | 月发起计数 | 成功进入冷却期递增，>3 次永久锁定，冻结不减少 | `initiate_recovery` |
 | 加速链接 TTL | 与冷却期一致（`COOLDOWN_HOURS * 60`），防止不一致 | `sign_recovery_token` |
 | 签名链接 | JWT HS256，15 分钟或与冷却期一致 | `sign_recovery_token` / `verify_recovery_token` |
-| 多渠道告警 | initiate/accelerate/freeze/自动激活 4 场景告警邮件 | `send_recovery_alert` |
+| 多渠道告警 | initiate/accelerate/freeze 3 场景告警邮件 | `send_recovery_alert` |
 | 客服解锁 | 管理员端点，核身后发送重置链接 | `POST /admin/recovery/unlock` |
 
 ## 五、条目同步
@@ -182,7 +182,7 @@
 | users | id, email, phone, google_id, auth_key_hash, password_salt, kdf_settings(JSONB) |
 | user_keys | user_id, password_wrapped, encrypted_private, rsa_public_key |
 | user_devices | user_id, device_name, device_public_key, device_wrapped |
-| recovery_codes | user_id, recovery_code_hash, recovery_code_salt, status, pending_*, monthly_initiation_count, failed_attempt_count, failed_attempt_last_at |
+| recovery_codes | user_id, recovery_code_hash, recovery_code_salt, status, cooldown_until, rollback_*, monthly_initiation_count, failed_attempt_count, failed_attempt_last_at |
 | token_families | user_id, family, active_token_hash |
 | items | id, user_id, client_did, type, icon, name, description, data, version, is_deleted, updated_at |
 
@@ -214,7 +214,6 @@
 | 8 | POST | /auth/login/phone | 无 | L1+L2 |
 | 9 | POST | /auth/login/google | 无 | L1+L2 |
 | 10 | POST | /auth/change-password | Bearer | L2 |
-| 11 | POST | /auth/reset-password | 无 | L2 |
 | 12 | POST | /auth/recovery/generate | Bearer | L2 |
 | 13 | POST | /auth/recovery/initiate | 无 | L2 |
 | 14 | GET | /auth/recovery/status | 无 | L2 |
@@ -348,8 +347,8 @@
 **v2 恢复码机制**：
 - 恢复码 = **服务端身份验证凭据**（HMAC-SHA256 验证），**不参与客户端密钥派生**
 - 客户端用新密码派生新密钥，生成新 User Key，用新密钥包裹
-- 提交 `pending_wrapped_user_key`（新密码包裹的新 User Key）给服务端
-- 进入 24h 冷却期，到期自动激活
+- 提交 `new_wrapped_user_key`（旧 User Key 用新密码重包，User Key 不换、数据不动）
+- 进入 24h 冷却期，到期后用新密码登录即生效
 
 **恢复流程**：
 ```
@@ -357,9 +356,9 @@
   ↓
 客户端用新密码派生新密钥 + 生成新 User Key
   ↓
-用新密钥包裹新 User Key -> pending_wrapped_user_key
+用恢复码解 recovery_wrapped 拿旧 User Key -> 用新密码重包 -> new_wrapped_user_key
   ↓
-提交服务端 -> 24h 冷却期 -> 自动激活
+提交服务端 -> 24h 冷却期 -> 到期后新密码登录生效
 ```
 
 **两条恢复路径**：
@@ -367,7 +366,6 @@
 | 路径 | 身份验证 | 冷却期 | 适用 |
 |------|---------|--------|------|
 | `/auth/recovery/initiate` | 恢复码 HMAC | 24h + 加速/冻结 | 邮箱不可用，逃生通道 |
-| `/auth/reset-password` | 邮箱验证码 | 无 | 邮箱可用，快速重置 |
 
 **当前状态**：✅ **已实现**（`RecoveryPage.tsx`）。
 

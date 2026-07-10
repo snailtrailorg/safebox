@@ -13,9 +13,8 @@ import type {
   LoginPhoneRequest,
   LoginGoogleRequest,
   LoginResponse,
-  ResetPasswordRequest,
   ChangePasswordRequest,
-  ResetPasswordResponse,
+  ChangePasswordResponse,
   RefreshTokenRequest,
   RefreshTokenResponse,
   RegisterDeviceRequest,
@@ -24,6 +23,8 @@ import type {
   GenerateRecoveryResponse,
   InitiateRecoveryRequest,
   InitiateRecoveryResponse,
+  ConfirmRecoveryRequest,
+  ConfirmRecoveryResponse,
   AccelerateRecoveryRequest,
   FreezeRecoveryRequest,
   RecoveryStatusResponse,
@@ -181,11 +182,7 @@ class ApiClient {
     return this.request("POST", "/auth/login/google", req, true);
   }
 
-  async resetPassword(req: ResetPasswordRequest): Promise<ResetPasswordResponse> {
-    return this.request("POST", "/auth/reset-password", req, true);
-  }
-
-  async changePassword(req: ChangePasswordRequest): Promise<ResetPasswordResponse> {
+  async changePassword(req: ChangePasswordRequest): Promise<ChangePasswordResponse> {
     return this.request("POST", "/auth/change-password", req, true);
   }
 
@@ -197,6 +194,10 @@ class ApiClient {
 
   async initiateRecovery(req: InitiateRecoveryRequest): Promise<InitiateRecoveryResponse> {
     return this.request("POST", "/auth/recovery/initiate", req, true);
+  }
+
+  async confirmRecovery(req: ConfirmRecoveryRequest): Promise<ConfirmRecoveryResponse> {
+    return this.request("POST", "/auth/recovery/confirm", req, true);
   }
 
   async getRecoveryStatus(): Promise<RecoveryStatusResponse> {

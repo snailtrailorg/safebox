@@ -2,7 +2,7 @@
 
 > 版本: v3.3
 > v3.2 → v3.3 变更:
->   - Step 6a recovery_codes 表：pending_password_wrapped → pending_wrapped_user_key（字段名和语义修正）
+>   - Step 6a recovery_codes 表：rollback_wrapped_user_key → rollback_wrapped_user_key（字段名和语义修正）
 >   - Step 6 删除 6f/6g 旧版本残留（recovery-init/cancel/complete 端点与告警）
 >   - Step 6e 重新组织告警通知（4 场景：initiate/accelerate/freeze/自动激活）
 >   - Step 10 checkPasswordStrength 弱模式检测改为连续序列检测（移除以子串匹配的方式）
@@ -246,12 +246,12 @@ CREATE TABLE recovery_codes (
     recovery_code_hash        VARCHAR(128) NOT NULL,   -- HMAC-SHA256(server_key, salt + normalized_mnemonic)
     recovery_code_salt        VARCHAR(64) NOT NULL,    -- 随机盐值，作为 HMAC 消息的一部分（非 HMAC 密钥）
     status                    VARCHAR(32) NOT NULL DEFAULT 'active',
-    pending_new_auth_key_hash VARCHAR(128),       -- 新密码的 auth_key_hash（加速通道验证用）
-    pending_password_salt     VARCHAR(128),       -- 新密码 salt
-    pending_kdf_settings      JSONB,              -- 新 KDF 设置
-    pending_wrapped_user_key  TEXT,               -- 用新密码派生的 key 包裹后的 User Key（恢复后解密保险库的核心数据）
+    rollback_auth_key_hash VARCHAR(128),       -- 新密码的 auth_key_hash（加速通道验证用）
+    rollback_password_salt     VARCHAR(128),       -- 新密码 salt
+    rollback_kdf_settings      JSONB,              -- 新 KDF 设置
+    rollback_wrapped_user_key  TEXT,               -- 用新密码派生的 key 包裹后的 User Key（恢复后解密保险库的核心数据）
     pending_setup_at          TIMESTAMPTZ,        -- 用户提交新密码的时间（冷却起始）
-    cooldown_expires_at       TIMESTAMPTZ,        -- pending_setup_at + 24h
+    cooldown_until       TIMESTAMPTZ,        -- pending_setup_at + 24h
     failed_attempt_count       INTEGER NOT NULL DEFAULT 0,     -- 连续失败次数（24h 滑动窗口，成功后清零）
     failed_attempt_last_at     TIMESTAMPTZ,                   -- 最后一次失败的时间（用于 24h 窗口判断）
     monthly_initiation_count   INTEGER NOT NULL DEFAULT 0,    -- 当月成功发起恢复次数（每月 1 日重置）
@@ -332,12 +332,12 @@ async function handleInitiateRecovery() {
   // 2. 一次性提交
   const resp = await apiClient.post("/auth/recovery/initiate", {
     recovery_code: code,
-    pending_new_auth_key_hash: await deriveAuthKey(newPassword, newSalt, kdf),
-    pending_password_salt: bytesToBase64(newSalt),
-    pending_kdf_settings: kdf,
-    pending_wrapped_user_key: newWrappedUserKey,
+    rollback_auth_key_hash: await deriveAuthKey(newPassword, newSalt, kdf),
+    rollback_password_salt: bytesToBase64(newSalt),
+    rollback_kdf_settings: kdf,
+    rollback_wrapped_user_key: newWrappedUserKey,
   });
-  setCooldownUntil(resp.cooldown_expires_at);  // 24h 倒计时
+  setCooldownUntil(resp.cooldown_until);  // 24h 倒计时
 }
 
 // 加速通道（验证码跳过剩余冷却）
