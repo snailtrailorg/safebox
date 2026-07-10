@@ -1,5 +1,24 @@
 """BIP39 词表 + 恢复码生成测试。"""
+import hashlib
+
 from app.services.bip39 import BIP39_WORDS, generate_bip39_code
+
+
+# 官方 BIP39 英文词表（https://github.com/bitcoin/bips/bip-0039/english.txt）
+# 2048 词 space-joined 的 SHA-256，用于穷尽校验词表与官方一致。
+OFFICIAL_BIP39_SHA256 = "f18b9a84c83e38e98eceb0102b275e26438af83ab08f080cdb780a2caa9f3a6d"
+
+
+def test_wordlist_matches_official_bip39():
+    """词表必须与官方 BIP39 english.txt 逐词一致（H6 回归）。"""
+    joined = " ".join(BIP39_WORDS)
+    assert hashlib.sha256(joined.encode()).hexdigest() == OFFICIAL_BIP39_SHA256
+    # 关键可读断言：标准词表无 africa/after（旧实现曾混入）
+    assert "africa" not in BIP39_WORDS
+    assert "after" not in BIP39_WORDS
+    assert BIP39_WORDS[0] == "abandon"
+    assert BIP39_WORDS[-1] == "zoo"
+    assert BIP39_WORDS[37] == "again"  # 旧 bug 在此插入 africa
 
 
 def test_wordlist_has_2048_words():

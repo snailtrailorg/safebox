@@ -1,5 +1,6 @@
 """认证业务逻辑。"""
 
+import json
 from uuid import UUID
 
 import bcrypt
@@ -13,6 +14,9 @@ from app.services.token_service import (
     verify_and_rotate_refresh_token,
     revoke_all_user_tokens,
 )
+
+# 服务端默认 KDF（与前端 DEFAULT_KDF 一致）；注册未指定时落库此值
+DEFAULT_KDF_SETTINGS = {"algorithm": "pbkdf2", "iterations": 600_000}
 
 
 def hash_auth_key(client_hash: str) -> str:
@@ -60,12 +64,12 @@ async def create_user_with_keys(
     password: str,  # 实际上是客户端派生的 auth_key_hash（PBKDF2 输出），不是原始密码
     client_password_salt: str,
     password_wrapped: str,
-    recovery_wrapped: str,
     encrypted_private: str,
     rsa_public_key: str,
     device_name: str | None,
     device_public_key: str,
     device_wrapped: str,
+    kdf_settings: dict | None = None,
 ) -> User:
     auth_key_hash = hash_auth_key(password)
 
@@ -75,6 +79,7 @@ async def create_user_with_keys(
         google_id=google_id,
         auth_key_hash=auth_key_hash,
         password_salt=client_password_salt,
+        kdf_settings=json.dumps(kdf_settings or DEFAULT_KDF_SETTINGS),
     )
     db.add(user)
     await db.flush()
@@ -82,7 +87,6 @@ async def create_user_with_keys(
     keys = UserKeys(
         user_id=user.id,
         password_wrapped=password_wrapped,
-        recovery_wrapped=recovery_wrapped,
         encrypted_private=encrypted_private,
         rsa_public_key=rsa_public_key,
     )

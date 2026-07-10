@@ -7,10 +7,11 @@ from pydantic import BaseModel, Field
 
 
 class SyncItemRequest(BaseModel):
-    client_did: int | None = None
+    client_did: int | None = None      # 本地 did，仅用于首次推送的回配
+    server_id: str | None = None       # 已同步条目的稳定 UUID，跨设备 re-push 时按此匹配更新
     type: str
     icon: str | None = None
-    name: str       # RSA 加密 + Base64
+    name: str       # EncryptedField JSON ({encrypted_key, ciphertext})
     description: str | None = None
     data: str | None = None
     version: int = 1
@@ -25,6 +26,7 @@ class SyncPushResult(BaseModel):
     client_did: int | None
     server_id: str | None = None
     status: str  # "created" | "updated" | "conflict"
+    version: int | None = None  # 服务端权威版本（created/updated 后的结果；conflict 时为服务端当前版本）
 
 
 class SyncPushResponse(BaseModel):

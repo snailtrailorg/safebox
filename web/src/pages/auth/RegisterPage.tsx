@@ -7,6 +7,7 @@ import { Toast } from "../../components/ui/Toast";
 import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
+import { useAuth } from "../../context/AuthContext";
 import { saveSession } from "../../db/sessionStore";
 import { GOOGLE_CLIENT_ID, checkPasswordStrength } from "../../config/constants";
 
@@ -29,6 +30,7 @@ declare global {
 export function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [tab, setTab] = useState<RegisterTab>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -108,43 +110,47 @@ export function RegisterPage() {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
           auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
-          password_wrapped: keys.passwordWrapped, recovery_wrapped: keys.recoveryWrapped,
+          password_wrapped: keys.passwordWrapped,
           encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
           kdf_settings: keys.kdfSettings,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
           email, passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
-          recoveryWrapped: keys.recoveryWrapped, encryptedPrivate: keys.encryptedPrivate,
+          encryptedPrivate: keys.encryptedPrivate,
           rsaPublicKey: keys.rsaPublicKey,
         });
+        // 持久化 token + serverUserId 并置为 ready（keyChain 已由 generateKeys 解锁）
+        await login(response.access_token, response.refresh_token, response.user_id);
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
           auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
-          password_wrapped: keys.passwordWrapped, recovery_wrapped: keys.recoveryWrapped,
+          password_wrapped: keys.passwordWrapped,
           encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
           kdf_settings: keys.kdfSettings,
         } as any);
         await saveSession({
           email: phone, passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
-          recoveryWrapped: keys.recoveryWrapped, encryptedPrivate: keys.encryptedPrivate,
+          encryptedPrivate: keys.encryptedPrivate,
           rsaPublicKey: keys.rsaPublicKey,
         });
+        await login(response.access_token, response.refresh_token, response.user_id);
       } else {
         const response = await apiClient.registerGoogle({
           google_id_token: googleIdToken,
           auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
-          password_wrapped: keys.passwordWrapped, recovery_wrapped: keys.recoveryWrapped,
+          password_wrapped: keys.passwordWrapped,
           encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
           kdf_settings: keys.kdfSettings,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
           email: "google", passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
-          recoveryWrapped: keys.recoveryWrapped, encryptedPrivate: keys.encryptedPrivate,
+          encryptedPrivate: keys.encryptedPrivate,
           rsaPublicKey: keys.rsaPublicKey,
         });
+        await login(response.access_token, response.refresh_token, response.user_id);
       }
 
       navigate("/");

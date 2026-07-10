@@ -13,7 +13,7 @@ import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { getSession, saveSession } from "../../db/sessionStore";
 import { deriveKey, deriveAuthKey, DEFAULT_KDF } from "../../crypto/kdf";
-import { aesEncrypt } from "../../crypto/aes";
+import { aesEncrypt, base64ToBytes } from "../../crypto/aes";
 import { checkPasswordStrength } from "../../config/constants";
 import type { KdfSettings } from "../../crypto/kdf";
 
@@ -38,7 +38,7 @@ export function ChangePasswordPage() {
   };
 
   const handleChangePassword = async () => {
-    if (!newPassword || !verifyCode) {
+    if (!currentPassword || !newPassword || !verifyCode) {
       setToast({ message: t("settings.enterNewPwAndCode"), type: "error" });
       return;
     }
@@ -51,6 +51,9 @@ export function ChangePasswordPage() {
     try {
       const session = await getSession();
       const email = session.email || "";
+
+      // 用「当前盐」派生当前密码的 auth key，供服务端二次校验当前密码
+      const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.passwordSalt));
 
       const newSalt = new Uint8Array(32);
       crypto.getRandomValues(newSalt);
@@ -69,6 +72,7 @@ export function ChangePasswordPage() {
         target: "email",
         value: email,
         verification_code: verifyCode,
+        current_auth_key_hash: currentAuthKeyHash,
         new_auth_key_hash: newAuthKeyHash,
         new_password_salt: saltBase64,
         new_password_wrapped: newPasswordWrapped,

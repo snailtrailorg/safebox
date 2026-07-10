@@ -14,6 +14,7 @@ from app.i18n import get_lang, get_text
 from app.middleware import get_current_user_id
 from app.models import User, UserDevice
 from app.schemas.auth import (
+    ChangePasswordRequest,
     DeleteAccountRequest,
     DeviceInfo,
     LoginEmailRequest,
@@ -35,6 +36,7 @@ from app.schemas.auth import (
     SendCodeResponse,
 )
 from app.services.auth_service import (
+    DEFAULT_KDF_SETTINGS,
     create_access_token,
     create_refresh_token,
     create_user_with_keys,
@@ -82,14 +84,14 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
         user = await find_user_by_phone(db, phone)
 
     if user:
-        kdf = json.loads(user.kdf_settings) if user.kdf_settings else {"algorithm": "pbkdf2", "iterations": 600_000}
+        kdf = json.loads(user.kdf_settings) if user.kdf_settings else DEFAULT_KDF_SETTINGS
         return {
             "password_salt": user.password_salt,
             "kdf_settings": kdf,
         }
     # 用户不存在时返回随机 salt，防止枚举
     return {"password_salt": secrets.token_hex(16),
-            "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600_000}}
+            "kdf_settings": DEFAULT_KDF_SETTINGS}
 
 
 # ── 验证码 ──────────────────────────────────────────
@@ -128,9 +130,10 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
 
     user = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
         password=req.auth_key_hash, client_password_salt=req.password_salt,
-        password_wrapped=req.password_wrapped, recovery_wrapped=req.recovery_wrapped,
+        password_wrapped=req.password_wrapped,
         encrypted_private=req.encrypted_private, rsa_public_key=req.rsa_public_key,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
+        kdf_settings=req.kdf_settings)
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
@@ -146,9 +149,10 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
 
     user = await create_user_with_keys(db=db, email=None, phone=req.phone, google_id=None,
         password=req.auth_key_hash, client_password_salt=req.password_salt,
-        password_wrapped=req.password_wrapped, recovery_wrapped=req.recovery_wrapped,
+        password_wrapped=req.password_wrapped,
         encrypted_private=req.encrypted_private, rsa_public_key=req.rsa_public_key,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
+        kdf_settings=req.kdf_settings)
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
@@ -165,9 +169,10 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
 
     user = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
         password=req.auth_key_hash, client_password_salt=req.password_salt,
-        password_wrapped=req.password_wrapped, recovery_wrapped=req.recovery_wrapped,
+        password_wrapped=req.password_wrapped,
         encrypted_private=req.encrypted_private, rsa_public_key=req.rsa_public_key,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
+        kdf_settings=req.kdf_settings)
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
@@ -185,7 +190,6 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
         access_token=access_token, refresh_token=refresh_token,
         password_salt=user.password_salt or "",
         password_wrapped=keys.password_wrapped if keys else None,
-        recovery_wrapped=keys.recovery_wrapped if keys else "",
         encrypted_private=keys.encrypted_private if keys else "",
         rsa_public_key=keys.rsa_public_key if keys else "",
         devices=[DeviceInfo(id=str(d.id), device_name=d.device_name, device_wrapped=d.device_wrapped) for d in devices],
@@ -274,7 +278,6 @@ async def reset_password(req: ResetPasswordRequest, request: Request, db: AsyncS
     return ResetPasswordResponse(
         success=True, access_token=access_token, refresh_token=refresh_token,
         password_salt=user.password_salt, password_wrapped=keys.password_wrapped if keys else None,
-        recovery_wrapped=keys.recovery_wrapped if keys else "",
         encrypted_private=keys.encrypted_private if keys else "",
         rsa_public_key=keys.rsa_public_key if keys else "",
     )
@@ -282,18 +285,24 @@ async def reset_password(req: ResetPasswordRequest, request: Request, db: AsyncS
 
 @router.post("/change-password", response_model=ResetPasswordResponse)
 async def change_password(
-    req: ResetPasswordRequest,
+    req: ChangePasswordRequest,
     request: Request,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """已登录用户修改密码。需验证码 + 当前密码。"""
-    if not await verify_and_consume(req.target, req.value, req.verification_code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
-
+    """已登录用户修改密码。需当前密码 + 验证码双因子。"""
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
+
+    # 因子一：校验当前密码（先于消费验证码，防止仅凭被盗 access token 改密，
+    # 也避免当前密码错误时白白烧掉一次性验证码）
+    if not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "current_password_wrong"))
+
+    # 因子二：邮箱/短信验证码
+    if not await verify_and_consume(req.target, req.value, req.verification_code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
 
     user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
     user.password_salt = req.new_password_salt
@@ -310,7 +319,6 @@ async def change_password(
     return ResetPasswordResponse(
         success=True, access_token=access_token, refresh_token=refresh_token,
         password_salt=user.password_salt, password_wrapped=keys.password_wrapped if keys else None,
-        recovery_wrapped=keys.recovery_wrapped if keys else "",
         encrypted_private=keys.encrypted_private if keys else "",
         rsa_public_key=keys.rsa_public_key if keys else "",
     )

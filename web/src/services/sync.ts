@@ -5,6 +5,8 @@
 import { apiClient } from "./api";
 import {
   getDirtyItems,
+  getDeletedDirtyItems,
+  clearDirty,
   markSynced,
   upsertFromServer,
   softDeleteByServerId,
@@ -31,6 +33,7 @@ export async function sync(): Promise<SyncResult> {
     const pushResult = await apiClient.push({
       items: dirtyItems.map((item) => ({
         client_did: item.did ?? null,
+        server_id: item.serverId ?? null,
         type: item.type,
         icon: item.icon,
         name: JSON.stringify(item.name),
@@ -57,9 +60,37 @@ export async function sync(): Promise<SyncResult> {
         result.server_id &&
         dirtyItems[i]?.did
       ) {
-        await markSynced(dirtyItems[i].did!, result.server_id);
+        // 落库服务端权威 version，作为下次 push 的乐观并发基线
+        await markSynced(dirtyItems[i].did!, result.server_id, result.version ?? undefined);
         pushed++;
       }
+    }
+  }
+
+  // 1.5 Push deletions（本地已删除的条目通知服务端软删除）
+  const deletedItems = await getDeletedDirtyItems();
+  if (deletedItems.length > 0) {
+    const withServer = deletedItems.filter((item) => item.serverId);
+    if (withServer.length > 0) {
+      const delResult = await apiClient.delete({
+        server_ids: withServer.map((item) => item.serverId!),
+      });
+      // deleted / not_found 都视为服务端已无该条目，清本地脏标记（保留墓碑）
+      const doneIds = new Set(
+        delResult.results
+          .filter((r) => r.status === "deleted" || r.status === "not_found")
+          .map((r) => r.server_id),
+      );
+      for (const item of withServer) {
+        if (item.did && item.serverId && doneIds.has(item.serverId)) {
+          await clearDirty(item.did);
+          pushed++;
+        }
+      }
+    }
+    // 本地创建但从未同步就删除的：服务端无需知道，直接清脏标记
+    for (const item of deletedItems.filter((i) => !i.serverId)) {
+      if (item.did) await clearDirty(item.did);
     }
   }
 
@@ -92,7 +123,7 @@ export async function sync(): Promise<SyncResult> {
           pulled++;
         }
       } else if (remote.server_id && conflictServerIds.has(remote.server_id)) {
-        // 冲突条目的服务端版本：不自动 upsert，等待用户选择
+        // 冲突条目的服务端版本：不自动 upsert，捕获供用户选「使用服务端」时应用
         const local = pendingConflicts.find((c) => c.serverId === remote.server_id);
         if (local) {
           conflicts.push({
@@ -100,6 +131,15 @@ export async function sync(): Promise<SyncResult> {
             serverId: remote.server_id,
             localUpdatedAt: local.localUpdatedAt,
             serverUpdatedAt: new Date(remote.updated_at).getTime(),
+            serverItem: {
+              type: remote.type,
+              icon: remote.icon,
+              name: JSON.parse(remote.name) as EncryptedField,
+              description: remote.description ? JSON.parse(remote.description) as EncryptedField : null,
+              data: JSON.parse(remote.data ?? "{}") as EncryptedField,
+              version: remote.version,
+              updatedAt: new Date(remote.updated_at).getTime(),
+            },
           });
         }
       } else {

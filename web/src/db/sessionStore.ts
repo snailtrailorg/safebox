@@ -13,7 +13,6 @@ const EMPTY_SESSION: SessionData = {
   email: "",
   passwordSalt: "",
   passwordWrapped: "",
-  recoveryWrapped: "",
   encryptedPrivate: "",
   rsaPublicKey: "",
   lastSyncTime: "2020-01-01T00:00:00+00:00",

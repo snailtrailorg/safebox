@@ -126,7 +126,6 @@ export function LoginPage() {
         email,
         passwordSalt: response.password_salt,
         passwordWrapped: response.password_wrapped ?? "",
-        recoveryWrapped: response.recovery_wrapped,
         encryptedPrivate: response.encrypted_private,
         rsaPublicKey: response.rsa_public_key,
       });
@@ -159,7 +158,6 @@ export function LoginPage() {
         email: phone,
         passwordSalt: response.password_salt,
         passwordWrapped: response.password_wrapped ?? "",
-        recoveryWrapped: response.recovery_wrapped,
         encryptedPrivate: response.encrypted_private,
         rsaPublicKey: response.rsa_public_key,
       });
@@ -183,7 +181,6 @@ export function LoginPage() {
         email: "google",
         passwordSalt: response.password_salt,
         passwordWrapped: response.password_wrapped ?? "",
-        recoveryWrapped: response.recovery_wrapped,
         encryptedPrivate: response.encrypted_private,
         rsaPublicKey: response.rsa_public_key,
       });

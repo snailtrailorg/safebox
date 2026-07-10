@@ -127,10 +127,15 @@ async def find_valid_recovery_code(
 
     if not verify_recovery_code(plaintext, rc.recovery_code_salt, rc.recovery_code_hash):
         now = datetime.now(timezone.utc)
-        # 24h 窗口：超过窗口期重置计数
+        # 24h 窗口：超过窗口期重置计数。
+        # last_at 归一到 aware UTC——PostgreSQL 返回 aware，SQLite 返回 naive，
+        # 不归一会在 aware - naive 相减时抛 TypeError。
+        last_at = rc.failed_attempt_last_at
+        if last_at is not None and last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
         if (
-            rc.failed_attempt_last_at is None
-            or (now - rc.failed_attempt_last_at).total_seconds() > FAILED_ATTEMPT_WINDOW_HOURS * 3600
+            last_at is None
+            or (now - last_at).total_seconds() > FAILED_ATTEMPT_WINDOW_HOURS * 3600
         ):
             rc.failed_attempt_count = 1
         else:
@@ -139,7 +144,9 @@ async def find_valid_recovery_code(
 
         if rc.failed_attempt_count >= MAX_FAILED_ATTEMPTS:
             rc.status = "permanently_locked"
-        await db.flush()
+        # 必须 commit（而非 flush）：调用方随后会抛 401，get_db 对异常回滚。
+        # 若仅 flush，失败计数会随请求一起被回滚，跨请求永不累加，≥5 锁定形同虚设。
+        await db.commit()
         return None
 
     # 验证成功，清零失败计数
@@ -186,6 +193,8 @@ async def activate_recovery(
     """将 pending_* 写入 users/user_keys，status → consumed。"""
     user.auth_key_hash = rc.pending_new_auth_key_hash
     user.password_salt = rc.pending_password_salt
+    if rc.pending_kdf_settings:
+        user.kdf_settings = rc.pending_kdf_settings  # M3：恢复激活时同步 KDF 设置
 
     # 更新 UserKeys
     result = await db.execute(

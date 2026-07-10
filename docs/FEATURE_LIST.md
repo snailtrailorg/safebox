@@ -32,7 +32,6 @@
 | Item Key | 每条目独立随机 AES-256，User Key 包裹后存储 |
 | RSA 密钥对 | 4096 位，PKCS8 格式，User Key 加密存储，用于跨设备和旧条目兼容 |
 | password_wrapped | AES-256-GCM(User Key, passwordDerivedKey) |
-| recovery_wrapped | AES-256-GCM(User Key, recoveryKey) |
 | encrypted_private | AES-256-GCM(RSA 私钥, User Key) |
 | 换密码不解密条目 | 只重新 wrap User Key，Item Keys 不动 |
 
@@ -77,7 +76,7 @@
 | 功能 | 描述 | 实现 |
 |------|------|------|
 | push 批量写入 | 支持批量创建/更新，批量 IN 查询（非 N+1） | `POST /sync/push` |
-| LWW 冲突检测 | 按 updated_at 比较，旧版本标记 conflict | `sync_push` |
+| 冲突检测（乐观并发） | 按 version 基线比较：客户端基线 == 服务端当前 version 才接受，否则 conflict | `sync_push` |
 | 冲突用户选择 | 前端显示冲突，用户选保留本地或使用服务端 | `resolveConflict` |
 | pull 增量同步 | since 游标 + limit 分页，返回 has_more 继续拉取 | `GET /sync/pull` |
 | 软删除 | 标记 is_deleted=true，pull 时返回删除标记 | `POST /sync/delete` |
@@ -181,7 +180,7 @@
 | 表 | 关键字段 |
 |------|---------|
 | users | id, email, phone, google_id, auth_key_hash, password_salt, kdf_settings(JSONB) |
-| user_keys | user_id, password_wrapped, recovery_wrapped, encrypted_private, rsa_public_key |
+| user_keys | user_id, password_wrapped, encrypted_private, rsa_public_key |
 | user_devices | user_id, device_name, device_public_key, device_wrapped |
 | recovery_codes | user_id, recovery_code_hash, recovery_code_salt, status, pending_*, monthly_initiation_count, failed_attempt_count, failed_attempt_last_at |
 | token_families | user_id, family, active_token_hash |

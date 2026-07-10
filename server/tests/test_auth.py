@@ -7,7 +7,6 @@ REGISTER_PAYLOAD = {
     "auth_key_hash": "pbkdf2_hashed",
     "password_salt": "salt",
     "password_wrapped": "wrapped",
-    "recovery_wrapped": "recovery",
     "encrypted_private": "enc_priv",
     "rsa_public_key": "rsa_pub",
     "device_name": "Test Device",
@@ -124,6 +123,53 @@ async def test_refresh_token(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_refresh_replay_cascades_all_families(client: AsyncClient):
+    """重放已轮换的旧 refresh token -> 撤销该用户全部 family（全线失效，M1）。
+
+    修复前：轮换新建 family 并删旧行，旧 token 重放只 401、新 token 仍可用（级联不可达）。
+    修复后：同 family 复用更新 hash，旧 token 重放触发级联，新 token 也失效。
+    """
+    resp = await client.post("/api/v1/auth/register/email", json={
+        **REGISTER_PAYLOAD, "email": "replay@safebox.example.com",
+    })
+    r1 = resp.json()["refresh_token"]
+
+    # 轮换：r1 失效，得到 r2
+    resp = await client.post("/api/v1/auth/refresh-token", json={"refresh_token": r1})
+    assert resp.status_code == 200
+    r2 = resp.json()["refresh_token"]
+
+    # 重放 r1：应被拒
+    resp = await client.post("/api/v1/auth/refresh-token", json={"refresh_token": r1})
+    assert resp.status_code == 401
+
+    # 级联：r2 也应失效（同 family 被撤销）
+    resp = await client.post("/api/v1/auth/refresh-token", json={"refresh_token": r2})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_without_family_rejected(client: AsyncClient):
+    """无 family 字段的 refresh token 被拒绝（M2，不再降级刷新绕过轮换/重放检测）。"""
+    import jwt
+    from app.config import settings
+
+    resp = await client.post("/api/v1/auth/register/email", json={
+        **REGISTER_PAYLOAD, "email": "nofamily@safebox.example.com",
+    })
+    user_id = resp.json()["user_id"]
+
+    # 伪造一个无 family 的 refresh token（签名有效、type 正确）
+    no_family_token = jwt.encode(
+        {"sub": user_id, "exp": 9999999999, "type": "refresh"},
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+    resp = await client.post("/api/v1/auth/refresh-token", json={"refresh_token": no_family_token})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_unauthorized_access(client: AsyncClient):
     resp = await client.get(f"/api/v1/sync/pull?since={SYNC_SINCE}")
     # FastAPI HTTPBearer 无 Authorization 头时返回 403（有效但无效 token 返回 401）
@@ -164,6 +210,24 @@ async def test_get_salt(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_register_persists_kdf_settings(client: AsyncClient):
+    """注册时 kdf_settings 落库，GET /salt 返回该账户的 kdf_settings（M3）。
+
+    修复前：kdf_settings 从不落库，GET /salt 恒返回默认 600k。
+    """
+    custom_kdf = {"algorithm": "pbkdf2", "iterations": 100_000}
+    resp = await client.post("/api/v1/auth/register/email", json={
+        **REGISTER_PAYLOAD, "email": "kdf@safebox.example.com",
+        "kdf_settings": custom_kdf,
+    })
+    assert resp.status_code == 201
+
+    resp = await client.get("/api/v1/auth/salt?email=kdf@safebox.example.com")
+    assert resp.status_code == 200
+    assert resp.json()["kdf_settings"] == custom_kdf  # 落库的是自定义值，非默认 600k
+
+
+@pytest.mark.asyncio
 async def test_auth_key_hash_flow(client: AsyncClient):
     """验证 auth_key_hash 字段名工作和向后兼容。"""
     # 新字段名
@@ -187,7 +251,7 @@ async def test_auth_key_hash_flow(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_change_password(client: AsyncClient):
-    """已登录用户修改密码。"""
+    """已登录用户修改密码：当前密码 + 验证码双因子。"""
     resp = await client.post("/api/v1/auth/register/email", json={
         **REGISTER_PAYLOAD, "email": "cp@safebox.example.com",
     })
@@ -197,11 +261,38 @@ async def test_change_password(client: AsyncClient):
     resp = await client.post("/api/v1/auth/change-password", json={
         "target": "email", "value": "cp@safebox.example.com",
         "verification_code": "123456",
+        "current_auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
         "new_auth_key_hash": "new_hash", "new_password_salt": "new_salt",
         "new_password_wrapped": "new_wrapped",
     }, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_change_password_wrong_current(client: AsyncClient):
+    """当前密码错误时改密被拒（401），且不改动 auth_key_hash。"""
+    resp = await client.post("/api/v1/auth/register/email", json={
+        **REGISTER_PAYLOAD, "email": "cpwrong@safebox.example.com",
+    })
+    token = resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = await client.post("/api/v1/auth/change-password", json={
+        "target": "email", "value": "cpwrong@safebox.example.com",
+        "verification_code": "123456",
+        "current_auth_key_hash": "wrong_current_hash",
+        "new_auth_key_hash": "new_hash", "new_password_salt": "new_salt",
+        "new_password_wrapped": "new_wrapped",
+    }, headers=headers)
+    assert resp.status_code == 401
+
+    # 原密码仍可登录（改密未生效）
+    resp = await client.post("/api/v1/auth/login/email", json={
+        "email": "cpwrong@safebox.example.com",
+        "auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
+    })
+    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio

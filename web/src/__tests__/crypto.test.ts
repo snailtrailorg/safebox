@@ -27,10 +27,6 @@ import {
   rsaEncrypt,
   rsaDecrypt,
 } from "../crypto/rsa";
-import {
-  generateRecoveryCode,
-} from "../crypto/bip39";
-import { BIP39_WORDS } from "../crypto/wordlist";
 
 // ── Base64 工具 ──────────────────────────────────
 
@@ -254,7 +250,7 @@ describe("RSA-4096 OAEP", () => {
 
   it("rsaEncrypt / rsaDecrypt roundtrip (long text, chunked)", async () => {
     const pair = await generateRsaKeyPair();
-    // 超过 470 字节的单块限制，测试分块加解密
+    // 超过 446 字节的单块限制，测试分块加解密
     const plaintext = "A".repeat(2000); // ~2KB
     const ct = await rsaEncrypt(pair.publicKey, plaintext);
     expect(ct).not.toBeNull();
@@ -299,43 +295,8 @@ describe("RSA-4096 OAEP", () => {
 });
 
 // ── BIP39 恢复码 ─────────────────────────────────
-
-describe("BIP39 Recovery Code", () => {
-  it("wordlist has 2049 words (Android custom list with 'satoshi')", () => {
-    expect(BIP39_WORDS.length).toBe(2049);
-  });
-
-  it("all words are unique", () => {
-    const unique = new Set(BIP39_WORDS);
-    expect(unique.size).toBe(2049);
-  });
-
-  it("all words are lowercase", () => {
-    for (const word of BIP39_WORDS) {
-      expect(word).toBe(word.toLowerCase());
-    }
-  });
-
-  it("generateRecoveryCode produces 12 words", () => {
-    const code = generateRecoveryCode();
-    const words = code.split(" ");
-    expect(words.length).toBe(12);
-  });
-
-  it("all generated words are in the wordlist", () => {
-    const code = generateRecoveryCode();
-    const words = code.split(" ");
-    for (const w of words) {
-      expect(BIP39_WORDS).toContain(w);
-    }
-  });
-
-  it("generateRecoveryCode produces different codes", () => {
-    const c1 = generateRecoveryCode();
-    const c2 = generateRecoveryCode();
-    expect(c1).not.toBe(c2);
-  });
-});
+// 恢复码由服务端生成（POST /auth/recovery/generate），Web 端不持有词表。
+// 词表标准性校验见 server/tests/test_bip39.py。
 
 // ── 跨模块集成测试 ───────────────────────────────
 

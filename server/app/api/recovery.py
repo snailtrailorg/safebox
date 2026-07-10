@@ -28,6 +28,7 @@ from app.services.recovery_service import (
     freeze_recovery,
     initiate_recovery,
     sign_recovery_token,
+    verify_recovery_code,
     verify_recovery_token,
 )
 from app.services.verification_service import verify_and_consume
@@ -141,19 +142,33 @@ async def initiate(
             detail=_t(request, "user_not_found"),
         )
 
-    # 查找并验证恢复码
-    rc = await find_valid_recovery_code(db, user.id, req.recovery_code)
-    if not rc:
+    # 先取该用户的恢复码（任意状态），以区分「已在冷却期」与「无效码」。
+    # find_valid_recovery_code 只查 active，无法识别 pending_activation。
+    result = await db.execute(
+        select(RecoveryCode).where(RecoveryCode.user_id == user.id)
+    )
+    existing = result.scalar_one_or_none()
+    if existing is not None and existing.status == "pending_activation":
+        # 已在冷却期：仅当提交的恢复码正确时提示「处理中」，
+        # 码错误则按无效码处理，避免向未持码者泄露 pending 状态。
+        if verify_recovery_code(
+            req.recovery_code, existing.recovery_code_salt, existing.recovery_code_hash
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=_t(request, "recovery_already_pending"),
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=_t(request, "recovery_code_invalid"),
         )
 
-    # 检查是否已在冷却期
-    if rc.status == "pending_activation":
+    # 查找并验证 active 恢复码（含失败计数 / ≥5 锁定，见 find_valid_recovery_code）
+    rc = await find_valid_recovery_code(db, user.id, req.recovery_code)
+    if not rc:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=_t(request, "recovery_already_pending"),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_t(request, "recovery_code_invalid"),
         )
 
     # 新密码哈希

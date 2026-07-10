@@ -175,7 +175,7 @@ Proton Account 密码
 |------|------|----------------|
 | Key hierarchy 有三层（根密钥→用户密钥→数据密钥） | 全部 | 有 masterKey → passwordWrapped，但缺少 User Key 层 |
 | 换密码只需重新 wrap 上层 key，不解密全部数据 | Bitwarden | ✅ 已经是这样 |
-| KDF 的可配置性（PBKDF2 iter / Argon2 参数） | Bitwarden | ❌ PBKDF2 100K 次写死 |
+| KDF 的可配置性（PBKDF2 iter / Argon2 参数） | Bitwarden | ✅ 可配置（默认 PBKDF2 600K，存 kdf_settings） |
 | Vault level 独立加密 | Proton Pass | ❌ 所有条目用同一个 masterKey |
 | 非对称加密仅用于共享/跨设备 key exchange | 全部 | ❌ 条目级加密用了 RSA 而不是对称 key |
 

@@ -14,6 +14,7 @@ import type {
   LoginGoogleRequest,
   LoginResponse,
   ResetPasswordRequest,
+  ChangePasswordRequest,
   ResetPasswordResponse,
   RefreshTokenRequest,
   RefreshTokenResponse,
@@ -161,7 +162,7 @@ class ApiClient {
     return this.request("POST", "/auth/register/google", req, true);
   }
 
-  async getSalt(email?: string, phone?: string): Promise<{ password_salt: string; recovery_wrapped?: string; encrypted_private?: string; rsa_public_key?: string }> {
+  async getSalt(email?: string, phone?: string): Promise<{ password_salt: string; encrypted_private?: string; rsa_public_key?: string }> {
     const params = new URLSearchParams();
     if (email) params.set("email", email);
     if (phone) params.set("phone", phone);
@@ -184,7 +185,7 @@ class ApiClient {
     return this.request("POST", "/auth/reset-password", req, true);
   }
 
-  async changePassword(req: ResetPasswordRequest): Promise<ResetPasswordResponse> {
+  async changePassword(req: ChangePasswordRequest): Promise<ResetPasswordResponse> {
     return this.request("POST", "/auth/change-password", req, true);
   }
 

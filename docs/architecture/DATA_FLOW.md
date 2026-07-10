@@ -130,8 +130,8 @@ Body: {target: "email" | "phone", value: "user@example.com",
        new_kdf_settings, new_password_wrapped}
 
 服务端:
-  ① verify_and_consume(target, value, code)    ← 验证码在前
-  ② verify(user.auth_hash, current_auth_key_hash)  ← 当前密码在后
+  ① verify(user.auth_hash, current_auth_key_hash)  ← 当前密码在前（错误则拒绝，不消费验证码）
+  ② verify_and_consume(target, value, code)        ← 验证码在后
   ③ 发送告警邮件/短信："您的密码已被修改"
   ④ UPDATE user + user_keys
   ⑤ revoke_all_tokens + create new
@@ -176,8 +176,8 @@ sync() → push dirty items
       │   → 返回给 VaultContext 显示冲突 UI
       │
       └─ 用户选择：
-          ├─ 保留本地 → markSynced(localDid, serverId)，下次 sync 重新 push 本地版本
-          └─ 使用服务端 → softDeleteItem(localDid)，下次 pull 写入服务端版本
+          ├─ 保留本地 → markForRepush(localDid, serverVersion)：基线设为服务端当前 version + 保持 dirty，下次 push 基线匹配被接受（乐观并发，不依赖时钟）
+          └─ 使用服务端 → upsertFromServer([ConflictInfo.serverItem])：按 serverId 原地更新为服务端版本（不删除条目）
 ```
 
 ### 解密流程

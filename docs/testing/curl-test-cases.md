@@ -72,8 +72,7 @@ curl -s -X POST $BASE/api/v1/auth/register/email \
     "auth_key_hash":"'$AUTH_HASH'",
     "password_salt":"'$SALT'",
     "password_wrapped":"mock_wrapped",
-    "recovery_wrapped":"",
-    "encrypted_private":"mock_priv",
+        "encrypted_private":"mock_priv",
     "rsa_public_key":"mock_rsa_pub",
     "kdf_settings":{"algorithm":"pbkdf2","iterations":600000}
   }'

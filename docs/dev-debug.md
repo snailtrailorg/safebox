@@ -90,13 +90,13 @@ cd web && npm test
 
 ### 验证码被消费但注册失败
 
-可能原因：RSA 密钥生成太慢导致超时（浏览器端 PBKDF2 100k 迭代 + RSA-4096 生成约 500ms-2s）。检查浏览器控制台和网络面板。
+可能原因：RSA 密钥生成太慢导致超时（浏览器端 PBKDF2 600k 迭代 + RSA-4096 生成约 500ms-2s）。检查浏览器控制台和网络面板。
 
 ### Web Crypto 跨平台兼容
 
-Web Crypto API 的 RSA-OAEP 分块大小必须与 Android `CryptoManager.kt` 一致（470 字节/块）。`web/src/__tests__/cross-platform.test.ts` 已验证字节级兼容。
+Web Crypto API 的 RSA-OAEP 分块大小必须与 Android `CryptoManager.kt` 一致（446 字节/块（OAEP-SHA256））。`web/src/__tests__/cross-platform.test.ts` 已验证字节级兼容。
 
-### 100k 次 PBKDF2 卡顿
+### 600k 次 PBKDF2 卡顿
 
 在浏览器中约 200-500ms，仅在登录/注册时执行一次。如需优化，可移到 Web Worker 避免阻塞主线程。
 
@@ -108,7 +108,7 @@ Vite 配置了代理转发，所以前端 fetch `/api/v1/auth/...` 会自动到 
 # 注册
 curl -X POST http://localhost:8000/api/v1/auth/register/email \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","verification_code":"123456","password_hash":"h","password_salt":"s","password_wrapped":"w","recovery_wrapped":"r","encrypted_private":"e","rsa_public_key":"p"}'
+  -d '{"email":"test@example.com","verification_code":"123456","password_hash":"h","password_salt":"s","password_wrapped":"w","encrypted_private":"e","rsa_public_key":"p"}'
 
 # 健康检查
 curl http://localhost:8000/health

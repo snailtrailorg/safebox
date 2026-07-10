@@ -2,7 +2,7 @@
  * RSA-4096 OAEP-SHA256 加解密
  * 与 Android CryptoManager.rsaEncrypt/rsaDecrypt 完全一致
  *
- * 加密: 分块 RSA-OAEP (每块 470 字节) → 拼接 → Base64
+ * 加密: 分块 RSA-OAEP (每块 446 字节, OAEP-SHA256) → 拼接 → Base64
  * 解密: Base64 解码 → 分块解密 (每块 512 字节) → 拼接 → UTF-8
  */
 import { RSA_KEY_LENGTH, RSA_CHUNK_SIZE, RSA_DECRYPT_CHUNK } from "../config/constants";
@@ -68,7 +68,7 @@ export async function decodePrivateKey(encoded: string): Promise<CryptoKey | nul
 
 /**
  * RSA-OAEP 加密（分块）
- * 与 Android rsaEncrypt 一致: 每块 470 字节
+ * 与 Android rsaEncrypt 一致: 每块 446 字节, OAEP-SHA256
  */
 export async function rsaEncrypt(
   publicKey: CryptoKey,

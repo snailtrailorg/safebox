@@ -77,10 +77,27 @@ export async function getDirtyItems(): Promise<Item[]> {
   return all.filter((item) => item.isDirty && !item.isDeleted);
 }
 
-/** 标记已同步 */
+/** 获取所有「已删除且待同步」的条目（用于向服务端传播删除） */
+export async function getDeletedDirtyItems(): Promise<Item[]> {
+  const db = await getDb();
+  const all = await db.getAll("items");
+  return all.filter((item) => item.isDirty && item.isDeleted);
+}
+
+/** 清除脏标记（保留其他字段，如 isDeleted 墓碑），避免重复上传 */
+export async function clearDirty(did: number): Promise<void> {
+  const db = await getDb();
+  const item = await db.get("items", did);
+  if (item) {
+    await db.put("items", { ...item, isDirty: false });
+  }
+}
+
+/** 标记已同步（并落库服务端权威 version，供下次 push 作为乐观并发基线） */
 export async function markSynced(
   did: number,
   serverId: string,
+  version?: number,
 ): Promise<void> {
   const db = await getDb();
   const item = await db.get("items", did);
@@ -88,7 +105,25 @@ export async function markSynced(
     await db.put("items", {
       ...item,
       serverId,
+      ...(version != null ? { version } : {}),
       isDirty: false,
+    });
+  }
+}
+
+/** 标记条目重新推送（冲突解决 keepLocal 用）：
+ *  设 version 为服务端当前版本（认基线），保持 isDirty=true，
+ *  下次 push 基线匹配 -> 接受，本地内容胜出。保留 serverId/isDeleted=false。 */
+export async function markForRepush(did: number, baseVersion?: number): Promise<void> {
+  const db = await getDb();
+  const item = await db.get("items", did);
+  if (item) {
+    await db.put("items", {
+      ...item,
+      isDirty: true,
+      isDeleted: false,
+      updatedAt: Date.now(),
+      ...(baseVersion != null ? { version: baseVersion } : {}),
     });
   }
 }

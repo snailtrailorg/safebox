@@ -17,7 +17,6 @@ export interface RegisterEmailRequest {
   auth_key_hash: string;
   password_salt: string;
   password_wrapped: string;
-  recovery_wrapped: string;
   encrypted_private: string;
   rsa_public_key: string;
   kdf_settings?: Record<string, unknown>;
@@ -36,7 +35,6 @@ export interface RegisterGoogleRequest {
   auth_key_hash: string;
   password_salt: string;
   password_wrapped: string;
-  recovery_wrapped: string;
   encrypted_private: string;
   rsa_public_key: string;
   kdf_settings?: Record<string, unknown>;
@@ -77,7 +75,6 @@ export interface LoginResponse {
   refresh_token: string;
   password_salt: string;
   password_wrapped: string | null;
-  recovery_wrapped: string;
   encrypted_private: string;
   rsa_public_key: string;
   devices: DeviceInfo[];
@@ -92,13 +89,17 @@ export interface ResetPasswordRequest {
   new_password_wrapped: string;
 }
 
+/** 已登录改密：在重置字段之外额外携带当前密码派生的 auth key，供服务端二次校验。 */
+export interface ChangePasswordRequest extends ResetPasswordRequest {
+  current_auth_key_hash: string;
+}
+
 export interface ResetPasswordResponse {
   success: boolean;
   access_token?: string;
   refresh_token?: string;
   password_salt?: string;
   password_wrapped?: string;
-  recovery_wrapped?: string;
   encrypted_private?: string;
   rsa_public_key?: string;
 }
@@ -175,6 +176,7 @@ export interface RevokeRecoveryRequest {
 
 export interface SyncItemRequest {
   client_did: number | null;
+  server_id?: string | null;
   type: string;
   icon: string | null;
   name: string;
@@ -192,6 +194,7 @@ export interface SyncPushResult {
   client_did: number | null;
   server_id: string | null;
   status: "created" | "updated" | "conflict";
+  version?: number | null;
 }
 
 export interface SyncPushResponse {

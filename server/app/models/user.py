@@ -50,7 +50,6 @@ class UserKeys(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True
     )
     password_wrapped: Mapped[str] = mapped_column(Text)
-    recovery_wrapped: Mapped[str] = mapped_column(Text)
     encrypted_private: Mapped[str] = mapped_column(Text)
     rsa_public_key: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
@@ -106,7 +105,7 @@ class TokenFamily(Base):
 
 
 class Item(Base):
-    """加密条目。所有敏感字段由客户端 RSA 加密后上传。"""
+    """加密条目。敏感字段由客户端用 Item Key + AES-256-GCM 加密后上传（v2 EncryptedField JSON）。"""
 
     __tablename__ = "items"
 
@@ -119,9 +118,9 @@ class Item(Base):
     client_did: Mapped[int | None] = mapped_column(nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(20))
     icon: Mapped[str | None] = mapped_column(Text, nullable=True)
-    name: Mapped[str] = mapped_column(Text)       # RSA 加密 + Base64
+    name: Mapped[str] = mapped_column(Text)       # EncryptedField JSON ({encrypted_key, ciphertext})
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    data: Mapped[str | None] = mapped_column(Text, nullable=True)  # RSA 加密 JSON
+    data: Mapped[str | None] = mapped_column(Text, nullable=True)  # EncryptedField JSON
     version: Mapped[int] = mapped_column(default=1)
     is_deleted: Mapped[bool] = mapped_column(default=False)
     updated_at: Mapped[datetime] = mapped_column(

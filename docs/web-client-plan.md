@@ -97,7 +97,7 @@ web/
 ### 密钥层级（与 Android 一致）
 
 ```
-用户密码 ──PBKDF2(100k, SHA-256)──> 派生密钥(AES-256)
+用户密码 ──PBKDF2(600k, SHA-256)──> 派生密钥(AES-256)
     └── AES-GCM 解密 password_wrapped ──> 主密钥(AES-256)
         └── AES-GCM 解密 encrypted_private ──> RSA 私钥(4096-bit)
             └── RSA-OAEP 解密 ──> 条目 data JSON
@@ -109,15 +109,15 @@ web/
 ```typescript
 // 1. importKey raw → 2. deriveBits(256) → 3. importKey raw AES-GCM
 const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" }, keyMaterial, 256);
+const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 600_000, hash: "SHA-256" }, keyMaterial, 256);
 const aesKey = await crypto.subtle.importKey("raw", new Uint8Array(bits), "AES-GCM", false, ["encrypt", "decrypt"]);
 ```
 
-**RSA-4096 OAEP**：Web Crypto 原生支持。分块大小需与 Android 一致（470 字节/块，对应 `CryptoManager.kt` 的 `RSA_CHUNK_SIZE`）。
+**RSA-4096 OAEP**：Web Crypto 原生支持。分块大小需与 Android 一致（446 字节/块，OAEP-SHA256；对应 `CryptoManager.kt` 的 `RSA_CHUNK_SIZE`）。
 
 **BIP39**：直接复制 `CryptoManager.kt` 中的 2048 词表。恢复码生成逻辑为纯字符串操作。
 
-### 100k 次 PBKDF2 在浏览器中的性能
+### 600k 次 PBKDF2 在浏览器中的性能
 
 现代浏览器约 200-500ms。仅在登录/注册时执行一次，可接受。如果 UI 卡顿，后续可移到 Web Worker。
 
@@ -126,7 +126,7 @@ const aesKey = await crypto.subtle.importKey("raw", new Uint8Array(bits), "AES-G
 ### 持久化存储：IndexedDB（`idb` 库）
 
 两个 object store：
-- `session`：accessToken, refreshToken, serverUserId, passwordSalt, passwordWrapped, recoveryWrapped, encryptedPrivate, rsaPublicKey, lastSyncTime
+- `session`：accessToken, refreshToken, serverUserId, passwordSalt, passwordWrapped, encryptedPrivate, rsaPublicKey, lastSyncTime
 - `items`：did(自增PK), uid, type, icon, name, description, data, serverId, version, isDirty, isDeleted, updatedAt, createdAt
 
 ### 内存状态：React Context

@@ -124,7 +124,6 @@ npx vitest run     # 111 tests
 |------|---------|---------|
 | `auth_key_hash` | bcrypt(PBKDF2(password)) | 仅用于认证比对 |
 | `password_wrapped` | AES-256-GCM(User Key, passwordDerivedKey) | 知道密码的人 |
-| `recovery_wrapped` | AES-256-GCM(User Key, recoveryKey) | 知道 12 词恢复码的人 |
 | `encrypted_item_keys` | AES-256-GCM(Item Key, User Key) | 拥有 User Key 的人 |
 | `items.name` | AES-256-GCM(明文, Item Key, AAD="name") | 拥有 Item Key 的人 |
 | `items.data` | AES-256-GCM(明文, Item Key, AAD="data") | 拥有 Item Key 的人 |

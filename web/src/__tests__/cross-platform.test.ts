@@ -21,7 +21,6 @@ import {
   bytesToBase64,
   base64ToBytes,
 } from "../crypto/aes";
-import { generateRecoveryCode } from "../crypto/bip39";
 
 // ── RFC 6070 PBKDF2 测试向量 ────────────────────
 
@@ -122,23 +121,6 @@ describe("AES-256-GCM known answer tests", () => {
     const ct = await aesEncrypt(key, plaintext);
     const pt = await aesDecrypt(key, ct);
     expect(new TextDecoder().decode(pt!)).toBe("A".repeat(10000));
-  });
-});
-
-// ── BIP39 恢复码兼容性 ───────────────────────────
-
-describe("BIP39 recovery code compatibility", () => {
-  it("word list is identical to Android CryptoManager.kt", async () => {
-    const { BIP39_WORDS } = await import("../crypto/wordlist");
-    // 验证词表特定位置的词与 Android 源码一致
-    expect(BIP39_WORDS[0]).toBe("abandon");
-    expect(BIP39_WORDS[1]).toBe("ability");
-    // Android 自定义词表有 2049 词（含 "satoshi"），zoo 在索引 2048
-    expect(BIP39_WORDS[2048]).toBe("zoo");
-    expect(BIP39_WORDS.length).toBe(2049);
-
-    // 验证 "satoshi" 在词表中（Android 自定义添加）
-    expect(BIP39_WORDS).toContain("satoshi");
   });
 });
 

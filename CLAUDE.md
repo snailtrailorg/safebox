@@ -20,7 +20,7 @@
 - `deriveAuthKey(password, salt, kdf_settings?)` → 发给服务器的 auth_key_hash（认证用）。来自 `kdf.ts`
 - 两者使用不同 salt 域：auth salt = salt + "auth" 后缀
 - 防止服务器 auth_key_hash 被直接用于解密 passwordWrapped
-- KDF 参数可配置：`{ algorithm: "pbkdf2", iterations: 100_000 }`，跟随账户存储在 `users.kdf_settings`（Text 列存 JSON）
+- KDF 参数可配置：`{ algorithm: "pbkdf2", iterations: 600_000 }`，跟随账户存储在 `users.kdf_settings`（Text 列存 JSON）
 - 旧 API `deriveKeyHash`（pbkdf2.ts）已废弃，新代码用 `deriveAuthKey`（kdf.ts）
 
 ### 密钥管理（v2）

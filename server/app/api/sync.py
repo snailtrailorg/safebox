@@ -79,46 +79,80 @@ async def sync_push(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """上传本地修改的条目。LWW 策略：按 updated_at 覆盖。"""
+    """上传本地修改的条目。乐观并发：按 version 检测冲突（不依赖时钟）。
+
+    客户端 version = 其持有的基线（上次拉到的服务端版本）。
+    base == 服务端当前 -> 接受，version+1；base != 服务端当前 -> conflict。
+    updated_at 由模型 onupdate 自动维护（仅用于 pull 游标/显示，不参与冲突判断）。
+    """
+    from sqlalchemy import or_
+
     results: list[SyncPushResult] = []
     new_items: list[Item] = []  # 新建的 Item 对象，flush 后取 ID
 
-    # 批量查询所有 client_did 对应的已有条目，避免 N+1 查询
+    # 批量查询已有条目：优先按 server_id（跨设备稳定标识），回退 client_did（同设备首次回配）
     all_dids = [i.client_did for i in req.items if i.client_did is not None]
-    if all_dids:
+    valid_server_ids: list[UUID] = []
+    for i in req.items:
+        if i.server_id:
+            try:
+                valid_server_ids.append(UUID(i.server_id))
+            except ValueError:
+                pass  # 非法 server_id 忽略，按 client_did/新建处理
+
+    existing_map_by_did: dict[int | None, Item] = {}
+    existing_map_by_sid: dict[str, Item] = {}
+    if all_dids or valid_server_ids:
+        sub_conds = []
+        if all_dids:
+            sub_conds.append(Item.client_did.in_(all_dids))
+        if valid_server_ids:
+            sub_conds.append(Item.id.in_(valid_server_ids))
         existing_result = await db.execute(
-            select(Item).where(and_(Item.user_id == user_id, Item.client_did.in_(all_dids)))
+            select(Item).where(and_(Item.user_id == user_id, or_(*sub_conds)))
         )
-        existing_map = {item.client_did: item for item in existing_result.scalars().all()}
-    else:
-        existing_map = {}
+        for item in existing_result.scalars().all():
+            if item.client_did is not None:
+                existing_map_by_did[item.client_did] = item
+            existing_map_by_sid[str(item.id)] = item
 
     for item_req in req.items:
-        existing = existing_map.get(item_req.client_did) if item_req.client_did is not None else None
+        # server_id 优先匹配（跨设备），否则 client_did（同设备）
+        existing = None
+        if item_req.server_id:
+            existing = existing_map_by_sid.get(item_req.server_id)
+        if existing is None and item_req.client_did is not None:
+            existing = existing_map_by_did.get(item_req.client_did)
 
         if existing:
-            client_updated_at = datetime.fromisoformat(item_req.updated_at) if item_req.updated_at else existing.updated_at
-            if client_updated_at > existing.updated_at:
+            # 乐观并发：客户端基线 version 必须等于服务端当前 version
+            if item_req.version == existing.version:
                 existing.type = item_req.type
                 existing.icon = item_req.icon
                 existing.name = item_req.name
                 existing.description = item_req.description
                 existing.data = item_req.data
-                existing.version = item_req.version
                 existing.is_deleted = False
-                existing.updated_at = client_updated_at
-                results.append(SyncPushResult(client_did=item_req.client_did, server_id=str(existing.id), status="updated"))
+                existing.version += 1  # 服务端权威递增（updated_at 由 onupdate 自动刷新）
+                results.append(SyncPushResult(
+                    client_did=item_req.client_did, server_id=str(existing.id),
+                    status="updated", version=existing.version,
+                ))
             else:
-                results.append(SyncPushResult(client_did=item_req.client_did, server_id=str(existing.id), status="conflict"))
+                # 基线不匹配：客户端基于旧版编辑，冲突
+                results.append(SyncPushResult(
+                    client_did=item_req.client_did, server_id=str(existing.id),
+                    status="conflict", version=existing.version,
+                ))
         else:
             item = Item(
                 user_id=user_id, client_did=item_req.client_did, type=item_req.type,
                 icon=item_req.icon, name=item_req.name, description=item_req.description,
-                data=item_req.data, version=item_req.version,
+                data=item_req.data, version=1,  # 新建从 1 开始，服务端权威
             )
             db.add(item)
             new_items.append(item)
-            results.append(SyncPushResult(client_did=item_req.client_did, server_id="", status="created"))
+            results.append(SyncPushResult(client_did=item_req.client_did, server_id="", status="created", version=1))
 
     await db.flush()
     # flush 后新 Item 已分配 ID

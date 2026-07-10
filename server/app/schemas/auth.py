@@ -23,7 +23,6 @@ class RegisterEmailRequest(BaseModel):
     auth_key_hash: str = Field(..., alias="password_hash")  # PBKDF2(password, salt+"auth") - 客户端已派生
     password_salt: str
     password_wrapped: str       # AES-256-GCM(masterKey, passwordDerivedKey)
-    recovery_wrapped: str = ""       # 注册时不再生成（恢复码在安全设置页单独生成）
     encrypted_private: str      # AES-256-GCM(rsaPrivateKey, masterKey)
     rsa_public_key: str
     kdf_settings: dict | None = None
@@ -39,9 +38,9 @@ class RegisterPhoneRequest(BaseModel):
     auth_key_hash: str = Field(..., alias="password_hash")
     password_salt: str
     password_wrapped: str
-    recovery_wrapped: str
     encrypted_private: str
     rsa_public_key: str
+    kdf_settings: dict | None = None
     device_name: str | None = None
     device_public_key: str
     device_wrapped: str
@@ -53,9 +52,9 @@ class RegisterGoogleRequest(BaseModel):
     auth_key_hash: str = Field(..., alias="password_hash")
     password_salt: str
     password_wrapped: str
-    recovery_wrapped: str
     encrypted_private: str
     rsa_public_key: str
+    kdf_settings: dict | None = None
     device_name: str | None = None
     device_public_key: str
     device_wrapped: str
@@ -92,7 +91,6 @@ class LoginResponse(BaseModel):
     # 密钥材料（客户端用来解密 masterKey）
     password_salt: str = ""              # PBKDF2 salt，新设备登录时必需
     password_wrapped: str | None = None
-    recovery_wrapped: str
     encrypted_private: str
     rsa_public_key: str
     devices: list["DeviceInfo"] = []
@@ -116,13 +114,20 @@ class ResetPasswordRequest(BaseModel):
     new_password_wrapped: str
 
 
+class ChangePasswordRequest(ResetPasswordRequest):
+    """已登录改密：在重置字段之外额外要求当前密码（PBKDF2 auth key），服务端二次校验。
+
+    与 reset-password（忘密码路径，凭恢复码/验证码，无当前密码）区分开。
+    """
+    current_auth_key_hash: str = Field(..., alias="current_password_hash")
+
+
 class ResetPasswordResponse(BaseModel):
     success: bool
     access_token: str | None = None
     refresh_token: str | None = None
     password_salt: str | None = None
     password_wrapped: str | None = None
-    recovery_wrapped: str | None = None
     encrypted_private: str | None = None
     rsa_public_key: str | None = None
 

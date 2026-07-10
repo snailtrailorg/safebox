@@ -3,7 +3,7 @@
  */
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { Item, ItemType, ConflictInfo } from "../types/domain";
-import { getUserItems, upsertItem, softDeleteItem, getItem, markSynced, softDeleteByServerId } from "../db/itemsStore";
+import { getUserItems, upsertItem, softDeleteItem, getItem, markSynced, markForRepush, upsertFromServer, softDeleteByServerId } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
 import { sync } from "../services/sync";
 import { keyChain } from "../keychain/keyChain";
@@ -105,24 +105,33 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
   const resolveConflict = useCallback(async (conflict: ConflictInfo, keepLocal: boolean) => {
     if (keepLocal) {
-      // 保留本地：删除服务端版本记录（下次 sync 重新 push 本地版本）
-      // 本地条目保持 isDirty，下次 sync 时服务端按 LWW 接受
-      // 这里只需标记该 serverId 对应的远程条目为已处理（通过 markSynced 避免重复提示）
-      await markSynced(conflict.localDid, conflict.serverId);
+      // 保留本地：把基线设为服务端当前版本（认基线），保持 dirty，
+      // 下次 push 基线匹配 -> 接受，本地内容胜出（方案 A 乐观并发）
+      await markForRepush(conflict.localDid, conflict.serverItem?.version);
     } else {
-      // 使用服务端版本：删除本地条目，下次 pull 时 upsertFromServer 写入服务端版本
-      await softDeleteItem(conflict.localDid);
+      // 使用服务端版本：本地应用 pull 时捕获的服务端版本（按 serverId 原地更新，不删除）
+      if (conflict.serverItem) {
+        await upsertFromServer([{
+          type: conflict.serverItem.type,
+          icon: conflict.serverItem.icon,
+          name: conflict.serverItem.name,
+          description: conflict.serverItem.description,
+          data: conflict.serverItem.data,
+          serverId: conflict.serverId,
+          version: conflict.serverItem.version,
+          isDirty: false,
+          updatedAt: conflict.serverItem.updatedAt,
+        }]);
+      }
     }
     setState((s) => ({
       ...s,
       conflicts: s.conflicts.filter((c) => c.localDid !== conflict.localDid),
       items: s.items.filter((i) => i.did !== conflict.localDid || !keepLocal),
     }));
-    // 重新同步以拉取服务端版本（useServer 场景）
-    if (!keepLocal) {
-      const uid = await getCurrentUserId();
-      await loadItems(uid);
-    }
+    // 重新加载本地列表反映变更
+    const uid = await getCurrentUserId();
+    await loadItems(uid);
   }, [loadItems]);
 
   const clearError = useCallback(() => {

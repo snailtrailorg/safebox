@@ -41,7 +41,15 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """带测试数据库的 HTTP 客户端。"""
 
     async def override_get_db():
-        yield db_session
+        # 忠实复刻生产 get_db：成功 commit、异常 rollback。
+        # 否则端点抛 4xx 时的中间写入（如恢复码失败计数）不会被回滚，
+        # 测试无法复现「异常回滚」相关的生产行为。
+        try:
+            yield db_session
+            await db_session.commit()
+        except Exception:
+            await db_session.rollback()
+            raise
 
     app.dependency_overrides[get_db] = override_get_db
 

@@ -27,6 +27,16 @@ export interface ConflictInfo {
   serverId: string;
   localUpdatedAt: number;   // epoch ms
   serverUpdatedAt: number;  // epoch ms
+  /** 冲突时捕获的服务端版本（供「使用服务端」时本地应用，避免条目消失） */
+  serverItem?: {
+    type: string;
+    icon: string | null;
+    name: EncryptedField;
+    description: EncryptedField | null;
+    data: EncryptedField;
+    version: number;
+    updatedAt: number;  // epoch ms
+  };
 }
 
 export interface SessionData {
@@ -36,7 +46,6 @@ export interface SessionData {
   email: string;
   passwordSalt: string;
   passwordWrapped: string;
-  recoveryWrapped: string;
   encryptedPrivate: string;
   rsaPublicKey: string;
   lastSyncTime: string;

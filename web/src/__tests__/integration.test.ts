@@ -197,7 +197,6 @@ describe("IndexedDB — sessionStore", () => {
       serverUserId: "user-1",
       passwordSalt: "salt-base64",
       passwordWrapped: "wrapped-base64",
-      recoveryWrapped: "recovery-base64",
       encryptedPrivate: "enc-priv-base64",
       rsaPublicKey: "rsa-pub-base64",
       lastSyncTime: "2025-06-01T00:00:00+00:00",

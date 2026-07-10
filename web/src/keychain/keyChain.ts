@@ -49,7 +49,6 @@ class KeyChain {
     authKeyHash: string;
     passwordSalt: string;
     passwordWrapped: string;
-    recoveryWrapped: string;
     encryptedPrivate: string;
     rsaPublicKey: string;
     devicePublicKey?: string;
@@ -79,8 +78,6 @@ class KeyChain {
     // 包装密钥
     const masterRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
     const passwordWrapped = await aesEncrypt(derivedKey, masterRaw);
-    // 恢复码现在由服务端生成（POST /auth/recovery/generate），注册时不再需要 recoveryWrapped
-    const recoveryWrapped = "";
     const encryptedPrivate = await this.encryptPrivateKey(this.rsaPrivateKey);
 
     const saltBase64 = this.bytesToBase64(salt);
@@ -90,7 +87,6 @@ class KeyChain {
       authKeyHash,
       passwordSalt: saltBase64,
       passwordWrapped,
-      recoveryWrapped,
       encryptedPrivate,
       rsaPublicKey: this.rsaPublicKey,
       kdfSettings: DEFAULT_KDF,
@@ -200,7 +196,7 @@ class KeyChain {
   }
 
   /**
-   * 解密条目字段（先试 v2 AES-GCM，失败回退 v1 RSA）
+   * 解密条目字段（v2：Item Key + AES-GCM + 字段 AAD。解密失败返回 null）
    */
   async decryptItemField(
     field: EncryptedField,

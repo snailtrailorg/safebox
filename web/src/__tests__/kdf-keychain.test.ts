@@ -115,8 +115,6 @@ describe("KeyChain", () => {
     expect(typeof keys.encryptedPrivate).toBe("string");
     expect(keys.rsaPublicKey).toBeTruthy();
     expect(typeof keys.rsaPublicKey).toBe("string");
-    // recoveryWrapped is empty with new server-side recovery
-    expect(keys.recoveryWrapped).toBe("");
     expect(keys.kdfSettings).toEqual(DEFAULT_KDF);
     expect(keyChain.isUnlocked).toBe(true);
   });

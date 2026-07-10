@@ -8,6 +8,7 @@
   "google_token_invalid": "Google ID Token verification failed.",
   "google_already_registered": "This Google account is already registered.",
   "email_or_password_wrong": "Incorrect email or password.",
+  "current_password_wrong": "The current password is incorrect.",
   "phone_or_password_wrong": "Incorrect phone number or password.",
   "google_not_registered": "This Google account is not registered.",
   "user_not_found": "User not found.",
