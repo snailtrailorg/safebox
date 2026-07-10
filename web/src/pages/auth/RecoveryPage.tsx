@@ -5,8 +5,9 @@ import { AuthLayout } from "../../components/layout/AuthLayout";
 import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
+import { keyChain } from "../../keychain/keyChain";
 import { deriveKey, deriveAuthKey, DEFAULT_KDF } from "../../crypto/kdf";
-import { aesEncrypt, aesDecrypt, base64ToBytes } from "../../crypto/aes";
+import { base64ToBytes } from "../../crypto/aes";
 import type { KdfSettings } from "../../crypto/kdf";
 
 export function RecoveryPage() {
@@ -49,24 +50,19 @@ export function RecoveryPage() {
         recovery_code: recoveryCode,
         new_auth_key_hash: newAuthKeyHash,
         new_password_salt: saltBase64,
-        new_kdf_settings: newKdf,
       });
 
       // 3. 用恢复码派生密钥解 recovery_wrapped 拿【旧 User Key】（零知识：服务端拿不到）
       const recoverySaltBytes = base64ToBytes(step1.recovery_salt);
-      const recoveryDerivedKey = await deriveKey(recoveryCode, recoverySaltBytes);
-      const oldUserKeyRaw = await aesDecrypt(recoveryDerivedKey, step1.recovery_wrapped);
-      if (!oldUserKeyRaw) {
+      // 模型 D：用恢复码 + recovery_salt 派生 K，解 encrypted_user_key -> User Key
+      const ok = await keyChain.unlockFromRecoveryCode(recoveryCode, "", step1.recovery_salt, step1.encrypted_user_key);
+      if (!ok) {
         throw new Error(t("auth.recovery.recoverFailed"));
       }
 
-      // 4. 用新密码重新包裹【旧 User Key】（User Key 不换，数据不动）
-      const newWrappedUserKey = await aesEncrypt(newDerivedKey, oldUserKeyRaw);
-
-      // 5. 步骤2：confirm 提交重包结果（写正式 + 进冷却 + 吊销旧 token）
+      // K 不变，User Key 不变，直接 confirm（无需传 wrapped）
       const step2 = await apiClient.confirmRecovery({
         initiate_token: step1.initiate_token,
-        new_wrapped_user_key: newWrappedUserKey,
       });
 
       setCooldownUntil(step2.cooldown_until);

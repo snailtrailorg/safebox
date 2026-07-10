@@ -30,7 +30,7 @@ export function ChangePasswordPage() {
 
   const handleSendVerifyCode = async () => {
     const session = await getSession();
-    const ok = await keyChain.unlockWithPassword(currentPassword, session.passwordSalt, session.passwordWrapped);
+    const ok = await keyChain.unlockWithPassword(currentPassword, session.loginSalt, session.encrypted_user_key, session.cached_K);
     if (!ok) throw new Error("wrong password");
     const email = session.email || "";
     if (!email) throw new Error("no email");
@@ -53,7 +53,7 @@ export function ChangePasswordPage() {
       const email = session.email || "";
 
       // 用「当前盐」派生当前密码的 auth key，供服务端二次校验当前密码
-      const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.passwordSalt));
+      const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.loginSalt));
 
       const newSalt = new Uint8Array(32);
       crypto.getRandomValues(newSalt);
@@ -79,8 +79,8 @@ export function ChangePasswordPage() {
       });
 
       await saveSession({
-        passwordSalt: saltBase64,
-        passwordWrapped: newPasswordWrapped,
+        loginSalt: saltBase64,
+        encrypted_user_key: newPasswordWrapped,
       });
 
       setToast({ message: t("settings.passwordChanged"), type: "success" });

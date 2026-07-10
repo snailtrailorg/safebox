@@ -195,16 +195,16 @@ describe("IndexedDB — sessionStore", () => {
       accessToken: "test-access-token",
       refreshToken: "test-refresh-token",
       serverUserId: "user-1",
-      passwordSalt: "salt-base64",
-      passwordWrapped: "wrapped-base64",
-      encryptedPrivate: "enc-priv-base64",
-      rsaPublicKey: "rsa-pub-base64",
+      loginSalt: "salt-base64",
+      encrypted_user_key: "wrapped-base64",
+      recovery_salt: "enc-priv-base64",
+      has_master_password: false,
       lastSyncTime: "2025-06-01T00:00:00+00:00",
     });
 
     const session = await getSession();
     expect(session.accessToken).toBe("test-access-token");
-    expect(session.passwordSalt).toBe("salt-base64");
+    expect(session.loginSalt).toBe("salt-base64");
     expect(session.lastSyncTime).toBe("2025-06-01T00:00:00+00:00");
   });
 
@@ -213,14 +213,14 @@ describe("IndexedDB — sessionStore", () => {
     await saveSession({
       accessToken: "old-access",
       refreshToken: "old-refresh",
-      passwordSalt: "keep-this",
+      loginSalt: "keep-this",
     });
     await updateTokens("new-access", "new-refresh");
 
     const session = await getSession();
     expect(session.accessToken).toBe("new-access");
     expect(session.refreshToken).toBe("new-refresh");
-    expect(session.passwordSalt).toBe("keep-this"); // 保留其他字段
+    expect(session.loginSalt).toBe("keep-this"); // 保留其他字段
   });
 
   it("hasSession returns false when no token", async () => {
@@ -238,11 +238,11 @@ describe("IndexedDB — sessionStore", () => {
 
   it("clearSession removes all data", async () => {
     const { saveSession, clearSession, getSession } = await import("../db/sessionStore");
-    await saveSession({ accessToken: "token", passwordSalt: "salt" });
+    await saveSession({ accessToken: "token", loginSalt: "salt" });
     await clearSession();
     const session = await getSession();
     expect(session.accessToken).toBe("");
-    expect(session.passwordSalt).toBe("");
+    expect(session.loginSalt).toBe("");
   });
 });
 

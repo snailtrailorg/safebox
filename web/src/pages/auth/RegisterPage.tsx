@@ -104,51 +104,47 @@ export function RegisterPage() {
 
     setLoading(true);
     try {
-      const keys = await keyChain.generateKeys(password);
-
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
-          auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
-          password_wrapped: keys.passwordWrapped,
-          encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
+          auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
+          encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
-          email, passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
-          encryptedPrivate: keys.encryptedPrivate,
-          rsaPublicKey: keys.rsaPublicKey,
+          email, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
+          recovery_salt: "",
+          has_master_password: false,
         });
         // 持久化 token + serverUserId 并置为 ready（keyChain 已由 generateKeys 解锁）
         await login(response.access_token, response.refresh_token, response.user_id);
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
-          auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
-          password_wrapped: keys.passwordWrapped,
-          encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
+          auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
+          encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
         } as any);
         await saveSession({
-          email: phone, passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
-          encryptedPrivate: keys.encryptedPrivate,
-          rsaPublicKey: keys.rsaPublicKey,
+          email: phone, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
+          recovery_salt: keys.recovery_salt, recovery_code: "a a a a a a a a a a a a", recovery_code_salt: "rec-code-salt",
+          recovery_salt: "",
+          has_master_password: false,
         });
         await login(response.access_token, response.refresh_token, response.user_id);
       } else {
         const response = await apiClient.registerGoogle({
           google_id_token: googleIdToken,
-          auth_key_hash: keys.authKeyHash, password_salt: keys.passwordSalt,
-          password_wrapped: keys.passwordWrapped,
-          encrypted_private: keys.encryptedPrivate, rsa_public_key: keys.rsaPublicKey,
+          auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
+          encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
-          email: "google", passwordSalt: keys.passwordSalt, passwordWrapped: keys.passwordWrapped,
-          encryptedPrivate: keys.encryptedPrivate,
-          rsaPublicKey: keys.rsaPublicKey,
+          email: "google", loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
+          recovery_salt: "",
+          has_master_password: false,
         });
         await login(response.access_token, response.refresh_token, response.user_id);
       }

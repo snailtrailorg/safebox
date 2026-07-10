@@ -104,76 +104,60 @@ describe("KDF (kdf.ts)", () => {
 
 describe("KeyChain", () => {
   it("generateKeys returns all required fields", async () => {
-    const keys = await keyChain.generateKeys("test-password");
+    const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","test-password");
     expect(keys.authKeyHash).toBeTruthy();
     expect(typeof keys.authKeyHash).toBe("string");
-    expect(keys.passwordSalt).toBeTruthy();
-    expect(typeof keys.passwordSalt).toBe("string");
-    expect(keys.passwordWrapped).toBeTruthy();
-    expect(typeof keys.passwordWrapped).toBe("string");
-    expect(keys.encryptedPrivate).toBeTruthy();
-    expect(typeof keys.encryptedPrivate).toBe("string");
-    expect(keys.rsaPublicKey).toBeTruthy();
-    expect(typeof keys.rsaPublicKey).toBe("string");
+    expect(keys.loginSalt).toBeTruthy();
+    expect(typeof keys.loginSalt).toBe("string");
+    expect(keys.encrypted_user_key).toBeTruthy();
+    expect(typeof keys.encrypted_user_key).toBe("string");
+    expect(keys.recovery_salt).toBeTruthy();
+    expect(typeof keys.recovery_salt).toBe("string");
     expect(keys.kdfSettings).toEqual(DEFAULT_KDF);
     expect(keyChain.isUnlocked).toBe(true);
   });
 
   it("generateKeys produces different keys each time", async () => {
-    const k1 = await keyChain.generateKeys("password");
-    const k2 = await keyChain.generateKeys("password");
+    const k1 = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
+    const k2 = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     expect(k1.authKeyHash).not.toBe(k2.authKeyHash);
-    expect(k1.passwordWrapped).not.toBe(k2.passwordWrapped);
-    expect(k1.rsaPublicKey).not.toBe(k2.rsaPublicKey);
+    expect(k1.encrypted_user_key).not.toBe(k2.encrypted_user_key);
   });
 
   it("unlockWithPassword works with correct password", async () => {
-    const keys = await keyChain.generateKeys("correct-password");
+    const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","correct-password");
     keyChain.lock();
     expect(keyChain.isUnlocked).toBe(false);
 
     const ok = await keyChain.unlockWithPassword(
-      "correct-password", keys.passwordSalt, keys.passwordWrapped,
+      "correct-password", keys.loginSalt, keys.encrypted_user_key, keys.cached_K,
     );
     expect(ok).toBe(true);
     expect(keyChain.isUnlocked).toBe(true);
   });
 
   it("unlockWithPassword fails with wrong password", async () => {
-    const keys = await keyChain.generateKeys("correct-password");
+    const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","correct-password");
     keyChain.lock();
 
     const ok = await keyChain.unlockWithPassword(
-      "wrong-password", keys.passwordSalt, keys.passwordWrapped,
+      "wrong-password", keys.loginSalt, keys.encrypted_user_key, keys.cached_K,
     );
     expect(ok).toBe(false);
     expect(keyChain.isUnlocked).toBe(false);
   });
 
   it("unlockWithPassword fails with wrong salt", async () => {
-    const keys = await keyChain.generateKeys("password");
+    const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     keyChain.lock();
 
     const wrongSalt = btoa(String.fromCharCode(...new Uint8Array(32)));
-    const ok = await keyChain.unlockWithPassword("password", wrongSalt, keys.passwordWrapped);
+    const ok = await keyChain.unlockWithPassword("password", wrongSalt, keys.encrypted_user_key, keys.cached_K);
     expect(ok).toBe(false);
   });
 
-  it("loadRsaKeys works after unlock", async () => {
-    const keys = await keyChain.generateKeys("password");
-    const rsaOk = await keyChain.loadRsaKeys(keys.encryptedPrivate, keys.rsaPublicKey);
-    expect(rsaOk).toBe(true);
-    expect(keyChain.isRsaLoaded).toBe(true);
-  });
-
-  it("loadRsaKeys fails with wrong encrypted key", async () => {
-    await keyChain.generateKeys("password");
-    const rsaOk = await keyChain.loadRsaKeys("not-valid-encrypted-key", "not-valid-pubkey");
-    expect(rsaOk).toBe(false);
-  });
-
   it("encryptFileBlob / decryptFileBlob roundtrip", async () => {
-    await keyChain.generateKeys("password");
+    await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     const original = new TextEncoder().encode("file content here").buffer;
     const encrypted = await keyChain.encryptFileBlob(original);
     expect(encrypted).toBeTruthy();
@@ -184,22 +168,16 @@ describe("KeyChain", () => {
   });
 
   it("lock clears all keys", async () => {
-    await keyChain.generateKeys("password");
+    await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     expect(keyChain.isUnlocked).toBe(true);
 
     keyChain.lock();
     expect(keyChain.isUnlocked).toBe(false);
-    expect(keyChain.isRsaLoaded).toBe(false);
   });
-
   it("unlock → lock → unlock cycle works", async () => {
-    const keys = await keyChain.generateKeys("password");
-    await keyChain.loadRsaKeys(keys.encryptedPrivate, keys.rsaPublicKey);
+    const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     keyChain.lock();
 
-    const ok = await keyChain.unlockWithPassword("password", keys.passwordSalt, keys.passwordWrapped);
-    expect(ok).toBe(true);
-    const rsaOk = await keyChain.loadRsaKeys(keys.encryptedPrivate, keys.rsaPublicKey);
-    expect(rsaOk).toBe(true);
+    const ok = await keyChain.unlockWithPassword("password", keys.loginSalt, keys.encrypted_user_key, keys.cached_K);
+    expect(ok).toBe(true);  });
   });
-});

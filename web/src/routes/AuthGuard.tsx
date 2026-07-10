@@ -68,21 +68,13 @@ function UnlockScreen() {
     setError("");
     try {
       const session = await getSession();
-      const ok = await keyChain.unlockWithPassword(password, session.passwordSalt, session.passwordWrapped);
+      const ok = await keyChain.unlockWithPassword(password, session.loginSalt, session.encrypted_user_key);
       if (!ok) {
         setError(t("auth.login.unlockFailed"));
         setUnlocking(false);
         return;
       }
-      const rsaLoaded = await keyChain.loadRsaKeys(
-        session.encryptedPrivate,
-        session.rsaPublicKey,
-      );
-      if (!rsaLoaded) {
-        setError(t("auth.login.rsaFailed"));
-        setUnlocking(false);
-        return;
-      }
+      // 模型 D：无 RSA，直接解锁
       unlock();
     } catch {
       setError(t("auth.login.unlockFailed"));

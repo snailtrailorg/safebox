@@ -5,10 +5,12 @@ from httpx import AsyncClient
 REG = {
     "verification_code": "123456",
     "auth_key_hash": "hash",
-    "password_salt": "salt",
-    "password_wrapped": "wrapped",
-    "encrypted_private": "enc_priv",
-    "rsa_public_key": "rsa_pub",
+    "login_salt": "salt",
+    "encrypted_user_key": "fake-euk",
+    "recovery_salt": "rec-salt",
+    "has_master_password": False,
+    "recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
+    "recovery_code_salt": "rec-code-salt",
     "device_name": "Test",
     "device_public_key": "device_pub",
     "device_wrapped": "device_wrapped",
@@ -19,8 +21,8 @@ REG = {
 async def test_login_after_register(client: AsyncClient):
     resp = await client.post("/api/v1/auth/register/email", json={
         **REG, "email": "login-test@safebox.example.com",
-        "auth_key_hash": "login_test_hash", "password_salt": "login_test_salt",
-        "password_wrapped": "login_test_wrapped", "recovery_wrapped": "login_test_recovery",
+        "auth_key_hash": "login_test_hash", "login_salt": "login_test_salt",
+        "login_salt": "login_test_wrapped", "recovery_wrapped": "login_test_recovery",
         "encrypted_private": "login_test_enc_priv", "rsa_public_key": "login_test_rsa_pub",
     })
     assert resp.status_code == 201
@@ -31,7 +33,7 @@ async def test_login_after_register(client: AsyncClient):
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert data["password_wrapped"] == "login_test_wrapped"
+    assert data["login_salt"] == "login_test_wrapped"
 
 
 @pytest.mark.asyncio

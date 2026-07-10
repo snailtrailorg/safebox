@@ -19,8 +19,6 @@ import type {
   RefreshTokenResponse,
   RegisterDeviceRequest,
   RegisterDeviceResponse,
-  GenerateRecoveryRequest,
-  GenerateRecoveryResponse,
   InitiateRecoveryRequest,
   InitiateRecoveryResponse,
   ConfirmRecoveryRequest,
@@ -163,7 +161,7 @@ class ApiClient {
     return this.request("POST", "/auth/register/google", req, true);
   }
 
-  async getSalt(email?: string, phone?: string): Promise<{ password_salt: string; encrypted_private?: string; rsa_public_key?: string }> {
+  async getSalt(email?: string, phone?: string): Promise<{ login_salt: string; kdf_settings: any; recovery_salt: string; has_master_password: boolean }> {
     const params = new URLSearchParams();
     if (email) params.set("email", email);
     if (phone) params.set("phone", phone);
@@ -188,10 +186,6 @@ class ApiClient {
 
   // ── Recovery 端点 ─────────────────────────────────
 
-  async generateRecovery(req: GenerateRecoveryRequest): Promise<GenerateRecoveryResponse> {
-    return this.request("POST", "/auth/recovery/generate", req, true);
-  }
-
   async initiateRecovery(req: InitiateRecoveryRequest): Promise<InitiateRecoveryResponse> {
     return this.request("POST", "/auth/recovery/initiate", req, true);
   }
@@ -199,6 +193,8 @@ class ApiClient {
   async confirmRecovery(req: ConfirmRecoveryRequest): Promise<ConfirmRecoveryResponse> {
     return this.request("POST", "/auth/recovery/confirm", req, true);
   }
+
+
 
   async getRecoveryStatus(): Promise<RecoveryStatusResponse> {
     return this.request("GET", "/auth/recovery/status");

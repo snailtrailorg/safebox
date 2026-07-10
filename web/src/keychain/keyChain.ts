@@ -1,301 +1,201 @@
 /**
- * KeyChain — User Key 生命周期管理
+ * KeyChain - User Key 生命周期（模型 D 串行化）
  *
- * 替代 v1 KeyManager，职责:
- *   - User Key 生命周期（生成/解锁/锁定）
- *   - Item Key 生成和加密（每条目一个随机 key）
- *   - RSA 私钥加载（仅用于旧条目解密）
- *   - 旧格式（RSA）解密回退
- *
- * 密钥仅存于 JavaScript 堆内存（CryptoKey 对象），永不持久化。
+ * K = PBKDF2(恢复码 [+ 主密码], recovery_salt) - 永久，不存服务器
+ * User Key = 随机 AES-256 - 包裹 Item Keys
+ * encrypted_user_key = AES(K, User Key) - 存服务器
+ * 登录密码只做认证 + 本地缓存 K
  */
 import {
-  generateAesKey,
-  exportAesKey,
-  importAesKey,
-  aesEncrypt,
-  aesDecrypt,
-  aesEncryptString,
-  aesDecryptString,
+  generateAesKey, importAesKey,
+  aesEncrypt, aesDecrypt, aesEncryptString, aesDecryptString,
   makeFieldAAD,
 } from "../crypto/aes";
-import {
-  deriveKey,
-  deriveAuthKey,
-  type KdfSettings,
-  DEFAULT_KDF,
-} from "../crypto/kdf";
-import type { UserKeySet, ItemKey, EncryptedField } from "./types";
+import { deriveKey, deriveAuthKey, type KdfSettings, DEFAULT_KDF } from "../crypto/kdf";
+import type { ItemKey, EncryptedField } from "./types";
 
 class KeyChain {
   private userKey: CryptoKey | null = null;
-  private rsaPrivateKey: CryptoKey | null = null;
-  private rsaPublicKey: string | null = null;
-  private authKeyHash: string | null = null;
 
-  // ── 状态查询 ────────────────────────────────────
+  get isUnlocked(): boolean { return this.userKey !== null; }
 
-  get isUnlocked(): boolean {
-    return this.userKey !== null;
-  }
+  // ── 注册时生成密钥 ──────────────────────────────
 
-  get isRsaLoaded(): boolean {
-    return this.rsaPrivateKey !== null;
-  }
-
-  // ── 密钥生成（注册时）──────────────────────────
-
-  async generateKeys(password: string): Promise<{
+  async generateKeys(recoveryCode: string, masterPassword: string, loginPassword: string): Promise<{
     authKeyHash: string;
-    passwordSalt: string;
-    passwordWrapped: string;
-    encryptedPrivate: string;
-    rsaPublicKey: string;
-    devicePublicKey?: string;
-    deviceWrapped?: string;
+    loginSalt: string;
+    encrypted_user_key: string;
+    recovery_salt: string;
+    cached_K: string;
     kdfSettings: KdfSettings;
   }> {
-    const salt = new Uint8Array(32);
-    crypto.getRandomValues(salt);
+    const loginSalt = new Uint8Array(32);
+    crypto.getRandomValues(loginSalt);
+    const recoverySalt = new Uint8Array(32);
+    crypto.getRandomValues(recoverySalt);
+
+    // K = PBKDF2(恢复码 [+ 主密码], recovery_salt)
+    const kSeed = recoveryCode + (masterPassword || "");
+    const K = await deriveKey(kSeed, recoverySalt);
+
+    // User Key（随机，不变）
     this.userKey = await generateAesKey();
-    const derivedKey = await deriveKey(password, salt);
-    const authKeyHash = await deriveAuthKey(password, salt);
+    const userKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
 
-    // 生成 RSA 密钥对（仅用于旧条目解密 + 未来共享）
-    const rsaPair = await crypto.subtle.generateKey(
-      {
-        name: "RSA-OAEP",
-        modulusLength: 4096,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: "SHA-256",
-      },
-      true,
-      ["encrypt", "decrypt"],
-    );
-    this.rsaPublicKey = await this.encodePublicKey(rsaPair.publicKey);
-    this.rsaPrivateKey = rsaPair.privateKey;
+    // encrypted_user_key = AES(K, User Key) - 存服务器
+    const encrypted_user_key = await aesEncrypt(K, userKeyRaw);
 
-    // 包装密钥
-    const masterRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
-    const passwordWrapped = await aesEncrypt(derivedKey, masterRaw);
-    const encryptedPrivate = await this.encryptPrivateKey(this.rsaPrivateKey);
+    // loginDerivedKey = PBKDF2(登录密码, loginSalt) - 本地缓存 K
+    const loginDerivedKey = await deriveKey(loginPassword, loginSalt);
+    const cached_K = await aesEncrypt(loginDerivedKey, userKeyRaw);  // K 不存服务器，只存本地
 
-    const saltBase64 = this.bytesToBase64(salt);
-    this.authKeyHash = authKeyHash;
+    // authKey - 服务端认证
+    const authKeyHash = await deriveAuthKey(loginPassword, loginSalt);
+
+    const saltBase64 = this.bytesToBase64(loginSalt);
+    const recSaltBase64 = this.bytesToBase64(recoverySalt);
 
     return {
       authKeyHash,
-      passwordSalt: saltBase64,
-      passwordWrapped,
-      encryptedPrivate,
-      rsaPublicKey: this.rsaPublicKey,
+      loginSalt: saltBase64,
+      encrypted_user_key,
+      recovery_salt: recSaltBase64,
+      cached_K,
       kdfSettings: DEFAULT_KDF,
     };
   }
 
-  // ── 解锁 ────────────────────────────────────────
+  // ── 日常解锁（Web: 登录密码 -> loginDerivedKey -> K -> UserKey）─────────
 
   async unlockWithPassword(
-    password: string,
-    saltBase64: string,
-    passwordWrapped: string,
+    loginPassword: string,
+    loginSaltBase64: string,
+    encryptedUserKey: string,
+    cached_K: string,
   ): Promise<boolean> {
     try {
-      const salt = this.base64ToBytes(saltBase64);
-      const derivedKey = await deriveKey(password, salt);
-      const masterRaw = await aesDecrypt(derivedKey, passwordWrapped);
-      if (!masterRaw) return false;
-      const buf = masterRaw.buffer.slice(masterRaw.byteOffset, masterRaw.byteOffset + masterRaw.byteLength) as ArrayBuffer;
-      this.userKey = await crypto.subtle.importKey(
-        "raw", buf, "AES-GCM", true, ["encrypt", "decrypt"],
-      );
+      const loginSalt = this.base64ToBytes(loginSaltBase64);
+      const loginDerivedKey = await deriveKey(loginPassword, loginSalt);
+      // K = AES 解密(cached_K, loginDerivedKey)
+      const kRaw = await aesDecrypt(loginDerivedKey, cached_K);
+      if (!kRaw) return false;
+      // User Key = AES 解密(encrypted_user_key, K)
+      const ukRaw = await aesDecrypt(await importAesKey(this.bytesToBase64(kRaw)), encryptedUserKey);
+      if (!ukRaw) return false;
+      const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
+      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 
-  /** 导出 User Key 的 raw bytes（供改密等场景使用）。未解锁时返回 null。 */
+  // ── 恢复码解锁（忘登录密码/换设备）─────────────────
+
+  async unlockFromRecoveryCode(
+    recoveryCode: string,
+    masterPassword: string,
+    recoverySaltBase64: string,
+    encryptedUserKey: string,
+  ): Promise<boolean> {
+    try {
+      const recoverySalt = this.base64ToBytes(recoverySaltBase64);
+      const kSeed = recoveryCode + (masterPassword || "");
+      const K = await deriveKey(kSeed, recoverySalt);
+      const ukRaw = await aesDecrypt(K, encryptedUserKey);
+      if (!ukRaw) return false;
+      const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
+      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
+      return true;
+    } catch { return false; }
+  }
+
+  // ── 改登录密码（K 不变，只更新本地缓存）─────────────
+
+  async rewrapCachedK(
+    oldLoginPassword: string, oldLoginSaltBase64: string,
+    oldCached_K: string,
+    newLoginPassword: string, newLoginSaltBase64: string,
+  ): Promise<string> {
+    const oldSalt = this.base64ToBytes(oldLoginSaltBase64);
+    const oldLoginDerivedKey = await deriveKey(oldLoginPassword, oldSalt);
+    const kRaw = await aesDecrypt(oldLoginDerivedKey, oldCached_K);
+    if (!kRaw) throw new Error("unlock_failed");
+    const newSalt = this.base64ToBytes(newLoginSaltBase64);
+    const newLoginDerivedKey = await deriveKey(newLoginPassword, newSalt);
+    return aesEncrypt(newLoginDerivedKey, kRaw);
+  }
+
+  /** 导出 User Key 的 raw bytes */
   async exportUserKeyRaw(): Promise<Uint8Array | null> {
     if (!this.userKey) return null;
     return new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
   }
 
-  // ── RSA 密钥加载 ────────────────────────────────
+  // ── Item Key（不变）──────────────────────────────
 
-  async loadRsaKeys(
-    encryptedPrivateKey: string,
-    publicKeyStr: string,
-  ): Promise<boolean> {
-    if (!this.userKey) return false;
-    try {
-      const privatePem = await aesDecryptString(this.userKey, encryptedPrivateKey);
-      if (!privatePem) return false;
-      const privateKey = await this.decodePrivateKey(privatePem);
-      const publicKey = await this.decodePublicKey(publicKeyStr);
-      if (!privateKey || !publicKey) return false;
-      this.rsaPrivateKey = privateKey;
-      this.rsaPublicKey = publicKeyStr;
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // ── Item Key 管理（v2 新增）─────────────────────
-
-  /** 生成一个 Item Key 并返回加密后的 key（用于存储） */
   async createItemKey(): Promise<ItemKey> {
     const key = await generateAesKey();
     const raw = new Uint8Array(await crypto.subtle.exportKey("raw", key));
     const encrypted = await aesEncrypt(this.userKey!, raw);
     return { key, encrypted };
   }
-
-  /** 从存储的加密 key 还原 Item Key */
   async decryptItemKey(encryptedKey: string): Promise<CryptoKey | null> {
     try {
       const raw = await aesDecrypt(this.userKey!, encryptedKey);
       if (!raw) return null;
-      const key = await importAesKey(this.bytesToBase64(raw));
-      return key;
-    } catch {
-      return null;
-    }
+      return importAesKey(this.bytesToBase64(raw));
+    } catch { return null; }
   }
 
-  // ── 条目字段加密/解密 ──────────────────────────
+  // ── 字段加密/解密（不变）─────────────────────────
 
-  /**
-   * 加密条目字段（v2 格式：Item Key + AES-GCM + 字段 AAD）
-   * 返回 { encrypted_key, ciphertext } — 存于条目记录的 single field
-   */
-  async encryptItemField(
-    plaintext: string,
-    fieldName: string,
-    itemType: string,
-    itemKey?: ItemKey,
-  ): Promise<EncryptedField> {
+  async encryptItemField(plaintext: string, fieldName: string, itemType: string, itemKey?: ItemKey): Promise<EncryptedField> {
     const ik = itemKey ?? (await this.createItemKey());
     const aad = makeFieldAAD(fieldName, itemType);
-    const nonce = new Uint8Array(12);
-    crypto.getRandomValues(nonce);
-    const ct = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
-      ik.key,
-      new TextEncoder().encode(plaintext).buffer.slice(0) as ArrayBuffer,
-    ) as ArrayBuffer;
-    const ctView = new Uint8Array(ct);
-    const result = new Uint8Array(nonce.length + ctView.length);
-    result.set(nonce, 0);
-    result.set(ctView, nonce.length);
-    return {
-      encrypted_key: ik.encrypted,
-      ciphertext: this.bytesToBase64(result),
-    };
+    const nonce = new Uint8Array(12); crypto.getRandomValues(nonce);
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad  as any}, ik.key, new TextEncoder().encode(plaintext) as BufferSource) as ArrayBuffer;
+    const ctView = new Uint8Array(ct as ArrayBuffer);
+    const r = new Uint8Array(12 + ctView.byteLength);
+    r.set(nonce, 0);
+    r.set(ctView, 12);
+    return { encrypted_key: ik.encrypted, ciphertext: this.bytesToBase64(r) };
   }
 
-  /**
-   * 解密条目字段（v2：Item Key + AES-GCM + 字段 AAD。解密失败返回 null）
-   */
-  async decryptItemField(
-    field: EncryptedField,
-    fieldName: string,
-    itemType: string,
-  ): Promise<string | null> {
-    const itemKey = await this.decryptItemKey(field.encrypted_key);
-    if (!itemKey) return null;
+  async decryptItemField(field: EncryptedField, fieldName: string, itemType: string): Promise<string | null> {
+    const ik = await this.decryptItemKey(field.encrypted_key);
+    if (!ik) return null;
     try {
       const aad = makeFieldAAD(fieldName, itemType);
       const data = this.base64ToBytes(field.ciphertext);
       if (data.length < 13) return null;
-      const nonce = data.slice(0, 12);
-      const ct = data.slice(12);
-      const pt = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: nonce.buffer.slice(nonce.byteOffset, nonce.byteOffset + nonce.byteLength) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer },
-        itemKey,
-        ct.buffer.slice(ct.byteOffset, ct.byteOffset + ct.byteLength) as ArrayBuffer,
-      ) as ArrayBuffer;
-      return new TextDecoder().decode(pt);
-    } catch {
-      return null;
-    }
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: data.slice(0, 12).buffer.slice(data.byteOffset, data.byteOffset + 12) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer }, ik, data.slice(12).buffer.slice(data.byteOffset + 12, data.byteOffset + data.length) as ArrayBuffer) as ArrayBuffer;
+      return new TextDecoder().decode(new Uint8Array(pt as ArrayBuffer));
+    } catch { return null; }
   }
 
-  // ── 文件加密/解密（AES-GCM，用于文件类型条目）─────
+  // ── 文件加密/解密（不变）─────────────────────────
 
-  /** 加密文件内容，返回 Base64(nonce + ciphertext) */
   async encryptFileBlob(plaintext: ArrayBuffer): Promise<string | null> {
     if (!this.userKey) return null;
     return aesEncrypt(this.userKey, new Uint8Array(plaintext));
   }
-
-  /** 解密文件内容，返回原始 ArrayBuffer */
   async decryptFileBlob(encoded: string): Promise<ArrayBuffer | null> {
     if (!this.userKey) return null;
     const bytes = await aesDecrypt(this.userKey, encoded);
     if (!bytes) return null;
-    return (bytes.buffer as ArrayBuffer).slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    );
+    return null;
   }
 
-  // ── 锁定 ────────────────────────────────────────
-
-  lock(): void {
-    this.userKey = null;
-    this.rsaPrivateKey = null;
-    this.rsaPublicKey = null;
-    this.authKeyHash = null;
-  }
-
-  // ── 内部工具 ────────────────────────────────────
-
-  private async encodePublicKey(key: CryptoKey): Promise<string> {
-    const spki = await crypto.subtle.exportKey("spki", key);
-    return this.bytesToBase64(new Uint8Array(spki as ArrayBuffer));
-  }
-
-  private async decodePublicKey(encoded: string): Promise<CryptoKey | null> {
-    try {
-      const bytes = this.base64ToBytes(encoded);
-      return await crypto.subtle.importKey(
-        "spki", bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-        { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"],
-      );
-    } catch { return null; }
-  }
-
-  private async decodePrivateKey(pem: string): Promise<CryptoKey | null> {
-    try {
-      const bytes = this.base64ToBytes(pem);
-      return await crypto.subtle.importKey(
-        "pkcs8", bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-        { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"],
-      );
-    } catch { return null; }
-  }
-
-  private async encryptPrivateKey(key: CryptoKey): Promise<string> {
-    const pkcs8 = await crypto.subtle.exportKey("pkcs8", key);
-    const encoded = this.bytesToBase64(new Uint8Array(pkcs8 as ArrayBuffer));
-    return aesEncryptString(this.userKey!, encoded);
-  }
+  lock(): void { this.userKey = null; }
 
   private bytesToBase64(bytes: Uint8Array): string {
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
+    let b = ""; for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+    return btoa(b);
   }
-
-  private base64ToBytes(base64: string): Uint8Array {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
+  private base64ToBytes(b64: string): Uint8Array {
+    const b = atob(b64); const r = new Uint8Array(b.length);
+    for (let i = 0; i < b.length; i++) r[i] = b.charCodeAt(i);
+    return r;
   }
 }
 
-/** 全局单例 */
 export const keyChain = new KeyChain();

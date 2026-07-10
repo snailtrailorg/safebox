@@ -43,39 +43,24 @@ def _t(request: Request, key: str, **kw: object) -> str:
     return get_text(key, lang, **kw)
 
 
-# ── Schemas ─────────────────────────────────────────
-
-class GenerateRecoveryRequest(BaseModel):
-    target: str = Field(..., pattern="^(phone|email)$")
-    value: str
-    verification_code: str = Field(..., min_length=6, max_length=6)
-    current_auth_key_hash: str
-    recovery_wrapped: str       # 恢复码派生密钥包裹的 User Key（客户端用恢复码明文派生）
-    recovery_salt: str          # 恢复码派生密钥的盐
-
-
-class GenerateRecoveryResponse(BaseModel):
-    recovery_code: str
-
+# -- Schemas -----------------------------------------
 
 class InitiateRecoveryRequest(BaseModel):
     target: str = Field(..., pattern="^(phone|email)$")
     value: str
     recovery_code: str
     new_auth_key_hash: str
-    new_password_salt: str
-    new_kdf_settings: dict
+    new_login_salt: str
 
 
 class InitiateRecoveryResponse(BaseModel):
-    recovery_wrapped: str       # 客户端用恢复码派生密钥解出旧 User Key，本地重包后调 confirm
-    recovery_salt: str
+    encrypted_user_key: str     # 客户端用 K=PBKDF2(恢复码[+主密码],recovery_salt) 解出 User Key
+    recovery_salt: str          # K 派生用盐
     initiate_token: str         # 步骤2 confirm 用（15min 有效）
 
 
 class ConfirmRecoveryRequest(BaseModel):
-    initiate_token: str
-    new_wrapped_user_key: str   # 旧 User Key 用新密码重包（User Key 不换，数据不动）
+    initiate_token: str         # 步骤1 返回的 token；K/User Key 不变，无需传 wrapped
 
 
 class ConfirmRecoveryResponse(BaseModel):
@@ -94,7 +79,6 @@ class FreezeRecoveryRequest(BaseModel):
 class RecoveryStatusResponse(BaseModel):
     status: str  # none | active | cooldown | permanently_locked
     cooldown_until: str | None = None
-    monthly_initiation_count: int = 0
     failed_attempt_count: int = 0
 
 
@@ -104,44 +88,7 @@ class RevokeRecoveryRequest(BaseModel):
     verification_code: str = Field(..., min_length=6, max_length=6)
     current_auth_key_hash: str
 
-
-# ── 生成恢复码（已登录）─────────────────────────────
-
-@router.post("/generate", response_model=GenerateRecoveryResponse)
-async def generate_recovery(
-    req: GenerateRecoveryRequest,
-    request: Request,
-    user_id: UUID = Depends(require_not_in_cooldown),
-    db: AsyncSession = Depends(get_db),
-):
-    """生成新恢复码。需验证码 + 当前密码。"""
-    if not await verify_and_consume(req.target, req.value, req.verification_code):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_t(request, "verification_code_invalid"),
-        )
-
-    user = await db.get(User, user_id)
-    if not user or not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash or ""):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_t(request, "email_or_password_wrong"),
-        )
-
-    plaintext, _ = await create_recovery_code(db, user_id)
-
-    # 存客户端用恢复码派生密钥包裹的 User Key（数据恢复用）
-    result = await db.execute(select(UserKeys).where(UserKeys.user_id == user_id))
-    uk = result.scalar_one_or_none()
-    if uk:
-        uk.recovery_wrapped = req.recovery_wrapped
-        uk.recovery_salt = req.recovery_salt
-    await db.commit()
-
-    return GenerateRecoveryResponse(recovery_code=plaintext)
-
-
-# ── 恢复：步骤 1（验证恢复码 + 建待确认态）─────────────
+# -- 恢复：步骤 1（验证恢复码 + 建待确认态）-
 
 @router.post("/initiate", response_model=InitiateRecoveryResponse)
 async def initiate(
@@ -149,10 +96,10 @@ async def initiate(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """步骤 1：验证恢复码。验通过后返回 recovery_wrapped + initiate_token。
+    """步骤 1：验证恢复码。验通过后返回 encrypted_user_key + recovery_salt + initiate_token。
 
-    此时**不改正式字段**、不进冷却。客户端用恢复码 + recovery_salt 本地解包旧 User Key、
-    用新密码重包后，调 /auth/recovery/confirm 完成。
+    此时**不改正式字段**、不进冷却。客户端用 K=PBKDF2(恢复码[+主密码], recovery_salt) 本地解出 User Key、
+    调 /auth/recovery/confirm 完成（K/User Key 不变，无需传 wrapped）。
     """
     user = (
         await find_user_by_email(db, req.value)
@@ -180,22 +127,21 @@ async def initiate(
         raise HTTPException(401, detail=_t(request, "recovery_code_invalid"))
 
     new_hash = hash_auth_key(req.new_auth_key_hash)
-    token, rec_wrapped, rec_salt = await initiate_recovery_step1(
+    token, eu_key, rec_salt = await initiate_recovery_step1(
         db, rc, user,
         new_auth_key_hash=new_hash,
-        new_password_salt=req.new_password_salt,
-        new_kdf_settings=req.new_kdf_settings,
+        new_login_salt=req.new_login_salt,
     )
     await db.commit()
 
     return InitiateRecoveryResponse(
-        recovery_wrapped=rec_wrapped,
+        encrypted_user_key=eu_key,
         recovery_salt=rec_salt,
         initiate_token=token,
     )
 
 
-# ── 恢复：步骤 2（确认 + 真正发起）────────────────────
+# -- 恢复：步骤 2（确认 + 真正发起）--------------------
 
 @router.post("/confirm", response_model=ConfirmRecoveryResponse)
 async def confirm(
@@ -203,9 +149,8 @@ async def confirm(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """步骤 2：验 token + 交重包后的 new_wrapped_user_key。真正发起恢复。
-
-    写正式=新密码 + rollback_*=旧密码 + status=cooldown + 吊销所有旧 token（A）。
+    """步骤 2：验 token + 真正发起恢复（写登录密码+进冷却+吊销旧token）。
+    K/User Key 不变，无需客户端传 wrapped key。
     """
     # 按 token 哈希找对应 recovery_code
     token_hash = hashlib.sha256(req.initiate_token.encode()).hexdigest()
@@ -220,7 +165,7 @@ async def confirm(
     if not user:
         raise HTTPException(404, detail=_t(request, "user_not_found"))
 
-    ok = await confirm_recovery(db, rc, user, req.initiate_token, req.new_wrapped_user_key)
+    ok = await confirm_recovery(db, rc, user, req.initiate_token)
     if not ok:
         raise HTTPException(401, detail=_t(request, "recovery_token_invalid"))
 
@@ -241,7 +186,7 @@ async def confirm(
     )
 
 
-# ── 状态查询 ────────────────────────────────────────
+# -- 状态查询 ----------------------------------------
 
 @router.get("/status", response_model=RecoveryStatusResponse)
 async def get_status(
@@ -260,12 +205,11 @@ async def get_status(
     return RecoveryStatusResponse(
         status=rc.status,
         cooldown_until=rc.cooldown_until.isoformat() if rc.cooldown_until else None,
-        monthly_initiation_count=rc.monthly_initiation_count,
         failed_attempt_count=rc.failed_attempt_count,
     )
 
 
-# ── 加速通道（需验证码 + 签名 token）───────────────
+# -- 加速通道（需验证码 + 签名 token）---------------
 
 @router.post("/accelerate", status_code=status.HTTP_204_NO_CONTENT)
 async def accelerate(
@@ -310,7 +254,7 @@ async def accelerate(
     await send_recovery_alert(user, "accelerate", "", "")
 
 
-# ── 冻结（签名 token，无需登录/验证码）──────────────
+# -- 冻结（签名 token，无需登录/验证码）--------------
 
 @router.post("/freeze", status_code=status.HTTP_204_NO_CONTENT)
 async def freeze(
@@ -349,7 +293,7 @@ async def freeze(
     await send_recovery_alert(user, "freeze", "", "")
 
 
-# ── 主动作废（已登录）───────────────────────────────
+# -- 主动作废（已登录）-------------------------------
 
 @router.post("/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke(

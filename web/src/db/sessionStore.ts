@@ -11,10 +11,12 @@ const EMPTY_SESSION: SessionData = {
   refreshToken: "",
   serverUserId: "",
   email: "",
-  passwordSalt: "",
-  passwordWrapped: "",
-  encryptedPrivate: "",
-  rsaPublicKey: "",
+  loginSalt: "",
+  cached_K: "",
+  encrypted_user_key: "",
+  recovery_salt: "",
+  password_version: 0,
+  has_master_password: false,
   lastSyncTime: "2020-01-01T00:00:00+00:00",
 };
 

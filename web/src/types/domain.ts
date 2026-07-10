@@ -44,9 +44,11 @@ export interface SessionData {
   refreshToken: string;
   serverUserId: string;
   email: string;
-  passwordSalt: string;
-  passwordWrapped: string;
-  encryptedPrivate: string;
-  rsaPublicKey: string;
+  loginSalt: string;            // 登录密码派生用盐（替代 passwordSalt）
+  cached_K: string;             // AES(K, PBKDF2(登录密码))，本地缓存 K
+  encrypted_user_key: string;   // AES(K, User Key)，从服务器获取
+  recovery_salt: string;        // K 派生用盐
+  password_version: number;     // 改登录密码 +1
+  has_master_password: boolean;
   lastSyncTime: string;
 }
