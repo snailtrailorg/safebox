@@ -1,7 +1,8 @@
 """认证 API：注册、登录、验证码、密码重置、设备注册。"""
 
 import json
-import secrets
+import hmac
+import hashlib
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -76,7 +77,11 @@ def _t(request: Request, key: str, **kw: object) -> str:
 
 @router.get("/salt")
 async def get_salt(email: str | None = None, phone: str | None = None, db: AsyncSession = Depends(get_db)):
-    """获取用户密码 salt，用于客户端 PBKDF2 派生密钥。"""
+    """获取用户密码 salt，用于客户端 PBKDF2 派生密钥。
+
+    防枚举：不存在用户返回由 target 派生的确定性 salt（HMAC(server_secret, target)），
+    与真实用户 salt 同为 base64(32 字节) 且稳定，攻击者无法通过稳定性/格式差异判断用户是否存在。
+    """
     user = None
     if email:
         user = await find_user_by_email(db, email)
@@ -89,9 +94,22 @@ async def get_salt(email: str | None = None, phone: str | None = None, db: Async
             "password_salt": user.password_salt,
             "kdf_settings": kdf,
         }
-    # 用户不存在时返回随机 salt，防止枚举
-    return {"password_salt": secrets.token_hex(16),
+    # 用户不存在：派生确定性 salt（稳定 + 格式与真实一致），防止枚举
+    target = email or phone or ""
+    return {"password_salt": _derive_fake_salt(target),
             "kdf_settings": DEFAULT_KDF_SETTINGS}
+
+
+def _derive_fake_salt(target: str) -> str:
+    """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。
+
+    - 稳定：同一 target 每次相同（与真实用户一致）。
+    - 格式一致：HMAC-SHA256 输出 32 字节 -> base64，与真实 salt（随机 32 字节 base64）不可区分。
+    - 不可预测：依赖 jwt_secret_key，攻击者无法自行计算比对。
+    """
+    import base64
+    digest = hmac.new(settings.jwt_secret_key.encode(), target.encode(), hashlib.sha256).digest()
+    return base64.b64encode(digest).decode()
 
 
 # ── 验证码 ──────────────────────────────────────────
