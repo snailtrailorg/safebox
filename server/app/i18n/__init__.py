@@ -1,5 +1,6 @@
 """轻量 i18n 模块：JSON 翻译文件 + Accept-Language 解析。"""
 
+from typing import Optional
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -34,7 +35,7 @@ def get_text(key: str, lang: str = "en", **kwargs) -> str:
     return text
 
 
-def get_lang(accept_language: str | None) -> str:
+def get_lang(accept_language: Optional[str]) -> str:
     """解析 Accept-Language header，返回 zh 或 en。
 
     规则：以 zh 开头 → zh，其余 → en

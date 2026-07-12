@@ -1,9 +1,10 @@
 """Google OAuth 身份验证服务。"""
 
+from typing import Optional
 from app.config import settings
 
 
-async def verify_google_id_token(token: str) -> str | None:
+async def verify_google_id_token(token: str) -> Optional[str]:
     """验证 Google ID Token。
 
     Returns:

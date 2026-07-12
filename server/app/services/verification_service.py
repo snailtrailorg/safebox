@@ -1,5 +1,6 @@
 """验证码服务：生成、存储（Redis）、验证。"""
 
+from typing import Optional
 import secrets
 import time
 import uuid
@@ -10,7 +11,7 @@ import redis.asyncio as aioredis
 from app.config import settings
 
 # Redis 连接（懒初始化）
-_redis: aioredis.Redis | None = None
+_redis: Optional[aioredis.Redis] = None
 
 
 async def _get_redis() -> aioredis.Redis:

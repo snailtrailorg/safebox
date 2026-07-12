@@ -1,5 +1,6 @@
 """同步 API：pull（拉取服务端更新）、push（上传本地修改）、delete（软删除）。"""
 
+from typing import Optional, List
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -87,12 +88,12 @@ async def sync_push(
     """
     from sqlalchemy import or_
 
-    results: list[SyncPushResult] = []
-    new_items: list[Item] = []  # 新建的 Item 对象，flush 后取 ID
+    results: List[SyncPushResult] = []
+    new_items: List[Item] = []  # 新建的 Item 对象，flush 后取 ID
 
     # 批量查询已有条目：优先按 server_id（跨设备稳定标识），回退 client_did（同设备首次回配）
     all_dids = [i.client_did for i in req.items if i.client_did is not None]
-    valid_server_ids: list[UUID] = []
+    valid_server_ids: List[UUID] = []
     for i in req.items:
         if i.server_id:
             try:
@@ -100,7 +101,7 @@ async def sync_push(
             except ValueError:
                 pass  # 非法 server_id 忽略，按 client_did/新建处理
 
-    existing_map_by_did: dict[int | None, Item] = {}
+    existing_map_by_did: dict[Optional[int], Item] = {}
     existing_map_by_sid: dict[str, Item] = {}
     if all_dids or valid_server_ids:
         sub_conds = []
@@ -169,7 +170,7 @@ async def sync_delete(
     db: AsyncSession = Depends(get_db),
 ):
     """软删除条目。"""
-    results: list[SyncDeleteResult] = []
+    results: List[SyncDeleteResult] = []
 
     for server_id_str in req.server_ids:
         try:

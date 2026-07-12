@@ -7,6 +7,7 @@ refresh token 设计（与 CLAUDE.md / FEATURE_LIST 一致）：
   - jti 保证同 family 的新旧 token hash 不同，使重放可被检测。
 """
 
+from typing import Optional
 import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
@@ -62,7 +63,7 @@ async def create_refresh_token(db: AsyncSession, user_id: UUID) -> str:
     return token
 
 
-def _decode_refresh_token_payload(token: str) -> dict | None:
+def _decode_refresh_token_payload(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "refresh":
@@ -74,7 +75,7 @@ def _decode_refresh_token_payload(token: str) -> dict | None:
 
 async def verify_and_rotate_refresh_token(
     db: AsyncSession, token: str,
-) -> tuple[str, str, UUID] | None:
+) -> Optional[tuple[str, str, UUID]]:
     """验证 refresh token。成功则同 family 轮换（旧 token 失效）。
 
     - 无 family 字段（旧格式）：拒绝（M2），不降级刷新，避免绕过轮换/重放检测。
@@ -87,7 +88,7 @@ async def verify_and_rotate_refresh_token(
         return None
 
     user_id = UUID(payload["sub"])
-    family: str | None = payload.get("family")
+    family: Optional[str] = payload.get("family")
 
     # M2：无 family 的 token 一律拒绝
     if not family:

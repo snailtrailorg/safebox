@@ -9,6 +9,7 @@
                首次新密码登录成功 -> 清 rollback（押后，清不掉无害）
 """
 
+from typing import Optional
 import base64
 import hashlib
 import hmac
@@ -115,7 +116,7 @@ async def create_recovery_code(
 
 async def find_valid_recovery_code(
     db: AsyncSession, user_id: UUID, plaintext: str,
-) -> RecoveryCode | None:
+) -> Optional[RecoveryCode]:
     """查找用户的 active 恢复码并验证。
 
     失败时：24h 滑动窗口内递增失败计数，≥5 次永久锁定。
@@ -163,7 +164,7 @@ async def find_valid_recovery_code(
 
 # ── 内部：UserKeys 查询 ────────────────────────────
 
-async def _get_user_keys(db: AsyncSession, user_id: UUID) -> UserKeys | None:
+async def _get_user_keys(db: AsyncSession, user_id: UUID) -> Optional[UserKeys]:
     result = await db.execute(select(UserKeys).where(UserKeys.user_id == user_id))
     return result.scalar_one_or_none()
 
@@ -340,7 +341,7 @@ def sign_recovery_token(payload: dict, expires_minutes: int = ACCELERATE_LINK_TT
     return jwt.encode(payload, _recovery_signing_key(), algorithm="HS256")
 
 
-def verify_recovery_token(token: str) -> dict | None:
+def verify_recovery_token(token: str) -> Optional[dict]:
     """验证恢复操作 token，返回 payload 或 None。"""
     try:
         return jwt.decode(token, _recovery_signing_key(), algorithms=["HS256"])

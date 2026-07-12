@@ -1,5 +1,6 @@
 """JWT 认证中间件。"""
 
+from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
@@ -29,7 +30,7 @@ async def get_current_user_id(
         payload = jwt_lib.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "access":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("invalid_token", lang))
-        user_id: str | None = payload.get("sub")
+        user_id: Optional[str] = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("invalid_token", lang))
         return UUID(user_id)

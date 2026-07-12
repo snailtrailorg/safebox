@@ -1,5 +1,6 @@
 """认证 API：注册、登录、验证码、密码重置、设备注册。"""
 
+from typing import Optional
 import json
 import hmac
 import hashlib
@@ -78,7 +79,7 @@ def _t(request: Request, key: str, **kw: object) -> str:
 # ── 预登录 ──────────────────────────────────────────
 
 @router.get("/salt")
-async def get_salt(email: str | None = None, phone: str | None = None, db: AsyncSession = Depends(get_db)):
+async def get_salt(email: Optional[str] = None, phone: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """返回 login_salt + kdf_settings + recovery_salt（换设备/恢复时客户端派生 K 用）。"""
     user = None
     if email:

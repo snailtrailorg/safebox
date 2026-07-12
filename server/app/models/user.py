@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
+from typing import Optional, List
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -20,12 +21,12 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
-    phone: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
-    google_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
-    auth_key_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
-    login_salt: Mapped[str | None] = mapped_column(Text, nullable=True)  # 登录密码派生用盐
-    kdf_settings: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
+    email: Mapped[Optional[str]] = mapped_column(String(320), unique=True, nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
+    google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    auth_key_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    login_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 登录密码派生用盐
+    kdf_settings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
     password_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 改登录密码+1，多设备同步用
     has_master_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否设了主密码
     created_at: Mapped[datetime] = mapped_column(
@@ -36,8 +37,8 @@ class User(Base):
     )
 
     keys: Mapped["UserKeys"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
-    devices: Mapped[list["UserDevice"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    items: Mapped[list["Item"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    devices: Mapped[List["UserDevice"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    items: Mapped[List["Item"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class UserKeys(Base):
@@ -75,7 +76,7 @@ class UserDevice(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
     )
-    device_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    device_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     device_public_key: Mapped[str] = mapped_column(Text)
     device_wrapped: Mapped[str] = mapped_column(Text)
     last_active_at: Mapped[datetime] = mapped_column(
@@ -117,12 +118,12 @@ class Item(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    client_did: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    client_did: Mapped[Optional[int]] = mapped_column(nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(20))
-    icon: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     name: Mapped[str] = mapped_column(Text)       # EncryptedField JSON ({encrypted_key, ciphertext})
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    data: Mapped[str | None] = mapped_column(Text, nullable=True)  # EncryptedField JSON
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # EncryptedField JSON
     version: Mapped[int] = mapped_column(default=1)
     is_deleted: Mapped[bool] = mapped_column(default=False)
     updated_at: Mapped[datetime] = mapped_column(

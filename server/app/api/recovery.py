@@ -1,5 +1,6 @@
 """恢复码 API：生成、发起恢复、加速、冻结、状态查询、作废。"""
 
+from typing import Optional
 import hashlib
 from uuid import UUID
 
@@ -78,7 +79,7 @@ class FreezeRecoveryRequest(BaseModel):
 
 class RecoveryStatusResponse(BaseModel):
     status: str  # none | active | cooldown | permanently_locked
-    cooldown_until: str | None = None
+    cooldown_until: Optional[str] = None
     failed_attempt_count: int = 0
 
 

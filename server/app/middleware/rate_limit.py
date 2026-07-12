@@ -8,7 +8,7 @@
 
 import base64
 import json
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Optional
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -31,7 +31,7 @@ def _client_ip(request: Request) -> str:
     return request.headers.get("x-real-ip") or (request.client.host if request.client else "")
 
 
-def _extract_user_id(request: Request) -> str | None:
+def _extract_user_id(request: Request) -> Optional[str]:
     """从 Authorization Bearer token 解析 user_id（仅解码 payload，不验签）。"""
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):

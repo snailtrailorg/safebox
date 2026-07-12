@@ -1,5 +1,6 @@
 """认证业务逻辑。"""
 
+from typing import Optional, List
 import json
 from uuid import UUID
 
@@ -29,27 +30,27 @@ def verify_auth_key(client_hash: str, stored_hash: str) -> bool:
 
 # ── 用户查询 ────────────────────────────────────────
 
-async def find_user_by_email(db: AsyncSession, email: str) -> User | None:
+async def find_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     result = await db.execute(select(User).where(User.email == email))
     return result.scalar_one_or_none()
 
 
-async def find_user_by_phone(db: AsyncSession, phone: str) -> User | None:
+async def find_user_by_phone(db: AsyncSession, phone: str) -> Optional[User]:
     result = await db.execute(select(User).where(User.phone == phone))
     return result.scalar_one_or_none()
 
 
-async def find_user_by_google_id(db: AsyncSession, google_id: str) -> User | None:
+async def find_user_by_google_id(db: AsyncSession, google_id: str) -> Optional[User]:
     result = await db.execute(select(User).where(User.google_id == google_id))
     return result.scalar_one_or_none()
 
 
-async def get_user_keys(db: AsyncSession, user_id: UUID) -> UserKeys | None:
+async def get_user_keys(db: AsyncSession, user_id: UUID) -> Optional[UserKeys]:
     result = await db.execute(select(UserKeys).where(UserKeys.user_id == user_id))
     return result.scalar_one_or_none()
 
 
-async def get_user_devices(db: AsyncSession, user_id: UUID) -> list[UserDevice]:
+async def get_user_devices(db: AsyncSession, user_id: UUID) -> List[UserDevice]:
     result = await db.execute(
         select(UserDevice).where(UserDevice.user_id == user_id).order_by(UserDevice.last_active_at.desc())
     )
@@ -58,18 +59,18 @@ async def get_user_devices(db: AsyncSession, user_id: UUID) -> list[UserDevice]:
 
 async def create_user_with_keys(
     db: AsyncSession,
-    email: str | None,
-    phone: str | None,
-    google_id: str | None,
+    email: Optional[str],
+    phone: Optional[str],
+    google_id: Optional[str],
     auth_key_hash: str,          # 客户端 PBKDF2 派生的 authKey（base64），服务端再 bcrypt
     login_salt: str,             # 登录密码派生用盐
-    kdf_settings: dict | None,
+    kdf_settings: Optional[dict],
     encrypted_user_key: str,     # AES(K, User Key)，K = PBKDF2(恢复码[+主密码], recovery_salt)
     recovery_salt: str,          # K 派生用盐
     has_master_password: bool,
     recovery_code_hash: str,    # HMAC(server_key, salt+mnemonic)
     recovery_code_salt: str,    # HMAC 验码用盐
-    device_name: str | None = None,
+    device_name: Optional[str] = None,
     device_public_key: str = "web",
     device_wrapped: str = "web",
 ) -> User:
