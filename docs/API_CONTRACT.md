@@ -6,6 +6,17 @@
 
 ## 认证
 
+### POST /auth/send-code
+发送验证码（邮件/短信）。无需认证。
+
+请求：
+```json
+{"target": "phone|email", "value": "user@example.com"}
+```
+响应 200：`{"expires_in": 300}`
+
+限流：60s 内同一目标只能发一次。dev 模式打印到终端。
+
 ### POST /auth/register/email
 注册（邮箱验证码）。
 
@@ -90,7 +101,8 @@
 401：密码错误
 409：密码已在别处修改（version 不符）
 
-限流：L2（100/h/user，与其他数据端点一致）。
+限流：默认 500/h（RateLimitMiddleware 统一处理，需 Bearer）。
+冷却期：/verify 不查冷却状态（纯认证校验，不下发数据）。冷却期内 /verify 仍返回 200（用户可检查密码是否正确），但 sync 等数据端点被 403 挡。
 
 ### POST /auth/change-password
 改登录密码（需 Bearer + 验证码）。
