@@ -9,6 +9,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.config import settings
 from app.middleware import require_not_in_cooldown
 from app.models import Item
 from app.schemas.sync import (
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 @router.get("/pull", response_model=SyncPullResponse)
 async def sync_pull(
     since: str = Query(..., description="ISO8601 时间戳，拉取此时间之后更新的条目"),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(settings.sync_batch_limit, ge=1, le=500),
     user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):

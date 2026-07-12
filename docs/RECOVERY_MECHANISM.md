@@ -48,7 +48,7 @@
 
 服务端：
 1. 验 token（sha256 比对 + 15min 时效）。
-2. 存旧登录密码到 `rollback_*`（auth_key_hash + login_salt）。
+2. 存旧登录密码到 `rollback_*`（auth_key_hash + login_salt + password_version）。
 3. 写正式：新 auth_key_hash + login_salt + password_version+1。
 4. status=cooldown, cooldown_until=now+24h。
 5. revoke_all_user_tokens（切断所有旧会话）。
@@ -87,7 +87,7 @@ confirm 时吊销所有 refresh token，旧会话无法续命。
 
 ### freeze（签名 token，无需验证码）
 ```
-点击冻结链接 → 正式字段回滚 = rollback_*（旧登录密码恢复）
+点击冻结链接 → 正式字段回滚 = rollback_*（旧登录密码 + 旧 password_version 恢复）
 → status=active, 清 rollback
 → 可用旧密码登录
 ```

@@ -12,10 +12,9 @@ import { useAuth } from "../../context/AuthContext";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { getSession, saveSession } from "../../db/sessionStore";
-import { deriveKey, deriveAuthKey, DEFAULT_KDF } from "../../crypto/kdf";
-import { aesEncrypt, base64ToBytes } from "../../crypto/aes";
+import { deriveAuthKey } from "../../crypto/kdf";
+import { base64ToBytes } from "../../crypto/aes";
 import { checkPasswordStrength } from "../../config/constants";
-import type { KdfSettings } from "../../crypto/kdf";
 
 export function ChangePasswordPage() {
   const { t } = useTranslation();
@@ -57,18 +56,16 @@ export function ChangePasswordPage() {
 
       const newSalt = new Uint8Array(32);
       crypto.getRandomValues(newSalt);
-      const newDerivedKey = await deriveKey(newPassword, newSalt);
       const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
-
-      const masterRaw = await keyChain.exportUserKeyRaw();
-      if (!masterRaw) {
-        setToast({ message: t("settings.unlockFailed"), type: "error" });
-        return;
-      }
-      const newPasswordWrapped = await aesEncrypt(newDerivedKey, masterRaw);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      await apiClient.changePassword({
+      // 重包 cached_K：K 不变、User Key 不变、encrypted_user_key 不变，只把 K 换用新登录密码派生的 loginDerivedKey 包裹
+      const newCachedK = await keyChain.rewrapCachedK(
+        currentPassword, session.loginSalt, session.cached_K,
+        newPassword, saltBase64,
+      );
+
+      const resp = await apiClient.changePassword({
         target: "email",
         value: email,
         verification_code: verifyCode,
@@ -77,9 +74,13 @@ export function ChangePasswordPage() {
         new_login_salt: saltBase64,
       });
 
+      // 用新盐 + 新 cached_K 覆盖本地，并用响应的新 token 替换被吊销的旧 token
       await saveSession({
         loginSalt: saltBase64,
-        encrypted_user_key: newPasswordWrapped,
+        cached_K: newCachedK,
+        ...(resp.access_token && resp.refresh_token
+          ? { accessToken: resp.access_token, refreshToken: resp.refresh_token }
+          : {}),
       });
 
       setToast({ message: t("settings.passwordChanged"), type: "success" });

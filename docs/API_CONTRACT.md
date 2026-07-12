@@ -32,9 +32,13 @@
   "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600000},
   "has_master_password": false,
   "recovery_code": "12词助记词明文",
-  "recovery_code_salt": "hex salt"
+  "recovery_code_salt": "hex salt",
+  "device_name": "Web Browser",
+  "device_public_key": "web",
+  "device_wrapped": "web"
 }
 ```
+> `device_*` 为可选字段，串行化模型下跨设备用恢复码，传占位值。
 
 响应 201：
 ```json

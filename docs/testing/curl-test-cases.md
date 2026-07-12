@@ -159,7 +159,7 @@ curl -s -X POST $BASE/api/v1/auth/recovery/confirm \
 ```bash
 curl -s $BASE/api/v1/auth/recovery/status \
   -H "Authorization: Bearer $TOKEN"
-# 200 {"status":"cooldown","cooldown_until":"...","failed_attempt_count":0}
+# 200 {"status":"cooldown","cooldown_until":"..."}
 ```
 
 ---
@@ -209,9 +209,9 @@ curl -s -X POST $BASE/api/v1/auth/logout \
 
 ---
 
-## TC-16 未认证访问 403
+## TC-16 未认证访问 401
 
 ```bash
 curl -s "$BASE/api/v1/sync/pull?since=2020-01-01T00%3A00%3A00%2B00%3A00"
-# 403
+# 401
 ```

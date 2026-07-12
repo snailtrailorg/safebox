@@ -6,7 +6,6 @@ import { AuthGuard, GuestGuard } from "./AuthGuard";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
 import { RecoveryPage } from "../pages/auth/RecoveryPage";
-import { RecoveryCodePage } from "../pages/auth/RecoveryCodePage";
 import { VaultListPage } from "../pages/vault/VaultListPage";
 import { ItemDetailPage } from "../pages/vault/ItemDetailPage";
 import { ItemEditPage } from "../pages/vault/ItemEditPage";
@@ -32,10 +31,6 @@ export function AppRoutes() {
             <RegisterPage />
           </GuestGuard>
         }
-      />
-      <Route
-        path="/register/recovery"
-        element={<RecoveryCodePage />}
       />
       <Route
         path="/recovery"

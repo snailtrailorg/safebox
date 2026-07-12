@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     # 恢复码
     recovery_hmac_key: str = ""  # 32 字节 base64 编码，服务端 HMAC 密钥
+    recovery_signing_key: str = ""  # accelerate/freeze 签名 token 密钥（留空回退 jwt_secret_key）
     cors_origins: str = "*"
 
     # 同步
