@@ -10,6 +10,13 @@ import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
 import { saveSession } from "../../db/sessionStore";
 import { GOOGLE_CLIENT_ID, checkPasswordStrength } from "../../config/constants";
+import { generateRecoveryCode } from "../../crypto/bip39";
+
+function generateRecoveryCodeSalt(): string {
+  const salt = new Uint8Array(32);
+  crypto.getRandomValues(salt);
+  return Array.from(salt).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 type RegisterTab = "email" | "phone" | "google";
 
@@ -45,6 +52,8 @@ export function RegisterPage() {
   const googleInitRef = useRef(false);
   const [googleReady, setGoogleReady] = useState(false);
   const [googleTimeout, setGoogleTimeout] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [showRecoveryCode, setShowRecoveryCode] = useState(false);
 
   // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
   useEffect(() => {
@@ -104,21 +113,24 @@ export function RegisterPage() {
 
     setLoading(true);
     try {
-      const keys = await keyChain.generateKeys("a a a a a a a a a a a a", "", password);
+      // 生成恢复码（BIP39 12 词）+ salt，用于派生 K
+      const recoveryCode = generateRecoveryCode();
+      const recoveryCodeSalt = generateRecoveryCodeSalt();
+      const keys = await keyChain.generateKeys(recoveryCode, "", password);
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
           auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          recovery_salt: keys.recovery_salt, recovery_code: "a a a a a a a a a a a a", recovery_code_salt: "rec-code-salt", device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
+          recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
+          device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
           email, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
-          recovery_salt: "",
-          has_master_password: false,
+          recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
+          has_master_password: false, password_version: 0,
         });
-        // 持久化 token + serverUserId 并置为 ready（keyChain 已由 generateKeys 解锁）
         await login(response.access_token, response.refresh_token, response.user_id);
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
@@ -126,11 +138,13 @@ export function RegisterPage() {
           auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
+          recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
+          device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         } as any);
         await saveSession({
           email: phone, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
-          recovery_salt: "",
-          has_master_password: false,
+          recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
+          has_master_password: false, password_version: 0,
         });
         await login(response.access_token, response.refresh_token, response.user_id);
       } else {
@@ -139,17 +153,20 @@ export function RegisterPage() {
           auth_key_hash: keys.authKeyHash, login_salt: keys.loginSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          recovery_salt: keys.recovery_salt, recovery_code: "a a a a a a a a a a a a", recovery_code_salt: "rec-code-salt", device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
+          recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
+          device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         await saveSession({
           email: "google", loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
-          recovery_salt: "",
-          has_master_password: false,
+          recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
+          has_master_password: false, password_version: 0,
         });
         await login(response.access_token, response.refresh_token, response.user_id);
       }
 
-      navigate("/");
+      // 展示恢复码（仅一次，提示用户保存）
+      setRecoveryCode(recoveryCode);
+      setShowRecoveryCode(true);
     } catch (e) {
       setToast({ message: e instanceof Error ? e.message : t("auth.register.registerFailed"), type: "error" });
     } finally {
@@ -256,6 +273,26 @@ export function RegisterPage() {
         <Link to="/login" style={{ color: "#0f3460", textDecoration: "none", fontWeight: 500 }}>{t("auth.register.loginLink")}</Link>
       </div>
 
+      {showRecoveryCode && recoveryCode && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: "2rem", maxWidth: 480, width: "90%", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
+            <h2 style={{ color: "#0f3460", marginBottom: "0.5rem" }}>🔐 恢复码</h2>
+            <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: "1rem" }}>
+              请妥善保存以下 12 个词，这是您忘记登录密码后恢复数据的唯一途径。此恢复码仅显示一次，无法再次查看。
+            </p>
+            <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "1rem", fontFamily: "monospace", fontSize: "1rem", lineHeight: 1.8, wordBreak: "break-all", marginBottom: "1rem" }}>
+              {recoveryCode}
+            </div>
+            <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
+              ⚠️ 丢失恢复码 + 忘记登录密码 = 数据永久丢失
+            </p>
+            <button onClick={() => { setShowRecoveryCode(false); navigate("/"); }}
+              style={{ width: "100%", padding: "0.75rem", background: "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: "pointer" }}>
+              我已保存，进入密码库
+            </button>
+          </div>
+        </div>
+      )}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </AuthLayout>
   );
