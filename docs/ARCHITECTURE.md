@@ -123,6 +123,7 @@ POST /auth/verify { authKey, password_version }  ← 每次服务端校验
 User Key = AES 解密(encrypted_user_key, K)
 数据可用
 ```
+> 注：日常解锁不需要恢复码，靠本地 cached_K（注册时存）。encrypted_user_key 仅在 cached_K 丢失时（换设备/清缓存）才需用恢复码派生 K 解密。
 
 ### 日常解锁（移动端，PIN/生物识别，语义1）
 ```

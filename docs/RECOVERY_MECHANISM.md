@@ -15,8 +15,8 @@
 
 ## 二、恢复码
 
-- BIP39 12 词助记词（132bit 熵），注册时生成，仅展示一次。
-- 服务端存储 `HMAC-SHA256(server_key, salt + normalized_mnemonic)`，不存明文。
+- BIP39 12 词助记词（132bit 熵），**客户端生成**，注册时展示一次。
+- 客户端上传恢复码明文给服务端，服务端计算 `HMAC-SHA256(server_key, salt + normalized_mnemonic)` 存哈希，不存明文。
 - 恢复码是 K 的种子（与主密码一起派生 K），永久不变，不重生成。
 - `server_key` = 环境变量 `SAFEBOX_RECOVERY_HMAC_KEY`（base64 32 字节），数据库泄露后无法离线验证。
 
@@ -29,15 +29,16 @@
 请求：`{ recovery_code, new_auth_key_hash, new_login_salt, target, value }`
 
 服务端：
-1. 验恢复码 HMAC（失败计数 ≥5 → permanently_locked）。
-2. 检查冷却期（已在 cooldown → 409）。
-3. 检查 pending_initiate（已有未过期 → 409，提示查看邮件进行加速或冻结，不允许覆盖）。
-4. 验通过后建待确认态（不改正式字段、不进冷却）：存 `pending_initiate_token`（sha256）、`pending_new_*`。
-5. 返回 `{ encrypted_user_key, recovery_salt, initiate_token }`（15min 有效）。
+1. 按 target/value 查找用户（邮箱或手机号，用于定位账户，非发送告警邮件）。
+2. 验恢复码 HMAC（失败计数 ≥5 → permanently_locked）。
+3. 检查冷却期（已在 cooldown → 409）。
+4. 检查 pending_initiate（已有未过期 → 409，提示查看邮件进行加速或冻结，不允许覆盖。15min 过期后可重新发起）。
+5. 验通过后建待确认态（不改正式字段、不进冷却）：存 `pending_initiate_token`（sha256）、`pending_new_*`。
+6. 返回 `{ encrypted_user_key, recovery_salt, initiate_token }`（15min 有效）。
 
 客户端：
 - 用恢复码[+主密码] + recovery_salt 派生 K。
-- 解 encrypted_user_key 拿到 User Key。
+- 解 encrypted_user_key 拿到 User Key（K 不变，User Key 不变，数据不动）。
 - 用新登录密码重包 cached_K。
 - 调步骤 2。
 
@@ -100,20 +101,37 @@ cooldown_until 到期 → 无系统动作
 
 ---
 
-## 六、API 端点
+## 六、签名 token（accelerate/freeze）
+
+confirm 成功后，服务端生成两个签名 token，通过告警邮件发送给用户：
+
+| 项 | 说明 |
+|---|---|
+| 算法 | JWT HS256 |
+| 密钥 | 独立 recovery_signing_key（回退到 jwt_secret_key） |
+| 有效期 | 24h（与冷却期一致） |
+| payload | `{sub: user_id, action: "accelerate"/"freeze", rc_id: recovery_code_id}` |
+| 生成时机 | confirm 成功后，随告警邮件发送 |
+| 一次性保证 | 由状态机保证（操作后 status 变 active，重放返回 409） |
+
+用户点击邮件中的链接（含 signed_token）触发 accelerate 或 freeze。
+
+---
+
+## 七、API 端点
 
 | 方法 | 路径 | 用途 |
 | :--- | :--- | :--- |
 | POST | /auth/recovery/initiate | 步骤 1：验恢复码，返回 encrypted_user_key + initiate_token |
-| POST | /auth/recovery/confirm | 步骤 2：验 token，写正式 + 进冷却 + 吊销 token |
-| POST | /auth/recovery/accelerate | 验证码解除冷却 |
-| POST | /auth/recovery/freeze | 回滚旧密码 |
+| POST | /auth/recovery/confirm | 步骤 2：验 token，写正式 + 进冷却 + 吊销 token + 发告警邮件（含签名 token） |
+| POST | /auth/recovery/accelerate | 验证码 + 签名 token 解除冷却 |
+| POST | /auth/recovery/freeze | 签名 token 回滚旧密码 |
 | GET | /auth/recovery/status | 查询状态（纯读） |
 | POST | /auth/recovery/revoke | 主动作废（已登录） |
 
 ---
 
-## 七、核心原则
+## 八、核心原则
 
 | 原则 | 说明 |
 | :--- | :--- |
