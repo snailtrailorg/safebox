@@ -89,7 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 网络错误不影响本地登出
     }
     keyChain.lock();
-    await clearSession();
+    // 只清 token，保留密钥材料（cached_K/encrypted_user_key 等）
+    // 否则退出后重新登录需要恢复码（cached_K 丢了，密码单独解不出 User Key）
+    const { saveSession } = await import("../db/sessionStore");
+    await saveSession({ accessToken: "", refreshToken: "" });
     setState({ status: "guest", userId: "", dbUnavailable: false, countdown: 0 });
   }, []);
 

@@ -8,7 +8,7 @@ import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
-import { saveSession } from "../../db/sessionStore";
+import { saveSession, getSession } from "../../db/sessionStore";
 import { deriveAuthKey } from "../../crypto/kdf";
 import { base64ToBytes } from "../../crypto/aes";
 import { GOOGLE_CLIENT_ID } from "../../config/constants";
@@ -93,9 +93,10 @@ export function LoginPage() {
 
   // ── 通用登录响应处理 ─────────────────────────────
   const handleLoginResponse = async (response: LoginResponse, pw: string) => {
+    // cached_K 在本地 session（注册时存），不在服务器响应里
+    const session = await getSession();
     const ok = await keyChain.unlockWithPassword(
-      pw, response.login_salt || "", response.encrypted_user_key, (response as any)._cachedK || "");
-    // FIXME: cached_K来自本地存储，首次登录从服务器获取后保存
+      pw, response.login_salt || "", response.encrypted_user_key, session.cached_K || "");
     if (!ok) {
       setToast({ message: t("auth.login.unlockFailed"), type: "error" });
       return;

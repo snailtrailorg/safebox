@@ -54,6 +54,7 @@ export function RegisterPage() {
   const [googleTimeout, setGoogleTimeout] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [showRecoveryCode, setShowRecoveryCode] = useState(false);
+  const [pendingTokens, setPendingTokens] = useState<{ access_token: string; refresh_token: string; user_id: string } | null>(null);
 
   // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
   useEffect(() => {
@@ -117,6 +118,7 @@ export function RegisterPage() {
       const recoveryCode = generateRecoveryCode();
       const recoveryCodeSalt = generateRecoveryCodeSalt();
       const keys = await keyChain.generateKeys(recoveryCode, "", password);
+      let tokens: { access_token: string; refresh_token: string; user_id: string } | null = null;
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
@@ -126,12 +128,12 @@ export function RegisterPage() {
           recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
+        tokens = response;
         await saveSession({
           email, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
           recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
           has_master_password: false, password_version: 0,
         });
-        await login(response.access_token, response.refresh_token, response.user_id);
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
@@ -141,12 +143,12 @@ export function RegisterPage() {
           recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         } as any);
+        tokens = response;
         await saveSession({
           email: phone, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
           recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
           has_master_password: false, password_version: 0,
         });
-        await login(response.access_token, response.refresh_token, response.user_id);
       } else {
         const response = await apiClient.registerGoogle({
           google_id_token: googleIdToken,
@@ -156,16 +158,18 @@ export function RegisterPage() {
           recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
+        tokens = response;
         await saveSession({
           email: "google", loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
           recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
           has_master_password: false, password_version: 0,
         });
-        await login(response.access_token, response.refresh_token, response.user_id);
       }
 
       // 展示恢复码（仅一次，提示用户保存）
+      // 不立即 login()，否则 GuestGuard 会重定向走，模态框看不到
       setRecoveryCode(recoveryCode);
+      setPendingTokens(tokens);
       setShowRecoveryCode(true);
     } catch (e) {
       setToast({ message: e instanceof Error ? e.message : t("auth.register.registerFailed"), type: "error" });
@@ -286,7 +290,13 @@ export function RegisterPage() {
             <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
               ⚠️ 丢失恢复码 + 忘记登录密码 = 数据永久丢失
             </p>
-            <button onClick={() => { setShowRecoveryCode(false); navigate("/"); }}
+            <button onClick={() => {
+              if (pendingTokens) {
+                login(pendingTokens.access_token, pendingTokens.refresh_token, pendingTokens.user_id);
+              }
+              setShowRecoveryCode(false);
+              navigate("/");
+            }}
               style={{ width: "100%", padding: "0.75rem", background: "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: "pointer" }}>
               我已保存，进入密码库
             </button>
