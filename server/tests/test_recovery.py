@@ -87,7 +87,9 @@ async def _init(client, email, code=PT):
 
 
 @pytest.mark.asyncio
-async def test_recovery_lockout_after_5_failures(client: AsyncClient):
+async def test_recovery_no_permanent_lockout(client: AsyncClient):
+    """恢复码 132bit 不可暴力枚举，不累积失败计数、不永久锁定。
+    连错 5 次后仍可用正确恢复码发起恢复。"""
     resp = await client.post("/api/v1/auth/register/email", json={
         **REG, "email": "lock@safebox.example.com",
     })
@@ -95,8 +97,9 @@ async def test_recovery_lockout_after_5_failures(client: AsyncClient):
     w = {**_step1("lock@safebox.example.com"), "recovery_code": "wrong " * 11 + "wrong"}
     for _ in range(5):
         assert (await client.post("/api/v1/auth/recovery/initiate", json=w)).status_code == 401
+    # 正确恢复码仍可用（不锁定）
     g = _step1("lock@safebox.example.com", PT)
-    assert (await client.post("/api/v1/auth/recovery/initiate", json=g)).status_code == 401
+    assert (await client.post("/api/v1/auth/recovery/initiate", json=g)).status_code == 200
 
 
 @pytest.mark.asyncio

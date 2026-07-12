@@ -51,9 +51,9 @@
 | 冷却期 24h | cooldown_until = now+24h，账户锁定 | confirm |
 | 加速通道 | 验证码 + 签名 token 解除冷却 | `POST /auth/recovery/accelerate` |
 | 冻结 | 签名 token 回滚旧密码 | `POST /auth/recovery/freeze` |
-| 状态查询 | 返回状态 + cooldown + 失败计数 | `GET /auth/recovery/status` |
+| 状态查询 | 返回状态 + cooldown | `GET /auth/recovery/status` |
 | 主动作废 | 需验证码 + 当前密码 | `POST /auth/recovery/revoke` |
-| 失败锁定 | 24h 窗口 ≥5 次失败 → permanently_locked | initiate |
+| 无失败锁定 | 恢复码 132bit 不可暴破，不累积计数、不锁定 | initiate |
 | 冷却零窗口 | revoke refresh + 中间件冷却门挡所有 access-token | confirm + middleware |
 
 ## 五、条目同步
@@ -116,7 +116,7 @@
 |------|---------|
 | users | id, email, phone, google_id, auth_key_hash, login_salt, kdf_settings, password_version, has_master_password |
 | user_keys | user_id, encrypted_user_key, recovery_salt |
-| recovery_codes | user_id, recovery_code_hash, recovery_code_salt, status, cooldown_until, rollback_*, pending_initiate_*, failed_attempt_count |
+| recovery_codes | user_id, recovery_code_hash, recovery_code_salt, status, cooldown_until, rollback_*, pending_initiate_* |
 | token_families | user_id, family, active_token_hash |
 | items | id, user_id, client_did, type, name(EncryptedField JSON), description, data, version, is_deleted |
 

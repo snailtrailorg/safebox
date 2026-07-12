@@ -107,7 +107,6 @@ async def create_user_with_keys(
         recovery_code_hash=recovery_code_hash,
         recovery_code_salt=recovery_code_salt,
         status="active",
-        failed_attempt_count=0,
     )
     db.add(rc)
 

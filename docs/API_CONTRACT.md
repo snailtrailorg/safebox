@@ -181,7 +181,7 @@
 ### GET /auth/recovery/status
 需 Bearer。响应 200：
 ```json
-{"status": "active|cooldown|permanently_locked", "cooldown_until": "ISO8601|null", "failed_attempt_count": 0}
+{"status": "active|cooldown", "cooldown_until": "ISO8601|null"}
 ```
 
 ### POST /auth/recovery/revoke

@@ -30,7 +30,7 @@
 
 服务端：
 1. 按 target/value 查找用户（邮箱或手机号，用于定位账户，非发送告警邮件）。
-2. 验恢复码 HMAC（失败计数 ≥5 → permanently_locked）。
+2. 验恢复码 HMAC（恢复码 132bit 不可暴力枚举，不累积失败计数、不永久锁定。失败由 RateLimitMiddleware 100/h 防骚扰）。
 3. 检查冷却期（已在 cooldown → 409）。
 4. 检查 pending_initiate（已有未过期 → 409，提示查看邮件进行加速或冻结，不允许覆盖。15min 过期后可重新发起）。
 5. 验通过后建待确认态（不改正式字段、不进冷却）：存 `pending_initiate_token`（sha256）、`pending_new_*`。

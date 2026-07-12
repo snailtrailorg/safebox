@@ -30,8 +30,6 @@ from app.services.bip39 import generate_bip39_code
 
 # ── 常量 ────────────────────────────────────────────
 
-MAX_FAILED_ATTEMPTS = 5          # 24h 窗口内连续失败 -> permanently_locked
-FAILED_ATTEMPT_WINDOW_HOURS = 24  # 失败计数窗口
 COOLDOWN_HOURS = 24
 ACCELERATE_LINK_TTL_MINUTES = COOLDOWN_HOURS * 60  # 与冷却期一致
 
@@ -86,7 +84,7 @@ def generate_recovery_code_salt() -> str:
 async def create_recovery_code(
     db: AsyncSession, user_id: UUID,
 ) -> tuple[str, RecoveryCode]:
-    """为用户生成新恢复码。如有旧码（active/cooldown）则标记为 permanently_locked。"""
+    """为用户生成新恢复码。如有旧码（active/cooldown）则不再需要（恢复码永久不重生成）。"""
     result = await db.execute(
         select(RecoveryCode).where(
             RecoveryCode.user_id == user_id,
@@ -94,7 +92,7 @@ async def create_recovery_code(
         )
     )
     for old in result.scalars().all():
-        old.status = "permanently_locked"
+        pass  # 恢复码永久不重生成，无需锁旧码
 
     plaintext = generate_recovery_code_plaintext()
     salt = generate_recovery_code_salt()
@@ -105,7 +103,6 @@ async def create_recovery_code(
         recovery_code_hash=code_hash,
         recovery_code_salt=salt,
         status="active",
-        failed_attempt_count=0,
     )
     db.add(rc)
     await db.flush()
@@ -119,8 +116,8 @@ async def find_valid_recovery_code(
 ) -> Optional[RecoveryCode]:
     """查找用户的 active 恢复码并验证。
 
-    失败时：24h 滑动窗口内递增失败计数，≥5 次永久锁定。
-    成功时：清零失败计数。
+    恢复码 132bit 不可暴力枚举，不累积失败计数、不永久锁定。
+    initiate 失败由 RateLimitMiddleware（100/h）防骚扰。
     """
     result = await db.execute(
         select(RecoveryCode).where(
@@ -133,32 +130,8 @@ async def find_valid_recovery_code(
         return None
 
     if not verify_recovery_code(plaintext, rc.recovery_code_salt, rc.recovery_code_hash):
-        now = datetime.now(timezone.utc)
-        # 24h 窗口：超过窗口期重置计数。
-        # last_at 归一到 aware UTC--PostgreSQL 返回 aware，SQLite 返回 naive，
-        # 不归一会在 aware - naive 相减时抛 TypeError。
-        last_at = rc.failed_attempt_last_at
-        if last_at is not None and last_at.tzinfo is None:
-            last_at = last_at.replace(tzinfo=timezone.utc)
-        if (
-            last_at is None
-            or (now - last_at).total_seconds() > FAILED_ATTEMPT_WINDOW_HOURS * 3600
-        ):
-            rc.failed_attempt_count = 1
-        else:
-            rc.failed_attempt_count += 1
-        rc.failed_attempt_last_at = now
-
-        if rc.failed_attempt_count >= MAX_FAILED_ATTEMPTS:
-            rc.status = "permanently_locked"
-        # 必须 commit（而非 flush）：调用方随后会抛 401，get_db 对异常回滚。
-        # 若仅 flush，失败计数会随请求一起被回滚，跨请求永不累加，≥5 锁定形同虚设。
-        await db.commit()
         return None
 
-    # 验证成功，清零失败计数
-    rc.failed_attempt_count = 0
-    rc.failed_attempt_last_at = None
     return rc
 
 
@@ -171,9 +144,10 @@ async def _get_user_keys(db: AsyncSession, user_id: UUID) -> Optional[UserKeys]:
 
 def _clear_rollback(rc: RecoveryCode) -> None:
     """清空旧登录密码副本（accelerate/freeze/登录成功后调用）。
-    模型 D：K/User Key 不变，只回滚登录密码认证字段。"""
+    K/User Key 不变，只回滚登录密码认证字段。"""
     rc.rollback_auth_key_hash = None
     rc.rollback_login_salt = None
+    rc.rollback_password_version = None
 
 
 # ── 发起恢复 ────────────────────────────────────────
@@ -251,6 +225,7 @@ async def confirm_recovery(
     # 3. 存旧登录密码到 rollback_*（供 freeze 回滚）
     rc.rollback_auth_key_hash = user.auth_key_hash
     rc.rollback_login_salt = user.login_salt
+    rc.rollback_password_version = user.password_version
 
     # 4. 写正式 = 新登录密码（用步骤1暂存）
     user.auth_key_hash = rc.pending_new_auth_key_hash
@@ -287,7 +262,8 @@ async def freeze_recovery(db: AsyncSession, rc: RecoveryCode, user: User) -> Non
         user.auth_key_hash = rc.rollback_auth_key_hash
     if rc.rollback_login_salt:
         user.login_salt = rc.rollback_login_salt
-    user.password_version += 1
+    if rc.rollback_password_version is not None:
+        user.password_version = rc.rollback_password_version
     rc.status = "active"
     rc.cooldown_until = None
     _clear_rollback(rc)

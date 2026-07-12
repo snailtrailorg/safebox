@@ -78,9 +78,8 @@ class FreezeRecoveryRequest(BaseModel):
 
 
 class RecoveryStatusResponse(BaseModel):
-    status: str  # none | active | cooldown | permanently_locked
+    status: str  # none | active | cooldown
     cooldown_until: Optional[str] = None
-    failed_attempt_count: int = 0
 
 
 class RevokeRecoveryRequest(BaseModel):
@@ -206,7 +205,7 @@ async def get_status(
     return RecoveryStatusResponse(
         status=rc.status,
         cooldown_until=rc.cooldown_until.isoformat() if rc.cooldown_until else None,
-        failed_attempt_count=rc.failed_attempt_count,
+        
     )
 
 
@@ -325,5 +324,5 @@ async def revoke(
     )
     rc = result.scalar_one_or_none()
     if rc:
-        rc.status = "permanently_locked"
+        rc.status = "active"  # 旧码不再锁定，恢复码永久不重生成
         await db.commit()
