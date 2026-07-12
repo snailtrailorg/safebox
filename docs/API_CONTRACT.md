@@ -1,162 +1,205 @@
-# SafeBox API v2（目标设计）
+# SafeBox API 契约
 
-> 版本: v2.6
-> v2.5 → v2.6 变更:
->   - 恢复码端点新增 /auth/recovery/accelerate（加速通道）
->   - /auth/recovery/initiate 请求体增加 pending 字段（一次性提交新密码）
->   - /auth/recovery/cancel 移除（合并入 freeze 语义，用户主动停止不需 cancel 端点）
->   - /auth/recovery/confirm 恢复（两步 initiate 的步骤2：验 token + 提交重包的 User Key）
->   - 新增 cooldown_until / rollback_* 字段；initiate 即写正式字段（新密码）+ 存旧密码副本
+所有路径前缀 `/api/v1`。除标注外，需 `Authorization: Bearer <access_token>`。
 
 ---
 
-## 一、恢复码端点
+## 认证
 
-### `POST /auth/recovery/generate`
+### POST /auth/register/email
+注册（邮箱验证码）。
 
-**用途**：已登录用户生成新恢复码。前置校验：邮箱/手机验证码 + 当前 Master Password。
-
+请求：
 ```json
-// Request
-Authorization: Bearer <access_token>
-{"verification_code": "123456",
- "current_auth_key_hash": "..."}
-
-// 200
-{"recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic"}
+{
+  "email": "user@example.com",
+  "verification_code": "123456",
+  "auth_key_hash": "PBKDF2(登录密码, login_salt+\"auth\")",
+  "login_salt": "base64(32字节)",
+  "encrypted_user_key": "AES(K, UserKey raw)",
+  "recovery_salt": "base64(32字节)",
+  "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600000},
+  "has_master_password": false,
+  "recovery_code": "12词助记词明文",
+  "recovery_code_salt": "hex salt"
+}
 ```
 
-- 生成 BIP39 12 词恢复码（`secrets.randbelow(2048)` 选取），HMAC-SHA256(server_key, salt + normalized_mnemonic) 后存储
-- 任何历史恢复码立即 `permanently_locked`
-- 恢复码明文**仅在此响应中返回一次**，服务端只存哈希
-
-### `POST /auth/recovery/initiate`
-
-**用途**：验证恢复码 + 一次性提交新密码。**无 verification_code。**
-
+响应 201：
 ```json
-// Request
-{"target":"email","value":"user@example.com",
- "recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
- "new_auth_key_hash": "...",
- "new_password_salt": "...",
- "new_kdf_settings": {...},
- "new_wrapped_user_key": "..."}          // 用新密码重新 wrap 后的 User Key
-
-// 200
-{"cooldown_until": "2026-07-08T13:00:00Z"}
-// 400 - 恢复码错误
-// 404 - 用户不存在
-// 429 - 连续错误达 5 次 + 当月已达 3 次 -> permanently_locked
+{"user_id": "uuid", "access_token": "jwt", "refresh_token": "jwt"}
 ```
 
-- 验证恢复码 -> 正式字段写新密码 + rollback_* 存旧密码 -> 进入冷却期 -> 多渠道告警
-- `users.password_hash` 和 `user_keys.password_wrapped` **不变**
-- 冻结时正式字段回滚 = rollback_*，旧密码恢复
+### POST /auth/register/phone
+同上，`email` 换 `phone`。
 
-### `GET /auth/recovery/status`
+### POST /auth/register/google
+同上，加 `google_id_token`，无 `email`/`verification_code`。
 
-**用途**：查询当前恢复码状态，供前端倒计时。
+### GET /auth/salt?email=... 或 ?phone=...
+获取 salt（未认证，防枚举）。
 
+响应：
 ```json
-// 200
-{"status": "none" | "active" | "cooldown" | "permanently_locked",
- "cooldown_remaining_seconds": 86400,
- "monthly_initiation_count": 1,
- "failed_attempt_count": 0}
+{
+  "login_salt": "...",
+  "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600000},
+  "recovery_salt": "...",
+  "has_master_password": false
+}
 ```
 
-### `POST /auth/recovery/accelerate`
-
-**用途**：加速通道——通过验证码立即激活新密码，跳过剩余冷却期。
-
+### POST /auth/login/email
+请求：
 ```json
-// Request
-{"signed_token": "一次性签名URL token",
- "verification_code": "123456"}
-
-// 204 No Content（无响应体）
-// 400 — token 无效/过期 / 验证码错误
+{"email": "...", "auth_key_hash": "PBKDF2(登录密码, login_salt+\"auth\")"}
 ```
 
-- 验证签名 token（TTL 与冷却期一致 24h；一次性由状态机保证：操作后 status=active，重放返回 409）
-- 验证码（5 次/小时，10 次/天）
-- 通过后：清 rollback_*，status=active（新密码已生效）
-
-### `POST /auth/recovery/freeze`
-
-**用途**：终止恢复，回滚到旧密码。无需登录，一次性签名 URL。
-
+响应 200：
 ```json
-// Request
-{"signed_token": "一次性签名URL token"}
-
-// 204 No Content（无响应体）
-// 400 — token 无效/过期
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "login_salt": "...",
+  "encrypted_user_key": "...",
+  "recovery_salt": "...",
+  "has_master_password": false
+}
 ```
 
-- 正式字段回滚 = rollback_*，清 rollback_*
-- `status → active`
-- `monthly_initiation_count` 保持不变（已 +1 不减少）
-- 旧密码恢复（正式字段回滚 = rollback_*）
+### POST /auth/login/phone
+同上，加 `verification_code`。
 
-### `POST /auth/recovery/revoke`
+### POST /auth/login/google
+请求：`{"google_id_token": "..."}`，响应同 login/email。
 
-**用途**：已登录用户主动作废旧码。
+### POST /auth/verify
+每次解锁校验（语义1：每次服务端校验）。
 
+请求：
 ```json
-// Request
-Authorization: Bearer <access_token>
-{"verification_code": "123456",
- "current_auth_key_hash": "..."}
-
-// 200
-{"success": true}
+{"auth_key_hash": "...", "password_version": 0}
 ```
 
-### `POST /admin/recovery/unlock`
+响应 200：`{"password_version": 0, "status": "ok"}`
+401：密码错误
+409：密码已在别处修改（version 不符）
 
-**用途**：客服解除永久锁定。
+### POST /auth/change-password
+改登录密码（需 Bearer + 验证码）。
 
+请求：
 ```json
-// Request
-Authorization: Bearer <admin_token>
-{"user_id": "uuid", "ticket_id": "CS-20260707-001"}
-
-// 200
-{"success": true, "action": "重置链接已发送至用户绑定邮箱"}
+{
+  "target": "email", "value": "...", "verification_code": "123456",
+  "current_auth_key_hash": "...",
+  "new_auth_key_hash": "...",
+  "new_login_salt": "..."
+}
 ```
 
-- 客服不能获取恢复码明文、不能解密 vault、不能设置新密码
-- 系统发送重置链接至邮箱（24h 有效）
+响应 200：
+```json
+{"success": true, "access_token": "...", "refresh_token": "..."}
+```
+
+### POST /auth/refresh-token
+请求：`{"refresh_token": "..."}`
+响应 200：`{"access_token": "...", "refresh_token": "..."}`
+
+### POST /auth/logout
+需 Bearer。204 No Content。
+
+### POST /auth/register-device
+需 Bearer。请求：`{"device_name": "...", "device_public_key": "...", "device_wrapped": "..."}`
+响应 200：`{"device_id": "..."}`
+
+### DELETE /auth/account
+需 Bearer + 验证码。请求：`{"target": "email", "value": "...", "verification_code": "123456"}`
+204 No Content。
 
 ---
 
-## 二、端点概要表
+## 恢复码
 
-| # | 方法 | 路径 | Auth | 限流 | 变更 |
-|---|------|------|------|------|------|
-| 1 | GET | /auth/salt | 无 | N | — |
-| 2 | POST | /auth/send-code | 无 | L2+L3 | — |
-| 3 | POST | /auth/register/email | 无 | L2 | — |
-| 4 | POST | /auth/register/phone | 无 | L2 | — |
-| 5 | POST | /auth/register/google | 无 | L2 | — |
-| 6 | POST | /auth/login/email | 无 | L1+L2 | — |
-| 7 | POST | /auth/login/phone | 无 | L1+L2 | — |
-| 8 | POST | /auth/login/google | 无 | L1+L2 | — |
-| 9 | POST | /auth/change-password | Bearer | L2 | +verification_code |
-| 11 | POST | /auth/recovery/generate | Bearer | L2 | **v2.6** |
-| 12 | POST | /auth/recovery/initiate | 无 | L2 | **v2.6** |
-| 13 | GET | /auth/recovery/status | 无 | L2 | **v2.6** |
-| 14 | POST | /auth/recovery/accelerate | 签名URL | L2 | **v2.6 新增** |
-| 15 | POST | /auth/recovery/freeze | 签名URL | N | **v2.6** |
-| 16 | POST | /auth/recovery/revoke | Bearer | L2 | **v2.6** |
-| 17 | POST | /admin/recovery/unlock | Admin | L2 | **v2.6 新增** |
-| 18 | POST | /auth/refresh-token | 无 | N | — |
-| 19 | POST | /auth/logout | Bearer | N | — |
-| 20 | DELETE | /auth/account | Bearer | N | +verification_code |
-| 21 | POST | /auth/register-device | Bearer | N | — |
-| 22 | GET | /sync/pull | Bearer | N | — |
-| 23 | POST | /sync/push | Bearer | N | — |
-| 24 | POST | /sync/delete | Bearer | N | — |
-| 25 | GET | /health | 无 | N | — |
+### POST /auth/recovery/initiate
+步骤1：验恢复码，返回 encrypted_user_key + initiate_token（无需认证）。
+
+请求：
+```json
+{
+  "target": "email", "value": "...",
+  "recovery_code": "12词助记词",
+  "new_auth_key_hash": "...",
+  "new_login_salt": "..."
+}
+```
+
+响应 200：
+```json
+{"encrypted_user_key": "...", "recovery_salt": "...", "initiate_token": "..."}
+```
+
+### POST /auth/recovery/confirm
+步骤2：验 token，写正式 + 进冷却 + 吊销 token（无需认证）。
+
+请求：`{"initiate_token": "..."}`
+响应 200：`{"cooldown_until": "ISO8601"}`
+
+### POST /auth/recovery/accelerate
+验证码解除冷却（无需认证，签名 token）。
+
+请求：`{"signed_token": "...", "verification_code": "123456"}`
+204 No Content。
+
+### POST /auth/recovery/freeze
+回滚旧密码（无需认证，签名 token）。
+
+请求：`{"signed_token": "..."}`
+204 No Content。
+
+### GET /auth/recovery/status
+需 Bearer。响应 200：
+```json
+{"status": "active|cooldown|permanently_locked", "cooldown_until": "ISO8601|null", "failed_attempt_count": 0}
+```
+
+### POST /auth/recovery/revoke
+需 Bearer + 验证码 + 当前密码。204 No Content。
+
+---
+
+## 同步
+
+### GET /sync/pull?since=ISO8601&limit=100
+需 Bearer。响应 200：
+```json
+{
+  "items": [{"server_id": "...", "client_did": 1, "type": "login", "name": "EncryptedField JSON", "version": 2, "is_deleted": false, "updated_at": "..."}],
+  "server_time": "...",
+  "has_more": false
+}
+```
+
+### POST /sync/push
+需 Bearer。请求：
+```json
+{
+  "items": [{"client_did": 1, "server_id": "可选", "type": "login", "name": "EncryptedField JSON", "version": 1, "updated_at": "..."}]
+}
+```
+响应 200：
+```json
+{"results": [{"client_did": 1, "server_id": "...", "status": "created|updated|conflict", "version": 2}]}
+```
+
+### POST /sync/delete
+需 Bearer。请求：`{"server_ids": ["uuid", ...]}`
+响应 200：`{"results": [{"server_id": "...", "status": "deleted|not_found"}]}`
+
+---
+
+## 健康检查
+
+### GET /health
+无需认证。响应 200：`{"status": "ok"}`

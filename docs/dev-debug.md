@@ -34,7 +34,7 @@ SQL
 
 ```bash
 cd server/
-cp docs/env.example .env
+cp .env.example .env
 # 编辑 .env，本地开发用默认值即可
 ```
 
@@ -51,7 +51,7 @@ alembic upgrade head
 ## 5. 启动服务
 
 ```bash
-# 后端（两个终端窗口）
+# 后端
 cd server && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # Web 前端
@@ -63,53 +63,50 @@ cd web && npm install && npm run dev
 - Swagger: http://localhost:8000/docs
 - 健康检查: http://localhost:8000/health
 
-Vite dev server 自动把 `/api/` 请求转发到后端 `localhost:8000`，不需要单独访问后端。
-
 ## 6. 运行测试
 
 ```bash
 # 后端
-cd server && make test
+cd server && PYTHONPATH=. venv/bin/python -m pytest tests/ -q
 
 # Web 前端
-cd web && npm test
+cd web && npx vitest run
 ```
 
-## 7. 常见调试问题
+## 7. 常见调试
 
-### 验证码怎么看？
+### 验证码
 
-本地开发时 SMTP 未配置，发送验证码时会打印到 uvicorn 终端：
+本地开发时 SMTP 未配置，验证码打印到 uvicorn 终端：
 ```
 [DEV] 验证码 123456 应发送到 user@example.com
 ```
 
-### 测试失败：注册返回 422
+### PBKDF2 600k 迭代
 
-测试里的注册请求缺少 `verification_code` 字段。schema 要求必填，即使测试也应该传 `"verification_code": "000000"`。
+浏览器中约 200-500ms，仅在登录/注册时执行一次。
 
-### 验证码被消费但注册失败
+### 清 IndexedDB
 
-可能原因：RSA 密钥生成太慢导致超时（浏览器端 PBKDF2 600k 迭代 + RSA-4096 生成约 500ms-2s）。检查浏览器控制台和网络面板。
+F12 → Application/存储 → IndexedDB → 右键 safebox → 删除。
 
-### Web Crypto 跨平台兼容
-
-Web Crypto API 的 RSA-OAEP 分块大小必须与 Android `CryptoManager.kt` 一致（446 字节/块（OAEP-SHA256））。`web/src/__tests__/cross-platform.test.ts` 已验证字节级兼容。
-
-### 600k 次 PBKDF2 卡顿
-
-在浏览器中约 200-500ms，仅在登录/注册时执行一次。如需优化，可移到 Web Worker 避免阻塞主线程。
-
-## 8. API 调试
-
-Vite 配置了代理转发，所以前端 fetch `/api/v1/auth/...` 会自动到 `localhost:8000`。如果直接用 curl：
+### 清 Redis
 
 ```bash
-# 注册
-curl -X POST http://localhost:8000/api/v1/auth/register/email \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","verification_code":"123456","password_hash":"h","password_salt":"s","password_wrapped":"w","encrypted_private":"e","rsa_public_key":"p"}'
-
-# 健康检查
-curl http://localhost:8000/health
+sudo redis-cli FLUSHALL
 ```
+
+### 删库重建
+
+```bash
+sudo -u postgres psql -c 'DROP DATABASE IF EXISTS safebox; CREATE DATABASE safebox OWNER safebox;'
+cd server && PYTHONPATH=. venv/bin/alembic upgrade head
+```
+
+## 8. 部署
+
+```bash
+./deploy.sh snailtrail.org --web
+```
+
+deploy.sh 推送代码 + 重启，不碰 .env/venv（两次 rsync 都排除）。数据库迁移需手动在服务器上跑。
