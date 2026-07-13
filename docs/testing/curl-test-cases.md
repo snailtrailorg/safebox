@@ -12,7 +12,7 @@ AUTH_HASH="test_auth_hash_$(date +%s)"
 LOGIN_SALT="aabbccdd11223344"
 RECOVERY_SALT="eeff001122334455"
 RECOVERY_CODE="abandon ability able about above absent absorb abstract accuse achieve acid acoustic"
-RECOVERY_CODE_SALT="aabbccdd11223344eeff0011223344556677889900112233445566778899001122"
+RECOVERY_CODE_SALT="aabbccdd11223344eeff00112233445566778899001122334455667788990011"
 # GOOGLE_ID_TOKEN="<真实 Google ID Token>"  # Google 注册/登录需，dev 通常跳过
 ```
 
@@ -354,11 +354,11 @@ curl -s -X POST $BASE/api/v1/auth/register/email \
 # 409 email_already_registered
 ```
 
-## TC-26 未认证访问 401
+## TC-26 未认证访问 403
 
 ```bash
 curl -s "$BASE/api/v1/sync/pull?since=2020-01-01T00%3A00%3A00%2B00%3A00"
-# 401 invalid_token（JWT 中间件 type="access" 校验）
+# 403（HTTPBearer 无 token 默认 403）；无效 token -> 401 invalid_token（JWT type="access" 校验）
 ```
 
 ## TC-27 登录限流 429
