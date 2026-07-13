@@ -157,7 +157,9 @@ async def test_accelerate_clears_cooldown_and_allows_login(client: AsyncClient, 
     r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("acc@safebox.example.com"))
     r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
     assert r2.status_code == 200
-    at = sign_recovery_token({"sub": str(rc.user_id), "action": "accelerate", "rc_id": str(rc.id)})
+    await db_session.refresh(rc)
+    cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
+    at = sign_recovery_token({"sub": str(rc.user_id), "action": "accelerate", "rc_id": str(rc.id), "cd": cd})
     assert (await client.post("/api/v1/auth/recovery/accelerate", json={
         "signed_token": at, "verification_code": "123456"})).status_code == 204
     await db_session.refresh(rc)
@@ -177,7 +179,9 @@ async def test_freeze_rolls_back_to_old_password(client: AsyncClient, db_session
     r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("frz@safebox.example.com"))
     r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
     assert r2.status_code == 200
-    ft = sign_recovery_token({"sub": str(rc.user_id), "action": "freeze", "rc_id": str(rc.id)})
+    await db_session.refresh(rc)
+    cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
+    ft = sign_recovery_token({"sub": str(rc.user_id), "action": "freeze", "rc_id": str(rc.id), "cd": cd})
     assert (await client.post("/api/v1/auth/recovery/freeze", json={"signed_token": ft})).status_code == 204
     lp = {"email": "frz@safebox.example.com"}
     assert (await client.post("/api/v1/auth/login/email", json={**lp, "auth_key_hash": REG["auth_key_hash"]})).status_code == 200

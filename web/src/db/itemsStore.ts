@@ -61,6 +61,8 @@ export async function softDeleteByServerId(serverId: string): Promise<void> {
   const db = await getDb();
   const items = await db.getAllFromIndex("items", "by-serverId", serverId);
   for (const item of items) {
+    // 本地有未同步编辑时不覆盖（避免静默丢失用户编辑，让下次 push 冲突处理）
+    if (item.isDirty) continue;
     await db.put("items", {
       ...item,
       isDeleted: true,
@@ -184,6 +186,8 @@ export async function upsertFromServer(
 
     const now = Date.now();
     if (existing) {
+      // 本地有未同步编辑时不覆盖，让 push 冲突处理（避免静默丢失用户编辑）
+      if (existing.isDirty) continue;
       // 更新
       await db.put("items", {
         ...existing,

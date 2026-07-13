@@ -45,3 +45,28 @@ async def send_sms(phone: str, code: str, lang: str = "en") -> bool:
         import logging
         logging.getLogger("safebox").exception(f"SMS send failed: {e}")
         return False
+
+
+async def send_alert_sms(phone: str, message: str, lang: str = "en") -> bool:
+    """发送告警短信（自定义文本，如恢复码告警含 accelerate/freeze URL）。"""
+    if not settings.twilio_account_sid:
+        import logging
+        logging.debug(f"[DEV] SMS alert not configured. Message would be sent to {phone}: {message}")
+        return True
+
+    if not phone.startswith("+"):
+        phone = f"+{phone}"
+
+    url = f"{TWILIO_URL}/{settings.twilio_account_sid}/Messages.json"
+    auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+    body = {"From": settings.twilio_phone_number, "To": phone, "Body": message}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, data=body, auth=auth, timeout=10)
+            data = resp.json()
+            return data.get("status") in ("queued", "sent", "delivered")
+    except (httpx.HTTPError, httpx.TimeoutException) as e:
+        import logging
+        logging.getLogger("safebox").exception(f"SMS alert failed: {e}")
+        return False

@@ -111,7 +111,7 @@ async def sync_push(
         if valid_server_ids:
             sub_conds.append(Item.id.in_(valid_server_ids))
         existing_result = await db.execute(
-            select(Item).where(and_(Item.user_id == user_id, or_(*sub_conds)))
+            select(Item).where(and_(Item.user_id == user_id, or_(*sub_conds))).with_for_update()
         )
         for item in existing_result.scalars().all():
             if item.client_did is not None:

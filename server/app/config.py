@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     recovery_signing_key: str = ""  # accelerate/freeze 签名 token 密钥（留空回退 jwt_secret_key）
     cors_origins: str = "*"
 
+    # 限流
+    trusted_proxies: str = ""  # 可信代理 IP（逗号分隔），仅这些直连 IP 的 X-Forwarded-For/X-Real-IP 被采纳
+
     # 同步
     sync_batch_limit: int = 100
 

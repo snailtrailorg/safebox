@@ -40,7 +40,7 @@ async function deriveBits(
     return new Uint8Array(bits as ArrayBuffer);
   }
   // Argon2id — 暂未实现，fallback 到 PBKDF2
-  return deriveBits(password, salt, DEFAULT_KDF, length);
+  throw new Error("argon2id KDF not yet supported");
 }
 
 /** deriveKey — 派生 AES-256 加密密钥（用于包裹/解包 User Key） */

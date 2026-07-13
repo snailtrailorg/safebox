@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from app.config import settings
 from app.services.verification_service import check_rate_key
 
 # 白名单路径：不限制
@@ -27,8 +28,20 @@ STRICT_MAX = 100
 
 
 def _client_ip(request: Request) -> str:
-    """提取客户端真实 IP。仅信任 Nginx 设置的 X-Real-IP。"""
-    return request.headers.get("x-real-ip") or (request.client.host if request.client else "")
+    """提取客户端真实 IP。
+
+    仅当直连来自可信代理（trusted_proxies）时才采纳 X-Forwarded-For/X-Real-IP，
+    防止客户端伪造头绕过 IP 限流。非可信直连用 request.client.host。
+    """
+    direct = request.client.host if request.client else ""
+    trusted = [p.strip() for p in settings.trusted_proxies.split(",") if p.strip()]
+    if direct in trusted:
+        # 可信代理：取 X-Forwarded-For 最左侧（最原始客户端），回退 X-Real-IP
+        xff = request.headers.get("x-forwarded-for", "")
+        if xff:
+            return xff.split(",")[0].strip()
+        return request.headers.get("x-real-ip") or direct
+    return direct
 
 
 def _extract_user_id(request: Request) -> Optional[str]:

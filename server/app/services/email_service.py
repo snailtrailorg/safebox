@@ -70,10 +70,13 @@ async def send_recovery_alert(
     event: "initiate" | "accelerate" | "freeze" | "password_changed"
     """
     email = user.email
-    if not email:
+    phone = user.phone
+    if not email and not phone:
         return False
 
     base_url = settings.cors_origins.split(",")[0] if settings.cors_origins != "*" else "https://safebox.snailtrail.org"
+    accelerate_url = f"{base_url}/recovery/accelerate?token={accelerate_token}" if accelerate_token else ""
+    freeze_url = f"{base_url}/recovery/freeze?token={freeze_token}" if freeze_token else ""
 
     if event == "initiate":
         accelerate_url = f"{base_url}/recovery/accelerate?token={accelerate_token}"
@@ -137,4 +140,20 @@ async def send_recovery_alert(
     else:
         return False
 
-    return await _send_email(email, subject, body)
+    if email:
+        return await _send_email(email, subject, body)
+    # phone 用户发 SMS 告警（含 accelerate/freeze URL）
+    if phone:
+        from app.services.sms_service import send_alert_sms
+        if event == "initiate":
+            msg = f"SafeBox 安全告警：恢复码已用于重置密码。本人加速:{accelerate_url} ; 非本人冻结:{freeze_url}"
+        elif event == "accelerate":
+            msg = "SafeBox：密码重置已确认"
+        elif event == "freeze":
+            msg = "SafeBox：密码重置已冻结，旧密码恢复"
+        elif event == "password_changed":
+            msg = "SafeBox 安全告警：密码已修改"
+        else:
+            return False
+        return await send_alert_sms(phone, msg)
+    return False

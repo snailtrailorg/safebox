@@ -2,6 +2,7 @@
 
 from typing import Optional
 import hashlib
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -23,6 +24,8 @@ from app.services.auth_service import (
 from app.services.email_service import send_recovery_alert
 from app.services.recovery_service import (
     COOLDOWN_HOURS,
+    INITIATE_TOKEN_TTL_MINUTES,
+    _clear_pending_initiate,
     accelerate_recovery,
     confirm_recovery,
     create_recovery_code,
@@ -120,6 +123,15 @@ async def initiate(
         ):
             raise HTTPException(409, detail=_t(request, "recovery_already_pending"))
         raise HTTPException(401, detail=_t(request, "recovery_code_invalid"))
+    # 检查 pending_initiate：已有未过期 -> 409（不允许覆盖）；过期 -> 清除继续
+    if existing is not None and existing.status == "active" and existing.pending_initiate_at:
+        pending_at = existing.pending_initiate_at
+        if pending_at.tzinfo is None:
+            pending_at = pending_at.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - pending_at).total_seconds()
+        if age < INITIATE_TOKEN_TTL_MINUTES * 60:
+            raise HTTPException(409, detail=_t(request, "recovery_already_pending"))
+        _clear_pending_initiate(existing)
 
     # 验证 active 恢复码（含失败计数 / 锁定）
     rc = await find_valid_recovery_code(db, user.id, req.recovery_code)
@@ -173,11 +185,12 @@ async def confirm(
     await db.commit()
 
     # 发送告警（同原 initiate）
+    cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
     accelerate_token = sign_recovery_token(
-        {"sub": str(user.id), "action": "accelerate", "rc_id": str(rc.id)}
+        {"sub": str(user.id), "action": "accelerate", "rc_id": str(rc.id), "cd": cd}
     )
     freeze_token = sign_recovery_token(
-        {"sub": str(user.id), "action": "freeze", "rc_id": str(rc.id)}
+        {"sub": str(user.id), "action": "freeze", "rc_id": str(rc.id), "cd": cd}
     )
     await send_recovery_alert(user, "initiate", accelerate_token, freeze_token)
 
@@ -242,7 +255,18 @@ async def accelerate(
             detail=_t(request, "recovery_not_pending"),
         )
 
-    if not await verify_and_consume("email", user.email or "", req.verification_code):
+    # cd 绑定本次冷却实例，防止签名 token 跨冷却周期重放
+    expected_cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
+    if payload.get("cd") != expected_cd:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_t(request, "recovery_token_invalid"),
+        )
+
+    # 验证码发到用户注册的联系方式（手机用户走 SMS 验证码）
+    target = "phone" if user.phone else "email"
+    value = user.phone or user.email or ""
+    if not await verify_and_consume(target, value, req.verification_code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_t(request, "verification_code_invalid"),
@@ -285,6 +309,14 @@ async def freeze(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=_t(request, "recovery_not_pending"),
+        )
+
+    # cd 绑定本次冷却实例，防止签名 token 跨冷却周期重放
+    expected_cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
+    if payload.get("cd") != expected_cd:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_t(request, "recovery_token_invalid"),
         )
 
     await freeze_recovery(db, rc, user)

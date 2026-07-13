@@ -31,9 +31,9 @@ export function ChangePasswordPage() {
     const session = await getSession();
     const ok = await keyChain.unlockWithPassword(currentPassword, session.loginSalt, session.encrypted_user_key, session.cached_K);
     if (!ok) throw new Error("wrong password");
-    const email = session.email || "";
-    if (!email) throw new Error("no email");
-    await apiClient.sendCode({ target: "email", value: email });
+    const contact = session.email || "";
+    if (!contact) throw new Error("no contact");
+    await apiClient.sendCode({ target: contact.includes("@") ? "email" : "phone", value: contact });
   };
 
   const handleChangePassword = async () => {
@@ -49,7 +49,7 @@ export function ChangePasswordPage() {
     setChanging(true);
     try {
       const session = await getSession();
-      const email = session.email || "";
+      const contact = session.email || "";
 
       // 用「当前盐」派生当前密码的 auth key，供服务端二次校验当前密码
       const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.loginSalt));
@@ -66,8 +66,8 @@ export function ChangePasswordPage() {
       );
 
       const resp = await apiClient.changePassword({
-        target: "email",
-        value: email,
+        target: contact.includes("@") ? "email" : "phone",
+        value: contact,
         verification_code: verifyCode,
         current_auth_key_hash: currentAuthKeyHash,
         new_auth_key_hash: newAuthKeyHash,

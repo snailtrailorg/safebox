@@ -5,6 +5,7 @@
  */
 import { deriveKey, generateSalt } from "../crypto/kdf";
 import { aesEncrypt, aesDecrypt } from "../crypto/aes";
+import { getDb } from "../db/database";
 import { getUserItems, upsertItem } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
 import type { Item, EncryptedField } from "../types/domain";
@@ -19,6 +20,7 @@ interface BackupPayload {
     name: EncryptedField;
     description: EncryptedField | null;
     data: EncryptedField;
+    serverId: string | null;
     createdAt: number;
     updatedAt: number;
   }>;
@@ -36,6 +38,7 @@ export async function exportBackup(password: string): Promise<void> {
       name: i.name,
       description: i.description,
       data: i.data,
+      serverId: i.serverId ?? null,
       createdAt: i.createdAt,
       updatedAt: i.updatedAt,
     })),
@@ -80,8 +83,14 @@ export async function importBackup(password: string, file: File): Promise<number
   if (payload.version !== 1) throw new Error(`不支持的备份版本: ${payload.version}`);
 
   const uid = await getCurrentUserId();
+  const db = await getDb();
   let count = 0;
   for (const item of payload.items) {
+    // 按 serverId 去重：已存在的条目跳过，避免重复导入产生重复
+    if (item.serverId) {
+      const existing = await db.getAllFromIndex("items", "by-serverId", item.serverId);
+      if (existing.length > 0) continue;
+    }
     await upsertItem({
       uid,
       type: item.type as Item["type"],
@@ -89,7 +98,7 @@ export async function importBackup(password: string, file: File): Promise<number
       name: item.name,
       description: item.description,
       data: item.data,
-      serverId: null,
+      serverId: item.serverId,
       version: 1,
       isDirty: true,
       isDeleted: false,
