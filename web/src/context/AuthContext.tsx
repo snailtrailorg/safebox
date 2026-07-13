@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isNewSession && has && tokenValid) {
       sessionStorage.setItem("sb_auth", "1");
     }
-    const status: AuthStatus = has && tokenValid && !isNewSession
+    const status: AuthStatus = has && tokenValid
       ? (keyChain.isUnlocked ? "ready" : "locked")
       : "guest";
     setState({
@@ -78,8 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (accessToken: string, refreshToken: string, userId: string) => {
-    await saveSession({ accessToken, refreshToken, serverUserId: userId });
-    setState({ status: "ready", userId, dbUnavailable: false, countdown: 0 });
+    // userId 为空时不覆盖 serverUserId（保留注册/上次登录存的值）
+    await saveSession({ accessToken, refreshToken, ...(userId ? { serverUserId: userId } : {}) });
+    const session = await getSession();
+    setState({ status: "ready", userId: session.serverUserId, dbUnavailable: false, countdown: 0 });
   }, []);
 
   const logout = useCallback(async () => {

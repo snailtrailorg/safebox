@@ -93,6 +93,7 @@ class LoginGoogleRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
+    user_id: str
     access_token: str
     refresh_token: str
     login_salt: str                                    # 登录密码派生用盐（新设备登录时必需）
@@ -167,6 +168,5 @@ class LogoutRequest(BaseModel):
 
 
 class DeleteAccountRequest(BaseModel):
-    target: str = Field(..., pattern="^(phone|email)$")
-    value: str
     verification_code: str = Field(..., min_length=6, max_length=6)
+    current_auth_key_hash: str

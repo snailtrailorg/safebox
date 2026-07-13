@@ -303,17 +303,19 @@ async def revoke(
     db: AsyncSession = Depends(get_db),
 ):
     """已登录用户主动作废恢复码。需验证码 + 当前密码。"""
-    if not await verify_and_consume(req.target, req.value, req.verification_code):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_t(request, "verification_code_invalid"),
-        )
-
     user = await db.get(User, user_id)
     if not user or not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=_t(request, "email_or_password_wrong"),
+        )
+    # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
+    code_ok = (user.email and await verify_and_consume("email", user.email, req.verification_code)) or \
+              (user.phone and await verify_and_consume("phone", user.phone, req.verification_code))
+    if not code_ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_t(request, "verification_code_invalid"),
         )
 
     result = await db.execute(
@@ -324,5 +326,8 @@ async def revoke(
     )
     rc = result.scalar_one_or_none()
     if rc:
-        rc.status = "active"  # 旧码不再锁定，恢复码永久不重生成
+        # 清空 hash/salt 使 HMAC 永远失配 -> 恢复码真正作废，无法再 initiate
+        # （恢复码永久不重生成，revoke 后用户将失去恢复能力）
+        rc.recovery_code_hash = ""
+        rc.recovery_code_salt = ""
         await db.commit()

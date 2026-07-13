@@ -61,6 +61,7 @@ export interface LoginPhoneRequest {
 }
 export interface LoginGoogleRequest { google_id_token: string }
 export interface LoginResponse {
+  user_id: string;
   access_token: string;
   refresh_token: string;
   login_salt: string;

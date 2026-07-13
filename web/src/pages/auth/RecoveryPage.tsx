@@ -6,9 +6,8 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
-import { deriveKey, deriveAuthKey, DEFAULT_KDF } from "../../crypto/kdf";
-import { base64ToBytes } from "../../crypto/aes";
-import type { KdfSettings } from "../../crypto/kdf";
+import { deriveAuthKey } from "../../crypto/kdf";
+import { saveSession } from "../../db/sessionStore";
 
 export function RecoveryPage() {
   const { t } = useTranslation();
@@ -35,15 +34,13 @@ export function RecoveryPage() {
     }
     setLoading(true);
     try {
-      // 1. 用新密码派生密钥
+      // 1. 新盐 + 新 authKey（供服务端写正式 auth 字段）
       const newSalt = new Uint8Array(32);
       crypto.getRandomValues(newSalt);
-      const newDerivedKey = await deriveKey(newPassword, newSalt);
       const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
-      const newKdf: KdfSettings = DEFAULT_KDF;
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      // 2. 步骤1：验证恢复码，拿 recovery_wrapped + initiate_token
+      // 2. 步骤1：验证恢复码，拿 encrypted_user_key + recovery_salt + initiate_token
       const step1 = await apiClient.initiateRecovery({
         target: "email",
         value: email,
@@ -52,18 +49,23 @@ export function RecoveryPage() {
         new_login_salt: saltBase64,
       });
 
-      // 3. 用恢复码派生密钥解 recovery_wrapped 拿【旧 User Key】（零知识：服务端拿不到）
-      const recoverySaltBytes = base64ToBytes(step1.recovery_salt);
-      // 模型 D：用恢复码 + recovery_salt 派生 K，解 encrypted_user_key -> User Key
-      const ok = await keyChain.unlockFromRecoveryCode(recoveryCode, "", step1.recovery_salt, step1.encrypted_user_key);
-      if (!ok) {
+      // 3. 用恢复码派生 K 解 User Key + 用新登录密码重包 cached_K（一次派生）
+      //    模型 D：K 不变、User Key 不变，只把 K 换用新登录密码派生的 loginDerivedKey 包裹
+      const rec = await keyChain.recoverAndRewrap(
+        recoveryCode, "", step1.recovery_salt, step1.encrypted_user_key,
+        newPassword, saltBase64,
+      );
+      if (!rec.ok || !rec.newCachedK) {
         throw new Error(t("auth.recovery.recoverFailed"));
       }
 
-      // K 不变，User Key 不变，直接 confirm（无需传 wrapped）
+      // 4. 步骤2：confirm 写正式 authKey+login_salt+password_version，进冷却
       const step2 = await apiClient.confirmRecovery({
         initiate_token: step1.initiate_token,
       });
+
+      // 5. 本地落库新盐 + 新 cached_K，冷却结束后用新密码可离线解锁
+      await saveSession({ loginSalt: saltBase64, cached_K: rec.newCachedK });
 
       setCooldownUntil(step2.cooldown_until);
       setToast({

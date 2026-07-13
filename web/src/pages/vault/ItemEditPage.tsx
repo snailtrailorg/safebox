@@ -37,12 +37,14 @@ export function ItemEditPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pwVisible, setPwVisible] = useState<Record<string, boolean>>({});
+  const [origItem, setOrigItem] = useState<Item | null>(null);
 
   useEffect(() => {
     if (isEdit && did) {
       setLoading(true);
       getItem(parseInt(did)).then(async (item) => {
         if (item) {
+          setOrigItem(item);
           setItemType(item.type);
           const decName = await keyChain.decryptItemField(item.name, "name", item.type);
           setName(decName || "");
@@ -105,18 +107,18 @@ export function ItemEditPage() {
         did: isEdit && did ? parseInt(did) : 0,
         uid,
         type: itemType,
-        icon: null,
+        icon: origItem?.icon ?? null,
         name: await keyChain.encryptItemField(name.trim(), "name", itemType, itemKey),
         description: description.trim()
           ? await keyChain.encryptItemField(description.trim(), "description", itemType, itemKey)
           : null,
         data: await keyChain.encryptItemField(dataJson, "data", itemType, itemKey),
-        serverId: null,
-        version: 1,
+        serverId: origItem?.serverId ?? null,
+        version: origItem?.version ?? 1,
         isDirty: true,
         isDeleted: false,
         updatedAt: Date.now(),
-        createdAt: Date.now(),
+        createdAt: origItem?.createdAt ?? Date.now(),
       };
 
       const savedDid = await saveItem(item);

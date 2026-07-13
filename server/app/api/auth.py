@@ -220,6 +220,7 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
     keys = await get_user_keys(db, user.id)
     devices = await get_user_devices(db, user.id)
     return LoginResponse(
+        user_id=str(user.id),
         access_token=access_token, refresh_token=refresh_token,
         login_salt=user.login_salt or "",
         encrypted_user_key=keys.encrypted_user_key if keys else "",
@@ -291,7 +292,12 @@ async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSessi
     if not user:
         await record_login_failure("google", google_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "google_not_registered"))
+    # 恢复冷却期：账户锁定（与 email/phone 登录一致，零窗口）
+    if await is_in_cooldown(db, user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
     await clear_login_failures("google", google_id)
+    # 冷却已结束且新密码登录成功 -> 清理 rollback（押后，清不掉无害）
+    await clear_rollback_after_login(db, user.id)
     return await _build_login_response(db, user)
 
 
@@ -312,7 +318,10 @@ async def change_password(
     if not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "current_password_wrong"))
 
-    if not await verify_and_consume(req.target, req.value, req.verification_code):
+    # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
+    code_ok = (user.email and await verify_and_consume("email", user.email, req.verification_code)) or \
+              (user.phone and await verify_and_consume("phone", user.phone, req.verification_code))
+    if not code_ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
 
     user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
@@ -394,10 +403,17 @@ async def delete_account(
     user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):
-    """注销账号。需验证码确认。"""
-    if not await verify_and_consume(req.target, req.value, req.verification_code):
+    """注销账号。需当前密码 + 验证码（绑定用户注册联系方式）确认。"""
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
+    if not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash or ""):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "current_password_wrong"))
+    # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
+    code_ok = (user.email and await verify_and_consume("email", user.email, req.verification_code)) or \
+              (user.phone and await verify_and_consume("phone", user.phone, req.verification_code))
+    if not code_ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
 
-    from app.models import User
     await db.execute(sa_delete(User).where(User.id == user_id))
     await db.commit()

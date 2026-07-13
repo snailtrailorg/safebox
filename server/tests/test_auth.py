@@ -364,9 +364,9 @@ async def test_delete_account_requires_verification(client: AsyncClient):
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 需要验证码
+    # 需验证码 + 当前密码（验证码绑定用户注册邮箱，不接受客户端自带 target/value）
     resp = await client.request("DELETE", "/api/v1/auth/account", json={
-        "target": "email", "value": "delacct@safebox.example.com",
         "verification_code": "123456",
+        "current_auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
     }, headers=headers)
     assert resp.status_code == 204

@@ -101,7 +101,7 @@ export function LoginPage() {
       setToast({ message: t("auth.login.unlockFailed"), type: "error" });
       return;
     }
-    await login(response.access_token, response.refresh_token, "");
+    await login(response.access_token, response.refresh_token, response.user_id || "");
     navigate("/");
   };
 

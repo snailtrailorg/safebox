@@ -9,6 +9,7 @@
 import {
   generateAesKey, importAesKey,
   aesEncrypt, aesDecrypt, aesEncryptString, aesDecryptString,
+  aesDecryptField,
   makeFieldAAD,
 } from "../crypto/aes";
 import { deriveKey, deriveAuthKey, type KdfSettings, DEFAULT_KDF } from "../crypto/kdf";
@@ -110,6 +111,35 @@ class KeyChain {
     } catch { return false; }
   }
 
+  // ── 恢复码解锁 + 重包 cached_K（忘密码恢复流程专用）──
+
+  /** 用恢复码派生 K -> 解 User Key 设到内存 + 用新登录密码重包 cached_K。
+   *  一次派生 K，避免重复 PBKDF2。返回新 cached_K 供 saveSession。 */
+  async recoverAndRewrap(
+    recoveryCode: string,
+    masterPassword: string,
+    recoverySaltBase64: string,
+    encryptedUserKey: string,
+    newLoginPassword: string,
+    newLoginSaltBase64: string,
+  ): Promise<{ ok: boolean; newCachedK?: string }> {
+    try {
+      const recoverySalt = this.base64ToBytes(recoverySaltBase64);
+      const kSeed = recoveryCode + (masterPassword || "");
+      const K = await deriveKey(kSeed, recoverySalt);
+      const ukRaw = await aesDecrypt(K, encryptedUserKey);
+      if (!ukRaw) return { ok: false };
+      const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
+      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
+      // 重包 cached_K = AES(newLoginDerivedKey, K_raw)
+      const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
+      const newSalt = this.base64ToBytes(newLoginSaltBase64);
+      const newLoginDerivedKey = await deriveKey(newLoginPassword, newSalt);
+      const newCachedK = await aesEncrypt(newLoginDerivedKey, kRaw);
+      return { ok: true, newCachedK };
+    } catch { return { ok: false }; }
+  }
+
   // ── 改登录密码（K 不变，只更新本地缓存）─────────────
 
   async rewrapCachedK(
@@ -166,11 +196,9 @@ class KeyChain {
     const ik = await this.decryptItemKey(field.encrypted_key);
     if (!ik) return null;
     try {
-      const aad = makeFieldAAD(fieldName, itemType);
-      const data = this.base64ToBytes(field.ciphertext);
-      if (data.length < 13) return null;
-      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: data.slice(0, 12).buffer.slice(data.byteOffset, data.byteOffset + 12) as ArrayBuffer, tagLength: 128, additionalData: aad.buffer.slice(aad.byteOffset, aad.byteOffset + aad.byteLength) as ArrayBuffer }, ik, data.slice(12).buffer.slice(data.byteOffset + 12, data.byteOffset + data.length) as ArrayBuffer) as ArrayBuffer;
-      return new TextDecoder().decode(new Uint8Array(pt as ArrayBuffer));
+      const bytes = await aesDecryptField(ik, field.ciphertext, fieldName, itemType);
+      if (!bytes) return null;
+      return new TextDecoder().decode(bytes);
     } catch { return null; }
   }
 
