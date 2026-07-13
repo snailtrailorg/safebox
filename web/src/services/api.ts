@@ -218,11 +218,10 @@ class ApiClient {
 
   // ── Sync 端点 ────────────────────────────────────
 
-  async pull(since: string, limit = 100): Promise<SyncPullResponse> {
-    return this.request(
-      "GET",
-      `/sync/pull?since=${encodeURIComponent(since)}&limit=${limit}`,
-    );
+  async pull(since: string, sinceId?: string | null, limit = 100): Promise<SyncPullResponse> {
+    const params = new URLSearchParams({ since, limit: String(limit) });
+    if (sinceId) params.set("since_id", sinceId);
+    return this.request("GET", `/sync/pull?${params.toString()}`);
   }
 
   async push(req: SyncPushRequest): Promise<SyncPushResponse> {

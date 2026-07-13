@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -29,20 +29,28 @@ router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 @router.get("/pull", response_model=SyncPullResponse)
 async def sync_pull(
     since: str = Query(..., description="ISO8601 时间戳，拉取此时间之后更新的条目"),
+    since_id: Optional[UUID] = Query(None, description="上一页最后一条 id，与 since 组成复合游标防同 updated_at 跨页丢失"),
     limit: int = Query(settings.sync_batch_limit, ge=1, le=500),
     user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):
-    """拉取自 since 以来更新的条目（包括软删除的）。"""
+    """拉取自 since 以来更新的条目（包括软删除的）。
+
+    keyset 分页：(updated_at, id) 复合游标，防同 updated_at 的条目跨页丢失。
+    """
     try:
         since_dt = datetime.fromisoformat(since)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid since format")
 
+    cond = Item.updated_at > since_dt
+    if since_id is not None:
+        cond = or_(Item.updated_at > since_dt, and_(Item.updated_at == since_dt, Item.id > since_id))
+
     result = await db.execute(
         select(Item)
-        .where(and_(Item.user_id == user_id, Item.updated_at > since_dt))
-        .order_by(Item.updated_at.asc())
+        .where(and_(Item.user_id == user_id, cond))
+        .order_by(Item.updated_at.asc(), Item.id.asc())
         .limit(limit + 1)
     )
     items = result.scalars().all()
@@ -51,8 +59,9 @@ async def sync_pull(
     if has_more:
         items = items[:limit]
 
-    # 用最后条目的 updated_at 作为 next 游标，避免服务器时间滑动导致跳号
+    # 用最后条目的 (updated_at, id) 作为 next 游标，避免服务器时间滑动导致跳号
     cursor = items[-1].updated_at.isoformat() if items else datetime.now(timezone.utc).isoformat()
+    last_id = str(items[-1].id) if items else None
 
     return SyncPullResponse(
         items=[
@@ -71,6 +80,7 @@ async def sync_pull(
             for item in items
         ],
         server_time=cursor,
+        server_id=last_id,
         has_more=has_more,
     )
 
@@ -87,7 +97,6 @@ async def sync_push(
     base == 服务端当前 -> 接受，version+1；base != 服务端当前 -> conflict。
     updated_at 由模型 onupdate 自动维护（仅用于 pull 游标/显示，不参与冲突判断）。
     """
-    from sqlalchemy import or_
 
     results: List[SyncPushResult] = []
     new_items: List[Item] = []  # 新建的 Item 对象，flush 后取 ID

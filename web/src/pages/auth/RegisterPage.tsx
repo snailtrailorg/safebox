@@ -142,7 +142,7 @@ export function RegisterPage() {
           kdf_settings: keys.kdfSettings,
           recovery_salt: keys.recovery_salt, recovery_code: recoveryCode, recovery_code_salt: recoveryCodeSalt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
-        } as any);
+        });
         tokens = response;
         await saveSession({
           email: phone, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,

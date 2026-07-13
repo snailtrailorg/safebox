@@ -1,7 +1,7 @@
 /**
  * VaultContext — 密码库状态管理
  */
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import type { Item, ItemType, ConflictInfo } from "../types/domain";
 import { getUserItems, upsertItem, softDeleteItem, getItem, markSynced, markForRepush, upsertFromServer, softDeleteByServerId } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
@@ -80,7 +80,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const syncingRef = useRef(false);
   const syncNow = useCallback(async () => {
+    // 程序级并发守卫：两次快速点击只执行一次（disabled 是 async setState，不可靠）
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setState((s) => ({ ...s, isSyncing: true, error: null }));
     try {
       const result = await sync();
@@ -100,6 +104,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         isSyncing: false,
         error: e instanceof Error ? e.message : "同步失败",
       }));
+    } finally {
+      syncingRef.current = false;
     }
   }, [decryptNames]);
 
@@ -121,15 +127,14 @@ export function VaultProvider({ children }: { children: ReactNode }) {
           version: conflict.serverItem.version,
           isDirty: false,
           updatedAt: conflict.serverItem.updatedAt,
-        }]);
+        }], true);  // force=true：用户主动选服务端，覆盖本地脏条目
       }
     }
     setState((s) => ({
       ...s,
       conflicts: s.conflicts.filter((c) => c.localDid !== conflict.localDid),
-      items: s.items.filter((i) => i.did !== conflict.localDid || !keepLocal),
     }));
-    // 重新加载本地列表反映变更
+    // 重新加载本地列表反映变更（items 由 loadItems 重建，无需手动过滤）
     const uid = await getCurrentUserId();
     await loadItems(uid);
   }, [loadItems]);

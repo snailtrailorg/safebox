@@ -73,13 +73,13 @@ export function ItemDetailPage() {
           const desc = await keyChain.decryptItemField(found.description, "description", found.type);
           if (!cancelled) setDecryptedDesc(desc);
         }
-        if (found.type === "file" && found.data) {
+        if (found.data) {
           const plain = await keyChain.decryptItemField(found.data, "data", found.type);
           if (!cancelled && plain) {
             try {
               setDecryptedData(JSON.parse(plain));
             } catch {
-              setDecryptedData({});
+              setDecryptedData({ raw: plain });
             }
           }
         }
@@ -88,20 +88,8 @@ export function ItemDetailPage() {
     return () => { cancelled = true; };
   }, [did]);
 
-  const handleShowSensitive = async () => {
-    if (!item?.data) return;
-    if (!decryptedData) {
-      const plain = await keyChain.decryptItemField(item.data, "data", item.type);
-      if (plain) {
-        try {
-          setDecryptedData(JSON.parse(plain));
-        } catch {
-          setDecryptedData({ raw: plain });
-        }
-      } else {
-        setDecryptedData({ raw: "" });
-      }
-    }
+  const handleShowSensitive = () => {
+    // data 已在 useEffect 预解密到 decryptedData，此处只切换显示（同步，避免 async 与 mouseUp 竞态）
     setShowSensitive(true);
   };
 

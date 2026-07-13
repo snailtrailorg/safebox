@@ -25,7 +25,7 @@ export interface RegisterEmailRequest {
   device_public_key?: string;
   device_wrapped?: string;
 }
-export interface RegisterPhoneRequest extends RegisterEmailRequest {
+export interface RegisterPhoneRequest extends Omit<RegisterEmailRequest, "email"> {
   phone: string;
 }
 export interface RegisterGoogleRequest {
@@ -166,6 +166,7 @@ export interface SyncItemResponse {
 export interface SyncPullResponse {
   items: SyncItemResponse[];
   server_time: string;
+  server_id: string | null;
   has_more: boolean;
 }
 export interface SyncDeleteRequest { server_ids: string[] }

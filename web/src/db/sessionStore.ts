@@ -18,6 +18,7 @@ const EMPTY_SESSION: SessionData = {
   password_version: 0,
   has_master_password: false,
   lastSyncTime: "2020-01-01T00:00:00+00:00",
+  lastSyncId: null,
 };
 
 export async function getSession(): Promise<SessionData> {
@@ -62,6 +63,15 @@ export async function getLastSyncTime(): Promise<string> {
 
 export async function updateLastSyncTime(time: string): Promise<void> {
   await saveSession({ lastSyncTime: time });
+}
+
+export async function getLastSyncId(): Promise<string | null> {
+  const session = await getSession();
+  return session.lastSyncId ?? null;
+}
+
+export async function updateLastSyncId(id: string | null): Promise<void> {
+  await saveSession({ lastSyncId: id });
 }
 
 export async function hasSession(): Promise<boolean> {

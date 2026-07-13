@@ -110,7 +110,8 @@ async def initiate(
         else await find_user_by_phone(db, req.value)
     )
     if not user:
-        raise HTTPException(404, detail=_t(request, "user_not_found"))
+        # 不返回 404（账户枚举 oracle），与恢复码错误返回一致的 401
+        raise HTTPException(401, detail=_t(request, "recovery_code_invalid"))
 
     # 检查是否已在冷却期
     result = await db.execute(
@@ -164,10 +165,10 @@ async def confirm(
     """步骤 2：验 token + 真正发起恢复（写登录密码+进冷却+吊销旧token）。
     K/User Key 不变，无需客户端传 wrapped key。
     """
-    # 按 token 哈希找对应 recovery_code
+    # 按 token 哈希找对应 recovery_code（FOR UPDATE 防并发 confirm 双成功）
     token_hash = hashlib.sha256(req.initiate_token.encode()).hexdigest()
     result = await db.execute(
-        select(RecoveryCode).where(RecoveryCode.pending_initiate_token == token_hash)
+        select(RecoveryCode).where(RecoveryCode.pending_initiate_token == token_hash).with_for_update()
     )
     rc = result.scalar_one_or_none()
     if not rc:

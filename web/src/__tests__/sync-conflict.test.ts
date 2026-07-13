@@ -104,7 +104,7 @@ describe("sync() 冲突解决 (M5)", () => {
     const result = await sync();
     const c = result.conflicts[0];
 
-    // 用户选「使用服务端」：应用捕获的服务端版本
+    // 用户选「使用服务端」：应用捕获的服务端版本（force=true 覆盖本地脏条目）
     await upsertFromServer([{
       type: c.serverItem!.type,
       icon: c.serverItem!.icon,
@@ -115,7 +115,7 @@ describe("sync() 冲突解决 (M5)", () => {
       version: c.serverItem!.version,
       isDirty: false,
       updatedAt: c.serverUpdatedAt,
-    }]);
+    }], true);
 
     // 本地条目仍存在（did=1），内容已更新为服务端版本
     const item = await db.get("items", 1);

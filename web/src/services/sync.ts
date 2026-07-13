@@ -11,7 +11,7 @@ import {
   upsertFromServer,
   softDeleteByServerId,
 } from "../db/itemsStore";
-import { getLastSyncTime, updateLastSyncTime } from "../db/sessionStore";
+import { getLastSyncTime, updateLastSyncTime, getLastSyncId, updateLastSyncId } from "../db/sessionStore";
 import type { ConflictInfo, EncryptedField } from "../types/domain";
 
 export interface SyncResult {
@@ -94,14 +94,16 @@ export async function sync(): Promise<SyncResult> {
     }
   }
 
-  // 2. Pull server changes (paginated)
+  // 2. Pull server changes (paginated, keyset (updated_at, id) 防同 updated_at 跨页丢失)
   let since = await getLastSyncTime();
+  let sinceId = await getLastSyncId();
   let hasMore = true;
   let lastServerTime = since;
+  let lastServerId = sinceId;
   const conflictServerIds = new Set(pendingConflicts.map((c) => c.serverId));
 
   while (hasMore) {
-    const pullResult = await apiClient.pull(since, 100);
+    const pullResult = await apiClient.pull(since, sinceId ?? undefined, 100);
     hasMore = pullResult.has_more;
 
     const toUpsert: Array<{
@@ -163,11 +165,14 @@ export async function sync(): Promise<SyncResult> {
     }
 
     lastServerTime = pullResult.server_time;
+    lastServerId = pullResult.server_id;
     since = pullResult.server_time;
+    sinceId = pullResult.server_id;
   }
 
   if (lastServerTime) {
     await updateLastSyncTime(lastServerTime);
+    await updateLastSyncId(lastServerId);
   }
 
   return { pushed, pulled, conflicts };

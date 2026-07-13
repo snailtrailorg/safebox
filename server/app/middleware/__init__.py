@@ -34,7 +34,7 @@ async def get_current_user_id(
         if user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("invalid_token", lang))
         return UUID(user_id)
-    except InvalidTokenError:
+    except (InvalidTokenError, ValueError, TypeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("invalid_token", lang))
 
 

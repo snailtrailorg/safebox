@@ -86,12 +86,11 @@ async def get_login_wait(target: str, value: str) -> int:
 
 
 async def record_login_failure(target: str, value: str) -> None:
-    """登录验证失败后记录一次失败。"""
+    """登录验证失败后记录一次失败。每次失败续期 TTL（防锁定窗口末尾重试）。"""
     r = await _get_redis()
     key = _login_fail_key(target, value)
-    count = await r.incr(key)
-    if count == 1:
-        await r.expire(key, LOGIN_LOCKOUT_SECONDS)
+    await r.incr(key)
+    await r.expire(key, LOGIN_LOCKOUT_SECONDS)
 
 
 async def clear_login_failures(target: str, value: str) -> None:

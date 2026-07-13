@@ -82,6 +82,7 @@
 }
 ```
 403：账户恢复冷却中（`account_in_cooldown`）
+429：登录限流（`login_rate_limited`，含 `seconds` 等待秒数）
 
 **使用场景**：
 - 日常登录（已登录设备）：客户端已有本地 `cached_K`，用登录密码解 cached_K → K → User Key。`encrypted_user_key` 用于刷新本地缓存（如被别处改密后）。
@@ -195,12 +196,13 @@
 
 ## 同步
 
-### GET /sync/pull?since=ISO8601&limit=100
-需 Bearer。响应 200：
+### GET /sync/pull?since=ISO8601&since_id=UUID&limit=100
+需 Bearer。`since_id` 为上一页最后一条 id（可选），与 `since` 组成复合游标，防同 `updated_at` 跨页丢失。响应 200：
 ```json
 {
   "items": [{"server_id": "...", "client_did": 1, "type": "login", "name": "EncryptedField JSON", "version": 2, "is_deleted": false, "updated_at": "..."}],
   "server_time": "...",
+  "server_id": "最后一条 id 或 null",
   "has_more": false
 }
 ```

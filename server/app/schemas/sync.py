@@ -36,6 +36,7 @@ class SyncPushResponse(BaseModel):
 class SyncPullResponse(BaseModel):
     items: List["SyncItemResponse"]
     server_time: str        # ISO8601，客户端以此为下次 since
+    server_id: Optional[str] = None  # 最后一页最后一条 id，与 server_time 组成复合游标防同 updated_at 跨页丢失
     has_more: bool
 
 

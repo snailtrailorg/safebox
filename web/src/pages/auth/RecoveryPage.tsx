@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthLayout } from "../../components/layout/AuthLayout";
@@ -17,7 +17,15 @@ export function RecoveryPage() {
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState<string | null>(null);
+  const [, setTick] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
+
+  // 冷却倒计时每秒刷新
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
 
   const handleInitiateRecovery = async () => {
     if (!email.trim()) {

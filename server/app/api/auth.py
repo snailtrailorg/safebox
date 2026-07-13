@@ -172,6 +172,9 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "phone_already_registered"))
 
+    # 清除该手机号的历史登录失败计数（与 email 注册一致）
+    await clear_login_failures("phone", req.phone)
+
     from app.services.recovery_service import hash_recovery_code
     recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
 
@@ -327,9 +330,7 @@ async def change_password(
     user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
     user.login_salt = req.new_login_salt
     user.password_version += 1
-    await db.commit()
-
-    await revoke_all_user_tokens(db, user.id)
+    await revoke_all_user_tokens(db, user.id)  # 同一事务吊销旧 token（单次 commit，原子）
     await db.commit()
 
     await send_recovery_alert(user, "password_changed")

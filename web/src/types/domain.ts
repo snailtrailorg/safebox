@@ -51,4 +51,5 @@ export interface SessionData {
   password_version: number;     // 改登录密码 +1
   has_master_password: boolean;
   lastSyncTime: string;
+  lastSyncId: string | null;     // 上次同步最后一条 server_id，与 lastSyncTime 组成复合游标
 }
