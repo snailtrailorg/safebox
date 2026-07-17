@@ -3,6 +3,8 @@
 ## 部署
 
 - 部署四件套：`scripts/deploy-server.sh`（后端+重启）、`scripts/deploy-web.sh`（前端构建+推送+reload）、`scripts/migrate-db.sh`（升级 schema 保留数据）、`scripts/clear-db.sh`（清库重置丢数据）；均通过 `sudo -u michael` 调 michael 侧部署工具，不装依赖
+- 直接 `./scripts/xxx.sh` 跑，脚本内 `sudo -u michael` 免密（sudoers 已配），**不要手动加 sudo**
+- 不要碰 michael 的 `/home/michael/.local/bin/safebox-deploy.sh`（bernard 无权读/改）
 - 服务器初始部署步骤见 `DEPLOY.md`
 - 部署后验证：`curl -s http://127.0.0.1:8000/health`
 - 推送到 GitHub 用 `spe git push github master`（需要代理）
