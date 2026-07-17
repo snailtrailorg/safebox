@@ -7,7 +7,8 @@
     "recoverAccount": "Enter 12-Word Recovery Phrase",
     "indexeddbWarning": "⚠️ This browser does not support local storage (possibly in incognito mode). SafeBox cannot be used.",
     "dbErrorTitle": "Database Error",
-    "dbErrorDetail": "An unexpected database error occurred. Please force-refresh the page to recover (Ctrl+F5)."
+    "dbErrorDetail": "An unexpected database error occurred. Please force-refresh the page to recover (Ctrl+F5).",
+    "createAccount": "Create Account"
   },
 
   "common": {
@@ -35,7 +36,10 @@
     "error": "Error",
     "success": "Success",
     "confirm": "Confirm",
-    "close": "Close"
+    "close": "Close",
+    "backToLogin": "Back to Sign In",
+    "optional": "Optional",
+    "reload": "Reload"
   },
 
   "auth": {
@@ -107,7 +111,11 @@
       "copied": "Copied to clipboard.",
       "savedAndEnter": "I've Saved It — Enter SafeBox",
       "noRecoveryCode": "No recovery phrase to save. Please complete registration first.",
-      "goToRegister": "Go to Registration"
+      "goToRegister": "Go to Registration",
+      "masterPasswordLabel": "Master Password (optional)",
+      "masterPasswordPlaceholder": "Optional, strengthens encryption",
+      "masterPasswordHint": "The master password is combined with your recovery phrase to derive the encryption key, strengthening security. It is permanent and cannot be changed. To recover data, you'll need both the recovery phrase and the master password. Leave blank to use the recovery phrase alone.",
+      "passwordTooWeak": "Password is too weak; please use a stronger password"
     },
     "recovery": {
       "title": "Recover Account",
@@ -134,7 +142,23 @@
       "verifyBtn": "Verify Recovery Phrase",
       "verified": "✅ Recovery Phrase Verified",
       "verifyCodePlaceholder": "Email verification code",
-      "resetAndLoginBtn": "Reset Password & Sign In"
+      "resetAndLoginBtn": "Reset Password & Sign In",
+      "masterPasswordLabel": "Master Password (optional, only if set at registration)",
+      "masterPasswordPlaceholder": "Only if you set a master password at registration",
+      "recoveryCodeWordCount": "Recovery phrase must be 12 English words separated by spaces",
+      "cooldownTitle": "Cooldown",
+      "cooldownDesc": "Recovery initiated. Account is in a 24-hour cooldown.",
+      "cooldownHint": "Cannot sign in during cooldown. Use your new password after it ends.",
+      "cooldownStarted": "Recovery initiated, 24-hour cooldown started",
+      "accelerateTitle": "Accelerate Recovery",
+      "accelerateDesc": "Enter the verification code to lift cooldown immediately and sign in with the new password.",
+      "accelerateBtn": "Accelerate",
+      "accelerated": "✅ Recovery accelerated. You can sign in with the new password.",
+      "freezeTitle": "Freeze Recovery",
+      "freezeDesc": "Freezing rolls back to the old password and cancels this recovery.",
+      "freezeBtn": "Confirm Freeze",
+      "frozen": "✅ Frozen. The old password works again.",
+      "invalidToken": "Link is invalid or expired"
     }
   },
 
@@ -164,7 +188,8 @@
       "name": "Name",
       "notes": "Notes",
       "sensitive": "Sensitive Data",
-      "holdToView": "👆 Hold to View",
+      "holdToView": "👁️ View Sensitive",
+      "hide": "Hide",
       "deleteItem": "🗑️ Delete Item",
       "fileName": "File Name",
       "fileSize": "Size",
@@ -191,15 +216,15 @@
       "enterName": "Please enter a name.",
       "saved": "Saved.",
       "saveFailed": "Save failed.",
-      "typeLogin": "🔑 Login",
+      "typeLogin": "Login",
       "typeLoginHint": "Website and app login credentials with username and password",
-      "typeCard": "💳 Card",
+      "typeCard": "Card",
       "typeCardHint": "Credit and debit card information",
-      "typeIdentity": "🪪 Identity",
+      "typeIdentity": "Identity",
       "typeIdentityHint": "Personal identification, ID cards, passports",
-      "typeNote": "📝 Secure Note",
+      "typeNote": "Secure Note",
       "typeNoteHint": "API keys, SSH keys, recovery codes, and any text",
-      "typeFile": "📁 File",
+      "typeFile": "File",
       "typeFileHint": "SSH key files, certificates, and other confidential documents",
       "loginUsername": "Username/Email",
       "loginUsernamePlaceholder": "Username or email",
@@ -231,9 +256,6 @@
       "identityEmailPlaceholder": "Email address",
       "noteContent": "Content",
       "noteContentPlaceholder": "Enter your encrypted text here...",
-      "typeAndroid": "Android App",
-      "typeAccount": "Account",
-      "typeFile": "File",
       "packageName": "Package",
       "packagePlaceholder": "com.example.app",
       "username": "Username",
@@ -286,7 +308,8 @@
     "imported": "Imported {{count}} item(s).",
     "importFailed": "Import failed.",
     "exportDescription": "Export all your vault items as an encrypted backup file (.safebox). You will need a password to decrypt this file.",
-    "importDescription": "Import items from an encrypted backup file (.safebox). This will add items to your current vault."
+    "importDescription": "Import items from an encrypted backup file (.safebox). This will add items to your current vault.",
+    "verifyCodePlaceholder": "Email verification code"
   },
 
   "appLayout": {

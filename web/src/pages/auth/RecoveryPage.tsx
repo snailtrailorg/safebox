@@ -14,6 +14,7 @@ export function RecoveryPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
+  const [masterPassword, setMasterPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState<string | null>(null);
@@ -34,6 +35,11 @@ export function RecoveryPage() {
     }
     if (!recoveryCode.trim()) {
       setToast({ message: t("auth.recovery.enterRecoveryCode"), type: "error" });
+      return;
+    }
+    const words = recoveryCode.trim().split(/\s+/).filter(Boolean);
+    if (words.length !== 12) {
+      setToast({ message: t("auth.recovery.recoveryCodeWordCount"), type: "error" });
       return;
     }
     if (!newPassword || newPassword.length < 12) {
@@ -60,7 +66,7 @@ export function RecoveryPage() {
       // 3. 用恢复码派生 K 解 User Key + 用新登录密码重包 cached_K（一次派生）
       //    模型 D：K 不变、User Key 不变，只把 K 换用新登录密码派生的 loginDerivedKey 包裹
       const rec = await keyChain.recoverAndRewrap(
-        recoveryCode, "", step1.recovery_salt, step1.encrypted_user_key,
+        recoveryCode, masterPassword, step1.recovery_salt, step1.encrypted_user_key,
         newPassword, saltBase64,
       );
       if (!rec.ok || !rec.newCachedK) {
@@ -139,6 +145,8 @@ export function RecoveryPage() {
           placeholder={t("auth.recovery.recoveryCodePlaceholder")} rows={3}
           style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" }} />
       </div>
+      <PasswordInput label={t("auth.recovery.masterPasswordLabel")} value={masterPassword}
+        onChange={(e) => setMasterPassword(e.target.value)} placeholder={t("auth.recovery.masterPasswordPlaceholder")} />
       <PasswordInput label={t("auth.recovery.newPasswordLabel")} value={newPassword}
         onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.recovery.newPasswordPlaceholder")} />
       <button onClick={handleInitiateRecovery} disabled={loading}

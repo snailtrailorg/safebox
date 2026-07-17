@@ -2,7 +2,7 @@
 
 ## 部署
 
-- `deploy.sh` 只做代码推送+重启，不装依赖不跑迁移
+- 部署四件套：`scripts/deploy-server.sh`（后端+重启）、`scripts/deploy-web.sh`（前端构建+推送+reload）、`scripts/migrate-db.sh`（升级 schema 保留数据）、`scripts/clear-db.sh`（清库重置丢数据）；均通过 `sudo -u michael` 调 michael 侧部署工具，不装依赖
 - 服务器初始部署步骤见 `DEPLOY.md`
 - 部署后验证：`curl -s http://127.0.0.1:8000/health`
 - 推送到 GitHub 用 `spe git push github master`（需要代理）
@@ -49,8 +49,10 @@
 
 ### 数据库
 - PostgreSQL + Redis
-- 清库重建: `sudo -u postgres psql -c 'DROP DATABASE IF EXISTS safebox; CREATE DATABASE safebox OWNER safebox;'`
-- Alembic 迁移: `cd server && PYTHONPATH=. venv/bin/alembic upgrade head`
+- 升级 schema（保留数据）: `./scripts/migrate-db.sh`（通过 `sudo -u michael` 调 migrate-pgsql：alembic upgrade，不停服务不丢数据）
+- 清服务器库（推荐）: `./scripts/clear-db.sh`（通过 `sudo -u michael` 调 michael 侧工具：DROP/CREATE + alembic upgrade + Redis FLUSHALL + 重启，重置含迁移）
+- 手动清库（本地/裸命令）: `sudo -u postgres psql -c 'DROP DATABASE IF EXISTS safebox; CREATE DATABASE safebox OWNER safebox;'`（服务器需先 `sudo systemctl stop safebox` 释放连接，否则 DROP 报 "being accessed by other users"）
+- Alembic 迁移（本地/单独）: `cd server && PYTHONPATH=. venv/bin/alembic upgrade head`；服务器清库重置由 `clear-db.sh` 自动含迁移，无需手动
 - 注意: alembic 的 `script_location` 是相对路径，需要在 server/ 目录下执行
 
 ### 安全
@@ -64,10 +66,10 @@
 
 ### 调试
 - 浏览器端清 IndexedDB：F12 → Application/存储 → IndexedDB → 右键 safebox → 删除
-- 服务端清数据库 + 迁移见上面数据库章节
+- 服务端清数据库 + 迁移：`./scripts/clear-db.sh`（见上面数据库章节）
 - 调试阶段前端 IndexedDB `DB_VERSION=1` 保持不变，schema 变更手动清库（`database.ts` 注释有投产前迁移指南）；后端用 Alembic 迁移链（4 个，`alembic upgrade head`）
 - Redis 清理：`sudo /usr/bin/redis6-cli FLUSHALL` 或 `DEL loginfail:email:xxx`
-- `deploy.sh` 不需要 `spe` 前缀，但部署后服务端 rsync 需要 sudo（`--rsync-path="sudo rsync"`）
+- 部署三件套不需要 `spe` 前缀（本地 `sudo -u michael`，不走代理）；rsync 在 michael 侧 `safebox-deploy.sh` 内部
 
 ### 测试
 - 后端（所有测试）：`cd server && PYTHONPATH=. python -m pytest tests/ -q`

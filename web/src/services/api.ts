@@ -26,7 +26,6 @@ import type {
   AccelerateRecoveryRequest,
   FreezeRecoveryRequest,
   RecoveryStatusResponse,
-  RevokeRecoveryRequest,
   SyncPushRequest,
   SyncPushResponse,
   SyncPullResponse,
@@ -206,10 +205,6 @@ class ApiClient {
 
   async freezeRecovery(req: FreezeRecoveryRequest): Promise<void> {
     return this.request("POST", "/auth/recovery/freeze", req, true);
-  }
-
-  async revokeRecovery(req: RevokeRecoveryRequest): Promise<void> {
-    return this.request("POST", "/auth/recovery/revoke", req, true);
   }
 
   async registerDevice(req: RegisterDeviceRequest): Promise<RegisterDeviceResponse> {

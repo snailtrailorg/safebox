@@ -189,9 +189,6 @@
 {"status": "active|cooldown", "cooldown_until": "ISO8601|null"}
 ```
 
-### POST /auth/recovery/revoke
-需 Bearer + 验证码 + 当前密码。204 No Content。
-
 ---
 
 ## 同步

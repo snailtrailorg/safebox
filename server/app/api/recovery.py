@@ -12,14 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.i18n import get_lang, get_text
-from app.middleware import get_current_user_id, require_not_in_cooldown
+from app.middleware import get_current_user_id
 from app.models.recovery_code import RecoveryCode
 from app.models.user import User, UserKeys
 from app.services.auth_service import (
     find_user_by_email,
     find_user_by_phone,
     hash_auth_key,
-    verify_auth_key,
 )
 from app.services.email_service import send_recovery_alert
 from app.services.recovery_service import (
@@ -83,13 +82,6 @@ class FreezeRecoveryRequest(BaseModel):
 class RecoveryStatusResponse(BaseModel):
     status: str  # none | active | cooldown
     cooldown_until: Optional[str] = None
-
-
-class RevokeRecoveryRequest(BaseModel):
-    target: str = Field(..., pattern="^(phone|email)$")
-    value: str
-    verification_code: str = Field(..., min_length=6, max_length=6)
-    current_auth_key_hash: str
 
 # -- 恢复：步骤 1（验证恢复码 + 建待确认态）-
 
@@ -324,43 +316,3 @@ async def freeze(
     await db.commit()
 
     await send_recovery_alert(user, "freeze", "", "")
-
-
-# -- 主动作废（已登录）-------------------------------
-
-@router.post("/revoke", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke(
-    req: RevokeRecoveryRequest,
-    request: Request,
-    user_id: UUID = Depends(require_not_in_cooldown),
-    db: AsyncSession = Depends(get_db),
-):
-    """已登录用户主动作废恢复码。需验证码 + 当前密码。"""
-    user = await db.get(User, user_id)
-    if not user or not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash or ""):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_t(request, "email_or_password_wrong"),
-        )
-    # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
-    code_ok = (user.email and await verify_and_consume("email", user.email, req.verification_code)) or \
-              (user.phone and await verify_and_consume("phone", user.phone, req.verification_code))
-    if not code_ok:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_t(request, "verification_code_invalid"),
-        )
-
-    result = await db.execute(
-        select(RecoveryCode).where(
-            RecoveryCode.user_id == user_id,
-            RecoveryCode.status.in_(["active", "cooldown"]),
-        )
-    )
-    rc = result.scalar_one_or_none()
-    if rc:
-        # 清空 hash/salt 使 HMAC 永远失配 -> 恢复码真正作废，无法再 initiate
-        # （恢复码永久不重生成，revoke 后用户将失去恢复能力）
-        rc.recovery_code_hash = ""
-        rc.recovery_code_salt = ""
-        await db.commit()

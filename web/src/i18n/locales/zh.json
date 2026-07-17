@@ -7,7 +7,8 @@
     "recoverAccount": "输入 12 词恢复码",
     "indexeddbWarning": "⚠️ 此浏览器不支持本地存储（可能处于无痕模式），无法使用 SafeBox。",
     "dbErrorTitle": "数据库错误",
-    "dbErrorDetail": "发生了意外的数据库错误，请强制刷新页面修复（Ctrl+F5）。"
+    "dbErrorDetail": "发生了意外的数据库错误，请强制刷新页面修复（Ctrl+F5）。",
+    "createAccount": "创建账号"
   },
 
   "common": {
@@ -35,7 +36,10 @@
     "error": "出错了",
     "success": "成功",
     "confirm": "确认",
-    "close": "关闭"
+    "close": "关闭",
+    "backToLogin": "返回登录",
+    "optional": "可选",
+    "reload": "重新加载"
   },
 
   "auth": {
@@ -107,7 +111,11 @@
       "copied": "已复制到剪贴板",
       "savedAndEnter": "我已保存，进入 SafeBox",
       "noRecoveryCode": "没有待保存的恢复码，请先完成注册。",
-      "goToRegister": "前往注册"
+      "goToRegister": "前往注册",
+      "masterPasswordLabel": "主密码（可选）",
+      "masterPasswordPlaceholder": "可选，加强加密",
+      "masterPasswordHint": "主密码会与恢复码一起派生加密密钥，提升安全性。永久不可改，恢复数据时需同时输入恢复码和主密码。留空则仅用恢复码派生。",
+      "passwordTooWeak": "密码太弱，请使用更复杂的密码"
     },
     "recovery": {
       "title": "恢复账号",
@@ -134,7 +142,23 @@
       "verifyBtn": "验证恢复码",
       "verified": "✅ 恢复码验证成功",
       "verifyCodePlaceholder": "邮箱验证码",
-      "resetAndLoginBtn": "重置密码并登录"
+      "resetAndLoginBtn": "重置密码并登录",
+      "masterPasswordLabel": "主密码（可选，注册时设了才填）",
+      "masterPasswordPlaceholder": "注册时设了主密码才填",
+      "recoveryCodeWordCount": "恢复码应为 12 个英文单词，用空格分隔",
+      "cooldownTitle": "冷却中",
+      "cooldownDesc": "恢复已发起，账号进入 24 小时冷却期。",
+      "cooldownHint": "冷却期间无法登录。结束后可用新密码登录。",
+      "cooldownStarted": "恢复已发起，进入 24 小时冷却期",
+      "accelerateTitle": "加速恢复",
+      "accelerateDesc": "输入验证码立即解除冷却，用新密码登录。",
+      "accelerateBtn": "加速恢复",
+      "accelerated": "✅ 已加速恢复，可用新密码登录",
+      "freezeTitle": "冻结恢复",
+      "freezeDesc": "冻结将回滚到旧密码，取消本次恢复操作。",
+      "freezeBtn": "确认冻结",
+      "frozen": "✅ 已冻结，旧密码可正常登录",
+      "invalidToken": "链接无效或已过期"
     }
   },
 
@@ -164,7 +188,8 @@
       "name": "名称",
       "notes": "备注",
       "sensitive": "敏感信息",
-      "holdToView": "👆 按住查看敏感信息",
+      "holdToView": "👁️ 查看敏感信息",
+      "hide": "收起",
       "deleteItem": "🗑️ 删除条目",
       "fileName": "文件名",
       "fileSize": "大小",
@@ -191,15 +216,15 @@
       "enterName": "请输入名称",
       "saved": "已保存",
       "saveFailed": "保存失败",
-      "typeLogin": "🔑 Login",
+      "typeLogin": "登录",
       "typeLoginHint": "用于网站、应用、服务的登录信息",
-      "typeCard": "💳 Card",
+      "typeCard": "银行卡",
       "typeCardHint": "用于银行卡、信用卡信息",
-      "typeIdentity": "🪪 Identity",
+      "typeIdentity": "身份信息",
       "typeIdentityHint": "用于个人身份信息、证件资料",
-      "typeNote": "📝 Secure Note",
+      "typeNote": "安全笔记",
       "typeNoteHint": "用于 API 密钥、SSH 私钥、恢复码等任意文本",
-      "typeFile": "📁 File",
+      "typeFile": "文件",
       "typeFileHint": "用于 SSH 密钥文件、证书、机密文档",
       "loginUsername": "用户名/邮箱",
       "loginUsernamePlaceholder": "用户名或邮箱",
@@ -231,9 +256,6 @@
       "identityEmailPlaceholder": "邮箱",
       "noteContent": "内容",
       "noteContentPlaceholder": "在此输入加密文本…",
-      "typeAndroid": "Android 应用",
-      "typeAccount": "通用账户",
-      "typeFile": "文件",
       "packageName": "包名",
       "packagePlaceholder": "com.example.app",
       "username": "用户名",
@@ -286,7 +308,8 @@
     "imported": "已导入 {{count}} 条条目",
     "importFailed": "导入失败",
     "exportDescription": "将所有密码库条目导出为加密备份文件（.safebox）。需要一个密码来解密备份文件。",
-    "importDescription": "从加密备份文件（.safebox）导入条目。这会将条目添加到当前密码库中。"
+    "importDescription": "从加密备份文件（.safebox）导入条目。这会将条目添加到当前密码库中。",
+    "verifyCodePlaceholder": "邮箱验证码"
   },
 
   "appLayout": {

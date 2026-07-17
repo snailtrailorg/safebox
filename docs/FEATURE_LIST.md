@@ -62,9 +62,8 @@
 | 加速通道 | 验证码 + 签名 token 立即解除冷却 | `POST /auth/recovery/accelerate` |
 | 冻结 | 签名 token 回滚旧 authKey + login_salt + password_version | `POST /auth/recovery/freeze` |
 | 状态查询 | 返回 status + cooldown_until（纯读，不挂冷却门） | `GET /auth/recovery/status` |
-| 主动作废 | 验证码 + 当前密码；实现置 status=active（不删行、不重置 hash） | `POST /auth/recovery/revoke` |
 | 无失败锁定 | 恢复码 132bit 不可暴破，不累积计数、不锁定 | initiate |
-| 冷却零窗口 | revoke refresh + `require_not_in_cooldown` 中间件挡 sync/register-device/account/change-password/revoke | confirm + middleware |
+| 冷却零窗口 | revoke refresh + `require_not_in_cooldown` 中间件挡 sync/register-device/account/change-password | confirm + middleware |
 | 签名 token | JWT HS256，密钥 `recovery_signing_key`（未配置回退 `jwt_secret_key`），24h | accelerate/freeze |
 
 ## 五、条目同步
@@ -142,17 +141,11 @@
 | user_devices | user_id, device_name, device_public_key, device_wrapped, last_active_at |
 | items | id, user_id, client_did, type, icon, name(EncryptedField JSON), description, data, version, is_deleted, updated_at, created_at |
 
-## 十、运维
+## 十、健康检查
 
-| 功能 | 描述 |
-|------|------|
-| 健康检查 | `GET /health` → `{status:"ok"}` |
-| 后端迁移 | Alembic 4 个迁移：`17473000bd71 → b2c3d4e5f6a7 → c2d3e4f5a6b7 → e5f6g7h8i9j0` |
-| 前端 schema | IndexedDB `DB_VERSION=1`，调试阶段保持，schema 变更手动清库 |
-| 清库重建 | `DROP DATABASE...CREATE DATABASE` + `alembic upgrade head` |
-| Systemd | gunicorn + uvicorn worker |
-| Apache 反代 | mod_proxy + mod_ssl + SPA fallback |
-| deploy.sh | rsync + 重启（排除 .env/venv，不装依赖不跑迁移） |
+| 功能 | 描述 | 端点 |
+|------|------|------|
+| 健康检查 | `GET /health` -> `{status:"ok"}` | `GET /health` |
 
 ## 十一、已知限制与技术债
 
@@ -162,9 +155,8 @@
 | RSA 工具死代码 | `crypto/rsa.ts` 保留但全项目无引用；keyChain 无 RSA v1 兼容函数 |
 | 文件 blob 不同步 | 多设备间文件内容不同步，仅元数据同步 |
 | logout 不清本地密钥 | 退出只清 token，保留 cached_K / encrypted_user_key（重新登录可解锁） |
-| recovery_signing_key | 代码 `getattr` 回退，但 Settings 类未声明此字段，环境变量不生效 → 实际用 jwt_secret_key |
 | sync_batch_limit | config.py 声明=100，但代码未引用（pull limit 用 Query 默认，max 500 硬编码） |
 | Google Client ID | 前端 constants.ts 有调试 fallback 写死在 bundle 内 |
 | 死路由 | `/register/recovery` + RecoveryCodePage 无 navigate 指向，注册成功直接 `/` |
 | 登录限流无 8 秒档 | 实际序列 0,0,1,2,4 → 锁 1h |
-| 恢复码永久不重生成 | revoke 不重置 hash/salt，同一恢复码仍可用 |
+| 恢复码永久有效 | 不过期/不重置/不重生成；无作废机制（revoke 端点已移除，恢复码不可主动作废） |

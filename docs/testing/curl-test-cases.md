@@ -287,19 +287,6 @@ curl -s -X POST $BASE/api/v1/auth/recovery/freeze \
 # 204（无需验证码；回滚 authKey+login_salt+password_version = rollback_*；status=active）
 ```
 
-## TC-21 恢复 revoke（主动作废恢复码）
-
-```bash
-curl -s -X POST $BASE/api/v1/auth/recovery/revoke \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"target\":\"email\",\"value\":\"$EMAIL\",\"verification_code\":\"123456\",
-    \"current_auth_key_hash\":\"$AUTH_HASH\"
-  }"
-# 204（清空 recovery_code_hash/salt，恢复码真正作废无法再 initiate；用户失去恢复能力）
-```
-
 ---
 
 # 三、同步

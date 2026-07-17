@@ -106,7 +106,12 @@ cd server && PYTHONPATH=. venv/bin/alembic upgrade head
 ## 8. 部署
 
 ```bash
-./deploy.sh snailtrail.org --web
+./scripts/deploy-server.sh        # 推送后端 + 重启
+./scripts/deploy-web.sh           # 构建前端 + 推送 + reload httpd
+./scripts/migrate-db.sh           # 升级 schema（alembic upgrade，保留数据，不停服务）
+./scripts/clear-db.sh             # 清库重置（DROP+CREATE+alembic，丢数据，用于重新注册测试）
 ```
 
-deploy.sh 推送代码 + 重启，不碰 .env/venv（两次 rsync 都排除）。数据库迁移需手动在服务器上跑。
+四个薄包装脚本通过 `sudo -u michael` 调 michael 侧部署工具，不碰 .env/venv（rsync 排除）。
+deploy-server.sh 只推代码+重启，不跑迁移。schema 变更后：想保留数据用 migrate-db.sh，
+想重新注册测试/数据不要了用 clear-db.sh。

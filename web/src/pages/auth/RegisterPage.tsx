@@ -41,6 +41,7 @@ export function RegisterPage() {
   const [tab, setTab] = useState<RegisterTab>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [masterPassword, setMasterPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,7 +118,7 @@ export function RegisterPage() {
       // 生成恢复码（BIP39 12 词）+ salt，用于派生 K
       const recoveryCode = generateRecoveryCode();
       const recoveryCodeSalt = generateRecoveryCodeSalt();
-      const keys = await keyChain.generateKeys(recoveryCode, "", password);
+      const keys = await keyChain.generateKeys(recoveryCode, masterPassword, password);
       let tokens: { access_token: string; refresh_token: string; user_id: string } | null = null;
       if (tab === "email") {
         const response = await apiClient.registerEmail({
@@ -132,7 +133,7 @@ export function RegisterPage() {
         await saveSession({
           email, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
           recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
-          has_master_password: false, password_version: 0,
+          has_master_password: !!masterPassword, password_version: 0,
         });
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
@@ -147,7 +148,7 @@ export function RegisterPage() {
         await saveSession({
           email: phone, loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
           recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
-          has_master_password: false, password_version: 0,
+          has_master_password: !!masterPassword, password_version: 0,
         });
       } else {
         const response = await apiClient.registerGoogle({
@@ -162,7 +163,7 @@ export function RegisterPage() {
         await saveSession({
           email: "google", loginSalt: keys.loginSalt, encrypted_user_key: keys.encrypted_user_key,
           recovery_salt: keys.recovery_salt, cached_K: keys.cached_K,
-          has_master_password: false, password_version: 0,
+          has_master_password: !!masterPassword, password_version: 0,
         });
       }
 
@@ -267,6 +268,14 @@ export function RegisterPage() {
         )}
       </div>
 
+      {/* 可选主密码 - 与恢复码一起派生 K，加强加密；永久不可改 */}
+      <div style={{ marginTop: "0.75rem", padding: "0.75rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+        <PasswordInput label={t("auth.register.masterPasswordLabel")} value={masterPassword} onChange={(e) => setMasterPassword(e.target.value)} placeholder={t("auth.register.masterPasswordPlaceholder")} />
+        <p style={{ fontSize: "0.75rem", color: "#999", marginTop: "0.4rem", lineHeight: 1.4 }}>
+          {t("auth.register.masterPasswordHint")}
+        </p>
+      </div>
+
       <button onClick={handleRegister} disabled={loading}
         style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
         {loading ? t("common.registering") : t("auth.register.submitBtn")}
@@ -287,9 +296,18 @@ export function RegisterPage() {
             <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "1rem", fontFamily: "monospace", fontSize: "1rem", lineHeight: 1.8, wordBreak: "break-all", marginBottom: "1rem" }}>
               {recoveryCode}
             </div>
+            <button onClick={() => { navigator.clipboard.writeText(recoveryCode); setToast({ message: t("auth.register.copied"), type: "success" }); }}
+              style={{ width: "100%", padding: "0.5rem", marginBottom: "1rem", background: "#0f3460", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem" }}>
+              {t("auth.register.copyRecoveryCode")}
+            </button>
             <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
               ⚠️ 丢失恢复码 + 忘记登录密码 = 数据永久丢失
             </p>
+            {masterPassword && (
+              <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
+                ⚠️ 您设置了主密码，恢复数据时需同时输入恢复码和主密码。请一并妥善保存主密码（永久不可改）。
+              </p>
+            )}
             <button onClick={() => {
               if (pendingTokens) {
                 login(pendingTokens.access_token, pendingTokens.refresh_token, pendingTokens.user_id);

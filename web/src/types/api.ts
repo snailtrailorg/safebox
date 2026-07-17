@@ -128,7 +128,6 @@ export interface RecoveryStatusResponse {
   cooldown_until: string | null;
   failed_attempt_count?: number;
 }
-export interface RevokeRecoveryRequest { target: "phone" | "email"; value: string; verification_code: string; current_auth_key_hash: string }
 
 // ── Sync ──────────────────────────────────────────
 

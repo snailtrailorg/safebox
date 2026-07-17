@@ -65,7 +65,7 @@
 confirm 时吊销所有 refresh token，旧会话无法续命。
 
 ### D：中间件冷却门
-`require_not_in_cooldown` 挂在数据访问端点（sync/register-device/account/change-password/revoke）。冷却期内拒所有 access-token 请求，**不等 30min 过期**。
+`require_not_in_cooldown` 挂在数据访问端点（sync/register-device/account/change-password）。冷却期内拒所有 access-token 请求，**不等 30min 过期**。
 
 豁免：accelerate/freeze（签名 token，不走 access token）、status（只读）。
 
@@ -127,7 +127,6 @@ confirm 成功后，服务端生成两个签名 token，通过告警邮件发送
 | POST | /auth/recovery/accelerate | 验证码 + 签名 token 解除冷却 |
 | POST | /auth/recovery/freeze | 签名 token 回滚旧密码 |
 | GET | /auth/recovery/status | 查询状态（纯读） |
-| POST | /auth/recovery/revoke | 主动作废（已登录） |
 
 ---
 

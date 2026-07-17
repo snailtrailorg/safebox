@@ -88,15 +88,6 @@ export function ItemDetailPage() {
     return () => { cancelled = true; };
   }, [did]);
 
-  const handleShowSensitive = () => {
-    // data 已在 useEffect 预解密到 decryptedData，此处只切换显示（同步，避免 async 与 mouseUp 竞态）
-    setShowSensitive(true);
-  };
-
-  const handleHideSensitive = () => {
-    setShowSensitive(false);
-  };
-
   const handleDelete = async () => {
     if (!item?.did || !confirm(t("vault.detail.confirmDelete"))) return;
     await softDeleteItem(item.did);
@@ -232,28 +223,26 @@ export function ItemDetailPage() {
             boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
           }}>
             <div style={{ fontSize: "0.8rem", color: "#999", marginBottom: "0.5rem" }}>{t("vault.detail.sensitive")}</div>
-            {!showSensitive ? (
-              <button
-                onMouseDown={(e) => { e.preventDefault(); handleShowSensitive(); }}
-                onMouseUp={handleHideSensitive}
-                onTouchStart={handleShowSensitive}
-                onTouchEnd={handleHideSensitive}
-                style={{
-                  width: "100%", padding: "1rem",
-                  background: "#f5f5f5", border: "2px dashed #ddd",
-                  borderRadius: 8, cursor: "pointer",
-                  fontSize: "0.9rem", color: "#666",
-                }}
-              >
-                {t("vault.detail.holdToView")}
-              </button>
-            ) : decryptedData ? (
+            <button
+              onClick={() => setShowSensitive((v) => !v)}
+              style={{
+                width: "100%", padding: "0.75rem",
+                background: showSensitive ? "#fff" : "#f5f5f5",
+                border: showSensitive ? "1px solid #ddd" : "2px dashed #ddd",
+                borderRadius: 8, cursor: "pointer",
+                fontSize: "0.9rem", color: "#666",
+                marginBottom: showSensitive ? "0.5rem" : 0,
+              }}
+            >
+              {showSensitive ? t("vault.detail.hide") : t("vault.detail.holdToView")}
+            </button>
+            {showSensitive && decryptedData && (
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {Object.entries(decryptedData).map(([key, value]) => (
                   <SensitiveField key={key} label={key} value={value} />
                 ))}
               </div>
-            ) : null}
+            )}
           </div>
         )}
 
