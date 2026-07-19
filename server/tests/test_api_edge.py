@@ -4,13 +4,13 @@ from httpx import AsyncClient
 
 REG = {
     "verification_code": "123456",
-    "auth_key_hash": "hash",
-    "login_salt": "salt",
+    "local_password_hash": "hash",
+    "local_salt": "salt",
     "encrypted_user_key": "fake-euk",
-    "recovery_salt": "rec-salt",
-    "has_master_password": False,
-    "recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
-    "recovery_code_salt": "rec-code-salt",
+    "mnemonic_salt": "rec-salt",
+    "has_passphrase": False,
+    "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
+    "mnemonic_hmac_salt": "rec-code-salt",
     "device_name": "Test",
     "device_public_key": "device_pub",
     "device_wrapped": "device_wrapped",
@@ -21,31 +21,31 @@ REG = {
 async def test_login_after_register(client: AsyncClient):
     resp = await client.post("/api/v1/auth/register/email", json={
         **REG, "email": "login-test@safebox.example.com",
-        "auth_key_hash": "login_test_hash", "login_salt": "login_test_salt",
-        "login_salt": "login_test_wrapped", "recovery_wrapped": "login_test_recovery",
+        "local_password_hash": "login_test_hash", "local_salt": "login_test_salt",
+        "local_salt": "login_test_wrapped", "recovery_wrapped": "login_test_recovery",
         "encrypted_private": "login_test_enc_priv", "rsa_public_key": "login_test_rsa_pub",
     })
     assert resp.status_code == 201
 
     resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "login-test@safebox.example.com", "auth_key_hash": "login_test_hash",
+        "email": "login-test@safebox.example.com", "local_password_hash": "login_test_hash",
     })
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert data["login_salt"] == "login_test_wrapped"
+    assert data["local_salt"] == "login_test_wrapped"
 
 
 @pytest.mark.asyncio
 async def test_login_wrong_password(client: AsyncClient):
     resp = await client.post("/api/v1/auth/register/email", json={
         **REG, "email": "wrong-pw@safebox.example.com",
-        "auth_key_hash": "correct_hash",
+        "local_password_hash": "correct_hash",
     })
     assert resp.status_code == 201
 
     resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "wrong-pw@safebox.example.com", "auth_key_hash": "wrong_hash",
+        "email": "wrong-pw@safebox.example.com", "local_password_hash": "wrong_hash",
     })
     assert resp.status_code == 401
 
@@ -53,7 +53,7 @@ async def test_login_wrong_password(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_login_nonexistent_user(client: AsyncClient):
     resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "nonexistent@safebox.example.com", "auth_key_hash": "some_hash",
+        "email": "nonexistent@safebox.example.com", "local_password_hash": "some_hash",
     })
     assert resp.status_code == 401
 

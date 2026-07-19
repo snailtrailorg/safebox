@@ -4,13 +4,13 @@ from httpx import AsyncClient
 
 REGISTER_PAYLOAD = {
     "verification_code": "123456",
-    "auth_key_hash": "pbkdf2_hashed",
-    "login_salt": "salt",
+    "local_password_hash": "pbkdf2_hashed",
+    "local_salt": "salt",
     "encrypted_user_key": "fake-euk",
-    "recovery_salt": "rec-salt",
-    "has_master_password": False,
-    "recovery_code": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
-    "recovery_code_salt": "rec-code-salt",
+    "mnemonic_salt": "rec-salt",
+    "has_passphrase": False,
+    "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
+    "mnemonic_hmac_salt": "rec-code-salt",
     "device_name": "Test Device",
     "device_public_key": "device_pub",
     "device_wrapped": "device_wrapped",
@@ -204,7 +204,7 @@ async def test_get_salt(client: AsyncClient):
     resp = await client.get("/api/v1/auth/salt?email=salt@safebox.example.com")
     assert resp.status_code == 200
     data = resp.json()
-    assert "login_salt" in data
+    assert "local_salt" in data
     assert "kdf_settings" in data
     assert "recovery_wrapped" not in data  # v2: 不再返回密钥材料
     assert "encrypted_private" not in data
@@ -241,7 +241,7 @@ async def test_salt_nonexistent_user_not_enumerable(client: AsyncClient):
     r1 = await client.get("/api/v1/auth/salt?email=nonexist-m4@safebox.example.com")
     r2 = await client.get("/api/v1/auth/salt?email=nonexist-m4@safebox.example.com")
     assert r1.status_code == 200 and r2.status_code == 200
-    s1, s2 = r1.json()["login_salt"], r2.json()["login_salt"]
+    s1, s2 = r1.json()["local_salt"], r2.json()["local_salt"]
     # 稳定：同一 target 每次相同（与真实用户一致）
     assert s1 == s2
     # 格式与真实用户一致：base64(32 字节) = 44 字符
@@ -249,16 +249,16 @@ async def test_salt_nonexistent_user_not_enumerable(client: AsyncClient):
 
     # 不同不存在邮箱 -> 不同 salt（避免批量枚举共用一个值）
     r3 = await client.get("/api/v1/auth/salt?email=other-m4@safebox.example.com")
-    assert r3.json()["login_salt"] != s1
+    assert r3.json()["local_salt"] != s1
 
     # 真实用户与不存在用户的 salt 格式无法区分
     import base64 as _b64
     real_salt_b64 = _b64.b64encode(__import__("secrets").token_bytes(32)).decode()
     await client.post("/api/v1/auth/register/email", json={
         **REGISTER_PAYLOAD, "email": "real-m4@safebox.example.com",
-        "login_salt": real_salt_b64,
+        "local_salt": real_salt_b64,
     })
-    real = (await client.get("/api/v1/auth/salt?email=real-m4@safebox.example.com")).json()["login_salt"]
+    real = (await client.get("/api/v1/auth/salt?email=real-m4@safebox.example.com")).json()["local_salt"]
     fake = s1
     # 真实 salt 也是 base64(32)，与派生 salt 同格式同长度
     assert len(base64.b64decode(real)) == 32
@@ -266,8 +266,8 @@ async def test_salt_nonexistent_user_not_enumerable(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_auth_key_hash_flow(client: AsyncClient):
-    """验证 auth_key_hash 字段名工作和向后兼容。"""
+async def test_local_password_hash_flow(client: AsyncClient):
+    """验证 local_password_hash 字段名工作和向后兼容。"""
     # 新字段名
     resp = await client.post("/api/v1/auth/register/email", json={
         **REGISTER_PAYLOAD, "email": "ak1@safebox.example.com",
@@ -276,13 +276,13 @@ async def test_auth_key_hash_flow(client: AsyncClient):
 
     # 新字段名登录
     resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "ak1@safebox.example.com", "auth_key_hash": "pbkdf2_hashed",
+        "email": "ak1@safebox.example.com", "local_password_hash": "pbkdf2_hashed",
     })
     assert resp.status_code == 200
 
     # 旧字段名（别名）登录 — 向后兼容
     resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "ak1@safebox.example.com", "password_hash": "pbkdf2_hashed",
+        "email": "ak1@safebox.example.com", "local_password_hash": "pbkdf2_hashed",
     })
     assert resp.status_code == 200
 
@@ -299,8 +299,8 @@ async def test_change_password(client: AsyncClient):
     resp = await client.post("/api/v1/auth/change-password", json={
         "target": "email", "value": "cp@safebox.example.com",
         "verification_code": "123456",
-        "current_auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
-        "new_auth_key_hash": "new_hash", "new_login_salt": "new_salt"
+        "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
+        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt"
     }, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["success"] is True
@@ -321,8 +321,8 @@ async def test_change_password_sends_security_alert(client: AsyncClient):
         resp = await client.post("/api/v1/auth/change-password", json={
             "target": "email", "value": "cpalert@safebox.example.com",
             "verification_code": "123456",
-            "current_auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
-            "new_auth_key_hash": "new_hash", "new_login_salt": "new_salt"
+            "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
+            "new_local_password_hash": "new_hash", "new_local_salt": "new_salt"
         }, headers=headers)
         assert resp.status_code == 200
         # 告警已发送，event=password_changed
@@ -332,7 +332,7 @@ async def test_change_password_sends_security_alert(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_change_password_wrong_current(client: AsyncClient):
-    """当前密码错误时改密被拒（401），且不改动 auth_key_hash。"""
+    """当前密码错误时改密被拒（401），且不改动 local_password_hash。"""
     resp = await client.post("/api/v1/auth/register/email", json={
         **REGISTER_PAYLOAD, "email": "cpwrong@safebox.example.com",
     })
@@ -342,15 +342,15 @@ async def test_change_password_wrong_current(client: AsyncClient):
     resp = await client.post("/api/v1/auth/change-password", json={
         "target": "email", "value": "cpwrong@safebox.example.com",
         "verification_code": "123456",
-        "current_auth_key_hash": "wrong_current_hash",
-        "new_auth_key_hash": "new_hash", "new_login_salt": "new_salt"
+        "current_local_password_hash": "wrong_current_hash",
+        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt"
     }, headers=headers)
     assert resp.status_code == 401
 
     # 原密码仍可登录（改密未生效）
     resp = await client.post("/api/v1/auth/login/email", json={
         "email": "cpwrong@safebox.example.com",
-        "auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
+        "local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
     })
     assert resp.status_code == 200
 
@@ -367,6 +367,6 @@ async def test_delete_account_requires_verification(client: AsyncClient):
     # 需验证码 + 当前密码（验证码绑定用户注册邮箱，不接受客户端自带 target/value）
     resp = await client.request("DELETE", "/api/v1/auth/account", json={
         "verification_code": "123456",
-        "current_auth_key_hash": REGISTER_PAYLOAD["auth_key_hash"],
+        "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
     }, headers=headers)
     assert resp.status_code == 204

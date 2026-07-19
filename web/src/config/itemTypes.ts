@@ -30,7 +30,7 @@ export function buildItemTypeConfigs(t: (key: string) => string): ItemTypeConfig
       hint: t("vault.edit.typeLoginHint"),
       fields: [
         { key: "username", label: t("vault.edit.loginUsername"), placeholder: t("vault.edit.loginUsernamePlaceholder"), type: "text" },
-        { key: "password", label: t("vault.edit.loginPassword"), placeholder: t("vault.edit.loginPasswordPlaceholder"), type: "password", enableGenerate: true },
+        { key: "password", label: t("vault.edit.localPassword"), placeholder: t("vault.edit.localPasswordPlaceholder"), type: "password", enableGenerate: true },
         { key: "url", label: t("vault.edit.loginUrl"), placeholder: t("vault.edit.loginUrlPlaceholder"), type: "url", optional: true },
         { key: "package", label: t("vault.edit.loginPackage"), placeholder: t("vault.edit.loginPackagePlaceholder"), type: "text", optional: true },
       ],

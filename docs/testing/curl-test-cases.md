@@ -40,7 +40,7 @@ curl -s $BASE/health
 
 ```bash
 curl -s "$BASE/api/v1/auth/salt?email=$EMAIL"
-# 200 {"login_salt":"...","kdf_settings":{"algorithm":"pbkdf2","iterations":600000},"recovery_salt":"...","has_master_password":false}
+# 200 {"local_salt":"...","kdf_settings":{"algorithm":"pbkdf2","iterations":600000},"mnemonic_salt":"...","has_passphrase":false}
 # 不存在的用户返回确定性伪造 salt（base64(HMAC-SHA256(jwt_secret, target))），不可区分
 ```
 
@@ -62,13 +62,13 @@ curl -s -X POST $BASE/api/v1/auth/register/email \
   -d "{
     \"email\":\"$EMAIL\",
     \"verification_code\":\"123456\",
-    \"auth_key_hash\":\"$AUTH_HASH\",
-    \"login_salt\":\"$LOGIN_SALT\",
+    \"local_password_hash\":\"$AUTH_HASH\",
+    \"local_salt\":\"$LOGIN_SALT\",
     \"encrypted_user_key\":\"fake-euk\",
-    \"recovery_salt\":\"$RECOVERY_SALT\",
-    \"has_master_password\":false,
-    \"recovery_code\":\"$RECOVERY_CODE\",
-    \"recovery_code_salt\":\"$RECOVERY_CODE_SALT\",
+    \"mnemonic_salt\":\"$RECOVERY_SALT\",
+    \"has_passphrase\":false,
+    \"mnemonic\":\"$RECOVERY_CODE\",
+    \"mnemonic_hmac_salt\":\"$RECOVERY_CODE_SALT\",
     \"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"
   }"
 # 201 {"user_id":"...","access_token":"...","refresh_token":"..."}
@@ -82,13 +82,13 @@ curl -s -X POST $BASE/api/v1/auth/register/phone \
   -d "{
     \"phone\":\"$PHONE\",
     \"verification_code\":\"123456\",
-    \"auth_key_hash\":\"$AUTH_HASH\",
-    \"login_salt\":\"$LOGIN_SALT\",
+    \"local_password_hash\":\"$AUTH_HASH\",
+    \"local_salt\":\"$LOGIN_SALT\",
     \"encrypted_user_key\":\"fake-euk\",
-    \"recovery_salt\":\"$RECOVERY_SALT\",
-    \"has_master_password\":false,
-    \"recovery_code\":\"$RECOVERY_CODE\",
-    \"recovery_code_salt\":\"$RECOVERY_CODE_SALT\",
+    \"mnemonic_salt\":\"$RECOVERY_SALT\",
+    \"has_passphrase\":false,
+    \"mnemonic\":\"$RECOVERY_CODE\",
+    \"mnemonic_hmac_salt\":\"$RECOVERY_CODE_SALT\",
     \"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"
   }"
 # 201 {"user_id":"...","access_token":"...","refresh_token":"..."}
@@ -102,13 +102,13 @@ curl -s -X POST $BASE/api/v1/auth/register/google \
   -H "Content-Type: application/json" \
   -d "{
     \"google_id_token\":\"$GOOGLE_ID_TOKEN\",
-    \"auth_key_hash\":\"$AUTH_HASH\",
-    \"login_salt\":\"$LOGIN_SALT\",
+    \"local_password_hash\":\"$AUTH_HASH\",
+    \"local_salt\":\"$LOGIN_SALT\",
     \"encrypted_user_key\":\"fake-euk\",
-    \"recovery_salt\":\"$RECOVERY_SALT\",
-    \"has_master_password\":false,
-    \"recovery_code\":\"$RECOVERY_CODE\",
-    \"recovery_code_salt\":\"$RECOVERY_CODE_SALT\",
+    \"mnemonic_salt\":\"$RECOVERY_SALT\",
+    \"has_passphrase\":false,
+    \"mnemonic\":\"$RECOVERY_CODE\",
+    \"mnemonic_hmac_salt\":\"$RECOVERY_CODE_SALT\",
     \"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"
   }"
 # 201 {"user_id":"...","access_token":"...","refresh_token":"..."}
@@ -120,8 +120,8 @@ curl -s -X POST $BASE/api/v1/auth/register/google \
 ```bash
 curl -s -X POST $BASE/api/v1/auth/login/email \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"auth_key_hash\":\"$AUTH_HASH\"}"
-# 200 {"user_id":"...","access_token":"...","refresh_token":"...","login_salt":"...","encrypted_user_key":"...","recovery_salt":"...","has_master_password":false,"devices":[...]}
+  -d "{\"email\":\"$EMAIL\",\"local_password_hash\":\"$AUTH_HASH\"}"
+# 200 {"user_id":"...","access_token":"...","refresh_token":"...","local_salt":"...","encrypted_user_key":"...","mnemonic_salt":"...","has_passphrase":false,"devices":[...]}
 # 限流：第 1 次不限制；2-4 次 1/2/4 秒退避；第 5 次起 429 login_rate_limited(seconds=N) + 锁 1h
 # 恢复冷却期 -> 403 account_in_cooldown
 ```
@@ -131,7 +131,7 @@ curl -s -X POST $BASE/api/v1/auth/login/email \
 ```bash
 curl -s -X POST $BASE/api/v1/auth/login/phone \
   -H "Content-Type: application/json" \
-  -d "{\"phone\":\"$PHONE\",\"verification_code\":\"123456\",\"auth_key_hash\":\"$AUTH_HASH\"}"
+  -d "{\"phone\":\"$PHONE\",\"verification_code\":\"123456\",\"local_password_hash\":\"$AUTH_HASH\"}"
 # 200 响应同 login/email
 ```
 
@@ -141,7 +141,7 @@ curl -s -X POST $BASE/api/v1/auth/login/phone \
 curl -s -X POST $BASE/api/v1/auth/login/google \
   -H "Content-Type: application/json" \
   -d "{\"google_id_token\":\"$GOOGLE_ID_TOKEN\"}"
-# 200 响应同 login/email（凭 Google ID Token 登录，不校验 auth_key_hash）
+# 200 响应同 login/email（凭 Google ID Token 登录，不校验 local_password_hash）
 # 冷却期内 403 account_in_cooldown（与 email/phone 登录一致，零窗口）
 ```
 
@@ -152,8 +152,8 @@ TOKEN="<从 TC-07 获取>"
 curl -s -X POST $BASE/api/v1/auth/verify \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"auth_key_hash\":\"$AUTH_HASH\",\"password_version\":0}"
-# 200 {"password_version":0,"status":"ok"}
+  -d "{\"local_password_hash\":\"$AUTH_HASH\",\"local_password_version\":0}"
+# 200 {"local_password_version":0,"status":"ok"}
 # 密码错 -> 401；别处改密 version 不符 -> 409 password_changed_elsewhere
 # 冷却期仍 200（纯认证校验，不下发数据）
 ```
@@ -166,13 +166,13 @@ curl -s -X POST $BASE/api/v1/auth/change-password \
   -H "Content-Type: application/json" \
   -d "{
     \"target\":\"email\",\"value\":\"$EMAIL\",\"verification_code\":\"123456\",
-    \"current_auth_key_hash\":\"$AUTH_HASH\",
-    \"new_auth_key_hash\":\"new_hash\",
-    \"new_login_salt\":\"new_salt\"
+    \"current_local_password_hash\":\"$AUTH_HASH\",
+    \"new_local_password_hash\":\"new_hash\",
+    \"new_local_salt\":\"new_salt\"
   }"
 # 200 {"success":true,"access_token":"...","refresh_token":"..."}
 # target/value 字段保留兼容但服务端忽略，验证码必须发到用户注册邮箱/手机
-# password_version+1 + 单 commit 原子吊销所有 token
+# local_password_version+1 + 单 commit 原子吊销所有 token
 ```
 
 ## TC-12 refresh token
@@ -203,7 +203,7 @@ curl -s -X POST $BASE/api/v1/auth/register-device \
   -H "Content-Type: application/json" \
   -d "{\"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"}"
 # 200 {"device_id":"..."}
-# 串行化模型下 device_public_key/device_wrapped 为占位值，跨设备用恢复码
+# 串行化模型下 device_public_key/device_wrapped 为占位值，跨设备用助记词
 ```
 
 ## TC-15 注销账号
@@ -214,14 +214,14 @@ curl -s -X DELETE $BASE/api/v1/auth/account \
   -H "Content-Type: application/json" \
   -d "{
     \"verification_code\":\"123456\",
-    \"current_auth_key_hash\":\"$AUTH_HASH\"
+    \"current_local_password_hash\":\"$AUTH_HASH\"
   }"
 # 204（需当前密码 + 验证码；验证码绑定用户注册联系方式；FK 级联删全数据，不可恢复）
 ```
 
 ---
 
-# 二、恢复码
+# 二、助记词
 
 ## TC-16 恢复 initiate（步骤1）
 
@@ -230,13 +230,13 @@ curl -s -X POST $BASE/api/v1/auth/recovery/initiate \
   -H "Content-Type: application/json" \
   -d "{
     \"target\":\"email\",\"value\":\"$EMAIL\",
-    \"recovery_code\":\"$RECOVERY_CODE\",
-    \"new_auth_key_hash\":\"new_hash\",
-    \"new_login_salt\":\"new_salt\"
+    \"mnemonic\":\"$RECOVERY_CODE\",
+    \"new_local_password_hash\":\"new_hash\",
+    \"new_local_salt\":\"new_salt\"
   }"
-# 200 {"encrypted_user_key":"...","recovery_salt":"...","initiate_token":"..."}
+# 200 {"encrypted_user_key":"...","mnemonic_salt":"...","initiate_token":"..."}
 # 15min 有效；不改正式字段、不进冷却
-# 恢复码错 / 用户不存在 -> 均返回 401 recovery_code_invalid（防枚举，不返回 404）
+# 助记词错 / 用户不存在 -> 均返回 401 mnemonic_invalid（防枚举，不返回 404）
 # 已有未过期 pending_initiate -> 409 recovery_already_pending
 ```
 
@@ -284,7 +284,7 @@ SIGNED_TOKEN="<从告警邮件 freeze 链接获取>"
 curl -s -X POST $BASE/api/v1/auth/recovery/freeze \
   -H "Content-Type: application/json" \
   -d "{\"signed_token\":\"$SIGNED_TOKEN\"}"
-# 204（无需验证码；回滚 authKey+login_salt+password_version = rollback_*；status=active）
+# 204（无需验证码；回滚 authKey+local_salt+local_password_version = rollback_*；status=active）
 ```
 
 ---
@@ -355,7 +355,7 @@ curl -s "$BASE/api/v1/sync/pull?since=2020-01-01T00%3A00%3A00%2B00%3A00"
 for i in 1 2 3 4 5; do
   curl -s -o /dev/null -w "%{http_code}\n" -X POST $BASE/api/v1/auth/login/email \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"$EMAIL\",\"auth_key_hash\":\"wrong\"}"
+    -d "{\"email\":\"$EMAIL\",\"local_password_hash\":\"wrong\"}"
 done
 # 401 401 401 401 429（第 5 次起 429 login_rate_limited(seconds=3600)）
 ```

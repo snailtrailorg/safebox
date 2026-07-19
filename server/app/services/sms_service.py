@@ -48,7 +48,7 @@ async def send_sms(phone: str, code: str, lang: str = "en") -> bool:
 
 
 async def send_alert_sms(phone: str, message: str, lang: str = "en") -> bool:
-    """发送告警短信（自定义文本，如恢复码告警含 accelerate/freeze URL）。"""
+    """发送告警短信（自定义文本，如助记词告警含 accelerate/freeze URL）。"""
     if not settings.twilio_account_sid:
         import logging
         logging.debug(f"[DEV] SMS alert not configured. Message would be sent to {phone}: {message}")

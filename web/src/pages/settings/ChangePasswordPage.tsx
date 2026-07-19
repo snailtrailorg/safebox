@@ -29,7 +29,7 @@ export function ChangePasswordPage() {
 
   const handleSendVerifyCode = async () => {
     const session = await getSession();
-    const ok = await keyChain.unlockWithPassword(currentPassword, session.loginSalt, session.encrypted_user_key, session.cached_K);
+    const ok = await keyChain.unlockWithPassword(currentPassword, session.localSalt, session.encrypted_user_key, session.cached_K);
     if (!ok) throw new Error("wrong password");
     const contact = session.email || "";
     if (!contact) throw new Error("no contact");
@@ -52,16 +52,16 @@ export function ChangePasswordPage() {
       const contact = session.email || "";
 
       // 用「当前盐」派生当前密码的 auth key，供服务端二次校验当前密码
-      const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.loginSalt));
+      const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.localSalt));
 
       const newSalt = new Uint8Array(32);
       crypto.getRandomValues(newSalt);
       const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      // 重包 cached_K：K 不变、User Key 不变、encrypted_user_key 不变，只把 K 换用新登录密码派生的 loginDerivedKey 包裹
+      // 重包 cached_K：K 不变、User Key 不变、encrypted_user_key 不变，只把 K 换用新本地密码派生的 localDerivedKey 包裹
       const newCachedK = await keyChain.rewrapCachedK(
-        currentPassword, session.loginSalt, session.cached_K,
+        currentPassword, session.localSalt, session.cached_K,
         newPassword, saltBase64,
       );
 
@@ -69,14 +69,14 @@ export function ChangePasswordPage() {
         target: contact.includes("@") ? "email" : "phone",
         value: contact,
         verification_code: verifyCode,
-        current_auth_key_hash: currentAuthKeyHash,
-        new_auth_key_hash: newAuthKeyHash,
-        new_login_salt: saltBase64,
+        current_local_password_hash: currentAuthKeyHash,
+        new_local_password_hash: newAuthKeyHash,
+        new_local_salt: saltBase64,
       });
 
       // 用新盐 + 新 cached_K 覆盖本地，并用响应的新 token 替换被吊销的旧 token
       await saveSession({
-        loginSalt: saltBase64,
+        localSalt: saltBase64,
         cached_K: newCachedK,
         ...(resp.access_token && resp.refresh_token
           ? { accessToken: resp.access_token, refreshToken: resp.refresh_token }

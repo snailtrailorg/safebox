@@ -20,7 +20,7 @@
   "email_body_expiry": "This code is valid for {minutes} minutes.",
   "email_body_ignore": "If you did not request this code, please ignore this email.",
   "sms_body": "[SafeBox] Your verification code is {code}, valid for {minutes} minutes.",
-  "recovery_code_invalid": "Invalid recovery code.",
+  "mnemonic_invalid": "Invalid recovery code.",
   "recovery_already_pending": "Recovery is already in progress. Please wait for the cooldown to expire.",
   "recovery_not_pending": "No recovery process is currently pending.",
   "account_in_cooldown": "Account is in recovery cooldown. Please try again later.",

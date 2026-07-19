@@ -58,7 +58,8 @@ export function AccelerateRecoveryPage() {
       setDone(true);
       setToast({ message: t("auth.recovery.accelerated"), type: "success" });
     } catch (e: any) {
-      setToast({ message: e.message || t("auth.recovery.recoverFailed"), type: "error" });
+      const msg = e?.status === 409 ? t("auth.recovery.alreadyFrozen") : (e?.message || t("auth.recovery.recoverFailed"));
+      setToast({ message: msg, type: "error" });
     } finally {
       setLoading(false);
     }

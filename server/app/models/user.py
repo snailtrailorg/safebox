@@ -24,11 +24,11 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String(320), unique=True, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
-    auth_key_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    login_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 登录密码派生用盐
+    local_password_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    local_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 本地密码派生用盐
     kdf_settings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
-    password_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 改登录密码+1，多设备同步用
-    has_master_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否设了主密码
+    local_password_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 改本地密码+1，多设备同步用
+    has_passphrase: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否设了Passphrase
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -52,9 +52,9 @@ class UserKeys(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True
     )
-    # 模型 D 串行化：K = PBKDF2(恢复码[+主密码], recovery_salt)，K 不存服务器
+    # 模型 D 串行化：K = PBKDF2(助记词[+Passphrase], mnemonic_salt)，K 不存服务器
     encrypted_user_key: Mapped[str] = mapped_column(Text)  # AES(K, User Key raw)，K 不在服务器
-    recovery_salt: Mapped[str] = mapped_column(Text)  # K 派生用盐（注册时客户端生成）
+    mnemonic_salt: Mapped[str] = mapped_column(Text)  # K 派生用盐（注册时客户端生成）
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -25,20 +25,20 @@
 {
   "email": "user@example.com",
   "verification_code": "123456",
-  "auth_key_hash": "PBKDF2(登录密码, login_salt+\"auth\")",
-  "login_salt": "base64(32字节)",
+  "local_password_hash": "PBKDF2(本地密码, local_salt+\"auth\")",
+  "local_salt": "base64(32字节)",
   "encrypted_user_key": "AES(K, UserKey raw)",
-  "recovery_salt": "base64(32字节)",
+  "mnemonic_salt": "base64(32字节)",
   "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600000},
-  "has_master_password": false,
-  "recovery_code": "12词助记词明文",
-  "recovery_code_salt": "hex salt",
+  "has_passphrase": false,
+  "mnemonic": "12词助记词明文",
+  "mnemonic_hmac_salt": "hex salt",
   "device_name": "Web Browser",
   "device_public_key": "web",
   "device_wrapped": "web"
 }
 ```
-> `device_*` 为可选字段，串行化模型下跨设备用恢复码，传占位值。
+> `device_*` 为可选字段，串行化模型下跨设备用助记词，传占位值。
 
 响应 201：
 ```json
@@ -57,17 +57,17 @@
 响应：
 ```json
 {
-  "login_salt": "...",
+  "local_salt": "...",
   "kdf_settings": {"algorithm": "pbkdf2", "iterations": 600000},
-  "recovery_salt": "...",
-  "has_master_password": false
+  "mnemonic_salt": "...",
+  "has_passphrase": false
 }
 ```
 
 ### POST /auth/login/email
 请求：
 ```json
-{"email": "...", "auth_key_hash": "PBKDF2(登录密码, login_salt+\"auth\")"}
+{"email": "...", "local_password_hash": "PBKDF2(本地密码, local_salt+\"auth\")"}
 ```
 
 响应 200：
@@ -75,18 +75,18 @@
 {
   "access_token": "...",
   "refresh_token": "...",
-  "login_salt": "...",
+  "local_salt": "...",
   "encrypted_user_key": "...",
-  "recovery_salt": "...",
-  "has_master_password": false
+  "mnemonic_salt": "...",
+  "has_passphrase": false
 }
 ```
 403：账户恢复冷却中（`account_in_cooldown`）
 429：登录限流（`login_rate_limited`，含 `seconds` 等待秒数）
 
 **使用场景**：
-- 日常登录（已登录设备）：客户端已有本地 `cached_K`，用登录密码解 cached_K → K → User Key。`encrypted_user_key` 用于刷新本地缓存（如被别处改密后）。
-- 换设备（新设备，无 cached_K）：客户端需登录密码（认证）+ 恢复码[+主密码]（派生 K）才能解 `encrypted_user_key`。仅靠登录密码无法解密。
+- 日常登录（已登录设备）：客户端已有本地 `cached_K`，用本地密码解 cached_K → K → User Key。`encrypted_user_key` 用于刷新本地缓存（如被别处改密后）。
+- 换设备（新设备，无 cached_K）：客户端需本地密码（认证）+ 助记词[+Passphrase]（派生 K）才能解 `encrypted_user_key`。仅靠本地密码无法解密。
 
 ### POST /auth/login/phone
 同上，加 `verification_code`。
@@ -99,10 +99,10 @@
 
 请求：
 ```json
-{"auth_key_hash": "...", "password_version": 0}
+{"local_password_hash": "...", "local_password_version": 0}
 ```
 
-响应 200：`{"password_version": 0, "status": "ok"}`
+响应 200：`{"local_password_version": 0, "status": "ok"}`
 401：密码错误
 409：密码已在别处修改（version 不符）
 
@@ -110,15 +110,15 @@
 冷却期：/verify 不查冷却状态（纯认证校验，不下发数据）。冷却期内 /verify 仍返回 200（用户可检查密码是否正确），但 sync 等数据端点被 403 挡。
 
 ### POST /auth/change-password
-改登录密码（需 Bearer + 验证码）。
+改本地密码（需 Bearer + 验证码）。
 
 请求：
 ```json
 {
   "target": "email", "value": "...", "verification_code": "123456",
-  "current_auth_key_hash": "...",
-  "new_auth_key_hash": "...",
-  "new_login_salt": "..."
+  "current_local_password_hash": "...",
+  "new_local_password_hash": "...",
+  "new_local_salt": "..."
 }
 ```
 
@@ -137,7 +137,7 @@
 ### POST /auth/register-device
 需 Bearer。请求：`{"device_name": "...", "device_public_key": "...", "device_wrapped": "..."}`
 响应 200：`{"device_id": "..."}`
-> 保留端点，当前串行化模型中跨设备用恢复码，device_public_key/device_wrapped 为占位值。
+> 保留端点，当前串行化模型中跨设备用助记词，device_public_key/device_wrapped 为占位值。
 
 ### DELETE /auth/account
 需 Bearer + 验证码。请求：`{"target": "email", "value": "...", "verification_code": "123456"}`
@@ -145,24 +145,24 @@
 
 ---
 
-## 恢复码
+## 助记词
 
 ### POST /auth/recovery/initiate
-步骤1：验恢复码，返回 encrypted_user_key + initiate_token（无需认证）。
+步骤1：验助记词，返回 encrypted_user_key + initiate_token（无需认证）。
 
 请求：
 ```json
 {
   "target": "email", "value": "...",
-  "recovery_code": "12词助记词",
-  "new_auth_key_hash": "...",
-  "new_login_salt": "..."
+  "mnemonic": "12词助记词",
+  "new_local_password_hash": "...",
+  "new_local_salt": "..."
 }
 ```
 
 响应 200：
 ```json
-{"encrypted_user_key": "...", "recovery_salt": "...", "initiate_token": "..."}
+{"encrypted_user_key": "...", "mnemonic_salt": "...", "initiate_token": "..."}
 ```
 
 ### POST /auth/recovery/confirm

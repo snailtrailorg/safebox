@@ -65,7 +65,7 @@ async def send_verification_email(email: str, code: str, lang: str = "en") -> bo
 async def send_recovery_alert(
     user, event: str, accelerate_token: str = "", freeze_token: str = "",
 ) -> bool:
-    """发送恢复码相关告警邮件。
+    """发送助记词相关告警邮件。
 
     event: "initiate" | "accelerate" | "freeze" | "password_changed"
     """
@@ -81,12 +81,12 @@ async def send_recovery_alert(
     if event == "initiate":
         accelerate_url = f"{base_url}/recovery/accelerate?token={accelerate_token}"
         freeze_url = f"{base_url}/recovery/freeze?token={freeze_token}"
-        subject = "SafeBox 安全告警：恢复码已用于重置密码"
+        subject = "SafeBox 安全告警：助记词已用于重置密码"
         body = f"""
         <html>
         <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
             <h2>⚠️ 安全告警</h2>
-            <p>您的 SafeBox 恢复码已被用于发起密码重置。</p>
+            <p>您的 SafeBox 助记词已被用于发起密码重置。</p>
             <p>新密码将在 <strong>24 小时冷却期</strong>后自动生效。</p>
             <p style="margin: 20px 0;">
                 <a href="{accelerate_url}" style="display: inline-block; padding: 12px 24px;
@@ -130,9 +130,9 @@ async def send_recovery_alert(
         <html>
         <body style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
             <h2>🔐 安全告警</h2>
-            <p>您的 SafeBox 主密码已被修改。</p>
+            <p>您的 SafeBox Passphrase已被修改。</p>
             <p style="color: #666; font-size: 14px;">
-                如果不是您本人操作，请立即通过恢复码恢复账户。
+                如果不是您本人操作，请立即通过助记词恢复账户。
             </p>
         </body>
         </html>
@@ -146,7 +146,7 @@ async def send_recovery_alert(
     if phone:
         from app.services.sms_service import send_alert_sms
         if event == "initiate":
-            msg = f"SafeBox 安全告警：恢复码已用于重置密码。本人加速:{accelerate_url} ; 非本人冻结:{freeze_url}"
+            msg = f"SafeBox 安全告警：助记词已用于重置密码。本人加速:{accelerate_url} ; 非本人冻结:{freeze_url}"
         elif event == "accelerate":
             msg = "SafeBox：密码重置已确认"
         elif event == "freeze":

@@ -1,4 +1,4 @@
-"""BIP39 词表 + 恢复码生成测试。"""
+"""BIP39 词表 + 助记词生成测试。"""
 import hashlib
 
 from app.services.bip39 import BIP39_WORDS, generate_bip39_code

@@ -1,10 +1,10 @@
 /**
  * KeyChain - User Key 生命周期（模型 D 串行化）
  *
- * K = PBKDF2(恢复码 [+ 主密码], recovery_salt) - 永久，不存服务器
+ * K = PBKDF2(助记词 [+ Passphrase], mnemonic_salt) - 永久，不存服务器
  * User Key = 随机 AES-256 - 包裹 Item Keys
  * encrypted_user_key = AES(K, User Key) - 存服务器
- * 登录密码只做认证 + 本地缓存 K
+ * 本地密码只做认证 + 本地缓存 K
  */
 import {
   generateAesKey, importAesKey,
@@ -22,22 +22,22 @@ class KeyChain {
 
   // ── 注册时生成密钥 ──────────────────────────────
 
-  async generateKeys(recoveryCode: string, masterPassword: string, loginPassword: string): Promise<{
-    authKeyHash: string;
-    loginSalt: string;
+  async generateKeys(mnemonic: string, passphrase: string, localPassword: string): Promise<{
+    localPasswordHash: string;
+    localSalt: string;
     encrypted_user_key: string;
-    recovery_salt: string;
+    mnemonic_salt: string;
     cached_K: string;
     kdfSettings: KdfSettings;
   }> {
-    const loginSalt = new Uint8Array(32);
-    crypto.getRandomValues(loginSalt);
-    const recoverySalt = new Uint8Array(32);
-    crypto.getRandomValues(recoverySalt);
+    const localSalt = new Uint8Array(32);
+    crypto.getRandomValues(localSalt);
+    const mnemonicSalt = new Uint8Array(32);
+    crypto.getRandomValues(mnemonicSalt);
 
-    // K = PBKDF2(恢复码 [+ 主密码], recovery_salt)
-    const kSeed = recoveryCode + (masterPassword || "");
-    const K = await deriveKey(kSeed, recoverySalt);
+    // K = PBKDF2(助记词 [+ Passphrase], mnemonic_salt)
+    const kSeed = mnemonic + (passphrase || "");
+    const K = await deriveKey(kSeed, mnemonicSalt);
 
     // User Key（随机，不变）
     this.userKey = await generateAesKey();
@@ -46,41 +46,41 @@ class KeyChain {
     // encrypted_user_key = AES(K, User Key) - 存服务器
     const encrypted_user_key = await aesEncrypt(K, userKeyRaw);
 
-    // loginDerivedKey = PBKDF2(登录密码, loginSalt) - 本地缓存 K
-    const loginDerivedKey = await deriveKey(loginPassword, loginSalt);
-    // cached_K = AES(loginDerivedKey, K)，K 是派生的主密钥，不在服务器
+    // localDerivedKey = PBKDF2(本地密码, localSalt) - 本地缓存 K
+    const localDerivedKey = await deriveKey(localPassword, localSalt);
+    // cached_K = AES(localDerivedKey, K)，K 是派生的主密钥，不在服务器
     const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
-    const cached_K = await aesEncrypt(loginDerivedKey, kRaw);
+    const cached_K = await aesEncrypt(localDerivedKey, kRaw);
 
     // authKey - 服务端认证
-    const authKeyHash = await deriveAuthKey(loginPassword, loginSalt);
+    const localPasswordHash = await deriveAuthKey(localPassword, localSalt);
 
-    const saltBase64 = this.bytesToBase64(loginSalt);
-    const recSaltBase64 = this.bytesToBase64(recoverySalt);
+    const saltBase64 = this.bytesToBase64(localSalt);
+    const recSaltBase64 = this.bytesToBase64(mnemonicSalt);
 
     return {
-      authKeyHash,
-      loginSalt: saltBase64,
+      localPasswordHash,
+      localSalt: saltBase64,
       encrypted_user_key,
-      recovery_salt: recSaltBase64,
+      mnemonic_salt: recSaltBase64,
       cached_K,
       kdfSettings: DEFAULT_KDF,
     };
   }
 
-  // ── 日常解锁（Web: 登录密码 -> loginDerivedKey -> K -> UserKey）─────────
+  // ── 日常解锁（Web: 本地密码 -> localDerivedKey -> K -> UserKey）─────────
 
   async unlockWithPassword(
-    loginPassword: string,
-    loginSaltBase64: string,
+    localPassword: string,
+    localSaltBase64: string,
     encryptedUserKey: string,
     cached_K: string,
   ): Promise<boolean> {
     try {
-      const loginSalt = this.base64ToBytes(loginSaltBase64);
-      const loginDerivedKey = await deriveKey(loginPassword, loginSalt);
-      // K = AES 解密(cached_K, loginDerivedKey)
-      const kRaw = await aesDecrypt(loginDerivedKey, cached_K);
+      const localSalt = this.base64ToBytes(localSaltBase64);
+      const localDerivedKey = await deriveKey(localPassword, localSalt);
+      // K = AES 解密(cached_K, localDerivedKey)
+      const kRaw = await aesDecrypt(localDerivedKey, cached_K);
       if (!kRaw) return false;
       // User Key = AES 解密(encrypted_user_key, K)
       const ukRaw = await aesDecrypt(await importAesKey(this.bytesToBase64(kRaw)), encryptedUserKey);
@@ -91,18 +91,18 @@ class KeyChain {
     } catch { return false; }
   }
 
-  // ── 恢复码解锁（忘登录密码/换设备）─────────────────
+  // ── 助记词解锁（忘本地密码/换设备）─────────────────
 
-  async unlockFromRecoveryCode(
-    recoveryCode: string,
-    masterPassword: string,
-    recoverySaltBase64: string,
+  async unlockFromMnemonic(
+    mnemonic: string,
+    passphrase: string,
+    mnemonicSaltBase64: string,
     encryptedUserKey: string,
   ): Promise<boolean> {
     try {
-      const recoverySalt = this.base64ToBytes(recoverySaltBase64);
-      const kSeed = recoveryCode + (masterPassword || "");
-      const K = await deriveKey(kSeed, recoverySalt);
+      const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
+      const kSeed = mnemonic + (passphrase || "");
+      const K = await deriveKey(kSeed, mnemonicSalt);
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return false;
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
@@ -111,22 +111,22 @@ class KeyChain {
     } catch { return false; }
   }
 
-  // ── 恢复码解锁 + 重包 cached_K（忘密码恢复流程专用）──
+  // ── 助记词解锁 + 重包 cached_K（忘密码恢复流程专用）──
 
-  /** 用恢复码派生 K -> 解 User Key 设到内存 + 用新登录密码重包 cached_K。
+  /** 用助记词派生 K -> 解 User Key 设到内存 + 用新本地密码重包 cached_K。
    *  一次派生 K，避免重复 PBKDF2。返回新 cached_K 供 saveSession。 */
   async recoverAndRewrap(
-    recoveryCode: string,
-    masterPassword: string,
-    recoverySaltBase64: string,
+    mnemonic: string,
+    passphrase: string,
+    mnemonicSaltBase64: string,
     encryptedUserKey: string,
     newLoginPassword: string,
     newLoginSaltBase64: string,
   ): Promise<{ ok: boolean; newCachedK?: string }> {
     try {
-      const recoverySalt = this.base64ToBytes(recoverySaltBase64);
-      const kSeed = recoveryCode + (masterPassword || "");
-      const K = await deriveKey(kSeed, recoverySalt);
+      const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
+      const kSeed = mnemonic + (passphrase || "");
+      const K = await deriveKey(kSeed, mnemonicSalt);
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return { ok: false };
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
@@ -140,7 +140,7 @@ class KeyChain {
     } catch { return { ok: false }; }
   }
 
-  // ── 改登录密码（K 不变，只更新本地缓存）─────────────
+  // ── 改本地密码（K 不变，只更新本地缓存）─────────────
 
   async rewrapCachedK(
     oldLoginPassword: string, oldLoginSaltBase64: string,

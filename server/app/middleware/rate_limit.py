@@ -22,7 +22,7 @@ from app.services.verification_service import check_rate_key
 WHITELIST_PATHS = ("/health", "/docs", "/openapi.json", "/redoc")
 
 # 路径前缀 -> 限流阈值（覆盖默认的 500/小时）
-# 严格端点：登录/注册/恢复码 - 100 次/小时
+# 严格端点：登录/注册/助记词 - 100 次/小时
 STRICT_PREFIXES = ("/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/recovery")
 STRICT_MAX = 100
 

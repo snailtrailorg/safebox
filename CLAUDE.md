@@ -5,6 +5,7 @@
 - 部署四件套：`scripts/deploy-server.sh`（后端+重启）、`scripts/deploy-web.sh`（前端构建+推送+reload）、`scripts/migrate-db.sh`（升级 schema 保留数据）、`scripts/clear-db.sh`（清库重置丢数据）；均通过 `sudo -u michael` 调 michael 侧部署工具，不装依赖
 - 直接 `./scripts/xxx.sh` 跑，脚本内 `sudo -u michael` 免密（sudoers 已配），**不要手动加 sudo**
 - 不要碰 michael 的 `/home/michael/.local/bin/safebox-deploy.sh`（bernard 无权读/改）
+- bernard 的 `sudo -u michael` 只放行 `safebox-deploy.sh`（不能跑别的命令）；服务器其他操作（如改 `.env`）要登录服务器手动做
 - 服务器初始部署步骤见 `DEPLOY.md`
 - 部署后验证：`curl -s http://127.0.0.1:8000/health`
 - 推送到 GitHub 用 `spe git push github master`（需要代理）
@@ -19,29 +20,29 @@
 
 ### 密钥派生（模型 D 串行化）
 - `deriveKey(password, salt, kdf_settings?)` → 通用 PBKDF2-SHA256 派生 AES-256 密钥（`kdf.ts`）。用于三处：
-  - 派生 K：`K = deriveKey(恢复码[+主密码], recovery_salt)` → 加密 User Key（`encrypted_user_key = AES(K, UserKey)`）
-  - 派生 loginDerivedKey：`deriveKey(登录密码, login_salt)` → 本地缓存 K（`cached_K = AES(loginDerivedKey, K)`）
+  - 派生 K：`K = deriveKey(助记词[+Passphrase], mnemonic_salt)` → 加密 User Key（`encrypted_user_key = AES(K, UserKey)`）
+  - 派生 localDerivedKey：`deriveKey(本地密码, local_salt)` → 本地缓存 K（`cached_K = AES(localDerivedKey, K)`）
   - 派生备份密钥：`deriveKey(备份密码, salt)` → 加密导出文件
-- `deriveAuthKey(password, salt, kdf_settings?)` → 发给服务器的 auth_key_hash（`kdf.ts`）。在 salt 后追加 4 字节 `"auth"`（`0x61 0x75 0x74 0x68`）作为独立 salt 域，与 K 派生隔离，防止 auth_key_hash 被用于解密
+- `deriveAuthKey(password, salt, kdf_settings?)` → 发给服务器的 local_password_hash（`kdf.ts`）。在 salt 后追加 4 字节 `"auth"`（`0x61 0x75 0x74 0x68`）作为独立 salt 域，与 K 派生隔离，防止 local_password_hash 被用于解密
 - KDF 参数可配置：`{ algorithm: "pbkdf2", iterations: 600_000 }`，跟随账户存储在 `users.kdf_settings`（Text 列存 JSON）
-- 服务端只收到 `auth_key_hash`（schema alias `password_hash`）后做 bcrypt，不感知派生细节
+- 服务端只收到 `local_password_hash`（schema alias `local_password_hash`）后做 bcrypt，不感知派生细节
 
 ### 密钥管理（模型 D 串行化）
 - `keyChain`（`keychain/keyChain.ts`）是全局单例，管理 User Key 生命周期
-- keyChain 提供：`generateKeys`、`unlockWithPassword`、`unlockFromRecoveryCode`、`rewrapCachedK`、`createItemKey`/`decryptItemKey`、`encryptItemField`/`decryptItemField`（AES-GCM + ItemKey）、`encryptFileBlob`/`decryptFileBlob`、`exportUserKeyRaw`、`lock`
+- keyChain 提供：`generateKeys`、`unlockWithPassword`、`unlockFromMnemonic`、`rewrapCachedK`、`createItemKey`/`decryptItemKey`、`encryptItemField`/`decryptItemField`（AES-GCM + ItemKey）、`encryptFileBlob`/`decryptFileBlob`、`exportUserKeyRaw`、`lock`
 - `services/keyManager.ts`、`crypto/pbkdf2.ts`、旧 `deriveKeyHash` API **已删除**（不再是 deprecated）
 - `crypto/rsa.ts`（RSA-OAEP 工具）保留但全项目无引用，属遗留死代码；keyChain 无 RSA v1 兼容函数（`loadRsaKeys`/`encryptItemData`/`decryptItemData` 已删）
 
-### 恢复码（模型 D 串行化）
-- 客户端 BIP39 12 词生成（注册时 `generateRecoveryCode()`），上传明文 + 客户端生成的 `recovery_code_salt`，服务端 `HMAC-SHA256(server_key, salt+mnemonic)` 哈希存储，注册成功后模态框展示一次
-- **无 `POST /auth/recovery/generate` 端点**；`recovery_service.create_recovery_code`/`generate_recovery_code_salt` 函数存在但无 API 调用（死代码）
-- 恢复码使用不需要验证码，加速通道需要验证码；24h 冷却期 + 加速/冻结三分支
+### 助记词（模型 D 串行化）
+- 客户端 BIP39 12 词生成（注册时 `generateMnemonic()`），上传明文 + 客户端生成的 `mnemonic_hmac_salt`，服务端 `HMAC-SHA256(server_key, salt+mnemonic)` 哈希存储，注册成功后模态框展示一次
+- **无 `POST /auth/recovery/generate` 端点**；`recovery_service.create_mnemonic`/`generate_mnemonic_hmac_salt` 函数存在但无 API 调用（死代码）
+- 助记词使用不需要验证码，加速通道需要验证码；24h 冷却期 + 加速/冻结三分支
 - 详见 `docs/RECOVERY_MECHANISM.md`
 
 ### 服务拆分
 - `auth_service.py`：认证业务逻辑（hash_auth_key、用户查询、create_user_with_keys）
 - `token_service.py`：JWT 创建 + refresh rotation + 撤销
-- `recovery_service.py`：恢复码验证/冷却期/加速/冻结（`create_recovery_code`/`generate_recovery_code_salt` 函数存在但无端点调用，恢复码实际由客户端生成上传）
+- `recovery_service.py`：助记词验证/冷却期/加速/冻结（`create_mnemonic`/`generate_mnemonic_hmac_salt` 函数存在但无端点调用，助记词实际由客户端生成上传）
 - `bip39.py`：BIP39 2048 词表 + 生成函数
 
 ### 依赖管理

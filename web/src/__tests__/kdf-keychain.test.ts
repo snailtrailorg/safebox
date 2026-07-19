@@ -105,14 +105,14 @@ describe("KDF (kdf.ts)", () => {
 describe("KeyChain", () => {
   it("generateKeys returns all required fields", async () => {
     const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","test-password");
-    expect(keys.authKeyHash).toBeTruthy();
-    expect(typeof keys.authKeyHash).toBe("string");
-    expect(keys.loginSalt).toBeTruthy();
-    expect(typeof keys.loginSalt).toBe("string");
+    expect(keys.localPasswordHash).toBeTruthy();
+    expect(typeof keys.localPasswordHash).toBe("string");
+    expect(keys.localSalt).toBeTruthy();
+    expect(typeof keys.localSalt).toBe("string");
     expect(keys.encrypted_user_key).toBeTruthy();
     expect(typeof keys.encrypted_user_key).toBe("string");
-    expect(keys.recovery_salt).toBeTruthy();
-    expect(typeof keys.recovery_salt).toBe("string");
+    expect(keys.mnemonic_salt).toBeTruthy();
+    expect(typeof keys.mnemonic_salt).toBe("string");
     expect(keys.kdfSettings).toEqual(DEFAULT_KDF);
     expect(keyChain.isUnlocked).toBe(true);
   });
@@ -120,7 +120,7 @@ describe("KeyChain", () => {
   it("generateKeys produces different keys each time", async () => {
     const k1 = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     const k2 = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
-    expect(k1.authKeyHash).not.toBe(k2.authKeyHash);
+    expect(k1.localPasswordHash).not.toBe(k2.localPasswordHash);
     expect(k1.encrypted_user_key).not.toBe(k2.encrypted_user_key);
   });
 
@@ -130,7 +130,7 @@ describe("KeyChain", () => {
     expect(keyChain.isUnlocked).toBe(false);
 
     const ok = await keyChain.unlockWithPassword(
-      "correct-password", keys.loginSalt, keys.encrypted_user_key, keys.cached_K,
+      "correct-password", keys.localSalt, keys.encrypted_user_key, keys.cached_K,
     );
     expect(ok).toBe(true);
     expect(keyChain.isUnlocked).toBe(true);
@@ -141,7 +141,7 @@ describe("KeyChain", () => {
     keyChain.lock();
 
     const ok = await keyChain.unlockWithPassword(
-      "wrong-password", keys.loginSalt, keys.encrypted_user_key, keys.cached_K,
+      "wrong-password", keys.localSalt, keys.encrypted_user_key, keys.cached_K,
     );
     expect(ok).toBe(false);
     expect(keyChain.isUnlocked).toBe(false);
@@ -178,6 +178,6 @@ describe("KeyChain", () => {
     const keys = await keyChain.generateKeys("a b c d e f g h i j k l","","password");
     keyChain.lock();
 
-    const ok = await keyChain.unlockWithPassword("password", keys.loginSalt, keys.encrypted_user_key, keys.cached_K);
+    const ok = await keyChain.unlockWithPassword("password", keys.localSalt, keys.encrypted_user_key, keys.cached_K);
     expect(ok).toBe(true);  });
   });

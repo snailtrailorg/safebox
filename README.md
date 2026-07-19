@@ -14,7 +14,7 @@
 服务端 (FastAPI + PostgreSQL + Redis)
   ├─ 用户认证 (Email / 手机号 / Google OAuth)
   ├─ 条目同步 (pull / push / delete)
-  ├─ 恢复码 (BIP39 12 词 + HMAC-SHA256 + 24h 冷却期)
+  ├─ 助记词 (BIP39 12 词 + HMAC-SHA256 + 24h 冷却期)
   └─ 验证码 (Twilio 短信 / SMTP 邮件)
 ```
 
@@ -39,7 +39,7 @@ safebox/
 ├── server/                 # FastAPI 后端
 │   ├── app/
 │   │   ├── api/            # 路由 (auth, recovery, sync)
-│   │   ├── models/         # SQLAlchemy ORM (user, recovery_code)
+│   │   ├── models/         # SQLAlchemy ORM (user, mnemonic)
 │   │   ├── schemas/        # Pydantic 请求/响应
 │   │   ├── services/       # 业务逻辑 (auth, token, recovery, bip39, email, sms, verification)
 │   │   ├── middleware/      # JWT 中间件 (token type 校验)
@@ -101,9 +101,9 @@ npx vitest run     # 111 tests
 ### 密钥层次（模型 D 串行化）
 
 ```
-恢复码[BIP39 12 词] [+ 主密码]
+助记词[BIP39 12 词] [+ Passphrase]
    │
-   └──PBKDF2(SHA-256, 600k, recovery_salt)──> K（派生主密钥，永久不变，不存服务器）
+   └──PBKDF2(SHA-256, 600k, mnemonic_salt)──> K（派生主密钥，永久不变，不存服务器）
                                                   │
                                                   └──AES-GCM──> encrypted_user_key（存服务器）
                                                                        │
@@ -115,12 +115,12 @@ npx vitest run     # 111 tests
                                                                               │
                                                                         条目明文
 
-登录密码（独立于 K，可改）
-   ├── PBKDF2(login_salt)        → loginDerivedKey → 本地 cached_K = AES(loginDerivedKey, K)
-   └── PBKDF2(login_salt+"auth") → auth_key_hash  → 服务端认证（bcrypt 二次哈希）
+本地密码（独立于 K，可改）
+   ├── PBKDF2(local_salt)        → localDerivedKey → 本地 cached_K = AES(localDerivedKey, K)
+   └── PBKDF2(local_salt+"auth") → local_password_hash  → 服务端认证（bcrypt 二次哈希）
 ```
 
-**模型 D 核心**：K 由恢复码派生（非登录密码），`encrypted_user_key = AES(K, UserKey)` 存服务器，`cached_K = AES(loginDerivedKey, K)` 存本地。换登录密码只重包 `cached_K`，K/User Key 不变，条目无需重加密。登录密码丢失不影响数据，只要恢复码在即可解 `encrypted_user_key`。
+**模型 D 核心**：K 由助记词派生（非本地密码），`encrypted_user_key = AES(K, UserKey)` 存服务器，`cached_K = AES(localDerivedKey, K)` 存本地。换本地密码只重包 `cached_K`，K/User Key 不变，条目无需重加密。本地密码丢失不影响数据，只要助记词在即可解 `encrypted_user_key`。
 
 ### 服务端存储了什么
 
@@ -128,16 +128,16 @@ npx vitest run     # 111 tests
 
 | 字段 | 实际内容 | 谁能解密 |
 |------|---------|---------|
-| `auth_key_hash` | bcrypt(PBKDF2(登录密码, login_salt+"auth")) | 仅用于认证比对 |
-| `encrypted_user_key` | AES-GCM(K, User Key)（K 不在服务器） | 拥有 K（即恢复码[+主密码]）的人 |
+| `local_password_hash` | bcrypt(PBKDF2(本地密码, local_salt+"auth")) | 仅用于认证比对 |
+| `encrypted_user_key` | AES-GCM(K, User Key)（K 不在服务器） | 拥有 K（即助记词[+Passphrase]）的人 |
 | `items.name` / `description` / `data` | EncryptedField `{encrypted_key, ciphertext}`，AES-GCM(Item Key, AAD) | 拥有 User Key 的人 |
-| `recovery_code_hash` | HMAC-SHA256(server_key, salt+mnemonic) | 仅用于验证比对 |
+| `mnemonic_hash` | HMAC-SHA256(server_key, salt+mnemonic) | 仅用于验证比对 |
 
 ### 攻击场景分析
 
 **场景一：服务器被入侵，数据库泄露**
 
-攻击者拿到所有密文，但没有用户的密码或恢复码，无法解密 User Key → 无法解密 Item Key → 无法解密任何条目。且 bcrypt 哈希不可逆，无法从 auth_key_hash 反推密码。
+攻击者拿到所有密文，但没有用户的密码或助记词，无法解密 User Key → 无法解密 Item Key → 无法解密任何条目。且 bcrypt 哈希不可逆，无法从 local_password_hash 反推密码。
 
 **场景二：管理员/内部人员作恶**
 
@@ -145,17 +145,17 @@ npx vitest run     # 111 tests
 
 **场景三：用户忘记密码**
 
-用 12 词 BIP39 恢复码找回。恢复码在注册时由客户端生成并展示一次，服务端 HMAC-SHA256 验证，24 小时冷却期防暴力破解。恢复码是唯一的恢复途径——没有恢复码且忘记密码，数据永久无法恢复。这不是 bug，是设计目标。
+用 12 词 BIP39 助记词找回。助记词在注册时由客户端生成并展示一次，服务端 HMAC-SHA256 验证，24 小时冷却期防暴力破解。助记词是唯一的恢复途径——没有助记词且忘记密码，数据永久无法恢复。这不是 bug，是设计目标。
 
-**场景四：用户忘记密码且丢失恢复码**
+**场景四：用户忘记密码且丢失助记词**
 
 数据永久丢失。服务端没有任何后门或重置机制能绕过加密。管理员也无法帮忙恢复。
 
 ### 用户必须知道的事
 
-1. **密码不要忘记。** 密码不出设备，没有"找回密码"功能，只有"重置密码"（需要恢复码）。
-2. **恢复码必须妥善保存。** 注册时生成的 12 个英文单词，是丢失密码后唯一的救命稻草。建议打印在纸上，存放在安全的地方。
-3. **不要只存在一台设备上。** 手机丢失 + 忘记密码 + 丢失恢复码 = 数据永久消失。
+1. **密码不要忘记。** 密码不出设备，没有"找回密码"功能，只有"重置密码"（需要助记词）。
+2. **助记词必须妥善保存。** 注册时生成的 12 个英文单词，是丢失密码后唯一的救命稻草。建议打印在纸上，存放在安全的地方。
+3. **不要只存在一台设备上。** 手机丢失 + 忘记密码 + 丢失助记词 = 数据永久消失。
 
 详见 `docs/`。
 

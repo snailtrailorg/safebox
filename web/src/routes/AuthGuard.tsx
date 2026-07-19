@@ -68,7 +68,7 @@ function UnlockScreen() {
     setError("");
     try {
       const session = await getSession();
-      const ok = await keyChain.unlockWithPassword(password, session.loginSalt, session.encrypted_user_key, session.cached_K || "");
+      const ok = await keyChain.unlockWithPassword(password, session.localSalt, session.encrypted_user_key, session.cached_K || "");
       if (!ok) {
         setError(t("auth.login.unlockFailed"));
         setUnlocking(false);

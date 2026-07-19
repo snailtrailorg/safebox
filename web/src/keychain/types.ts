@@ -7,7 +7,7 @@
  */
 export interface UserKeySet {
   userKey: CryptoKey;         // AES-256-GCM，加密 Item Key 和 RSA 私钥
-  authKeyHash: string;        // 发送给服务端的认证 hash
+  localPasswordHash: string;        // 发送给服务端的认证 hash
   rsaPrivateKey?: CryptoKey;  // RSA-4096（仅用于旧条目解密 + 未来共享）
   rsaPublicKey?: string;      // 公钥 base64 SPKI
 }

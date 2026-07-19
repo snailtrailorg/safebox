@@ -96,7 +96,7 @@ export function LoginPage() {
     // cached_K 在本地 session（注册时存），不在服务器响应里
     const session = await getSession();
     const ok = await keyChain.unlockWithPassword(
-      pw, response.login_salt || "", response.encrypted_user_key, session.cached_K || "");
+      pw, response.local_salt || "", response.encrypted_user_key, session.cached_K || "");
     if (!ok) {
       setToast({ message: t("auth.login.unlockFailed"), type: "error" });
       return;
@@ -112,17 +112,17 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const { login_salt: salt } = await apiClient.getSalt(email);
+      const { local_salt: salt } = await apiClient.getSalt(email);
       const saltBytes = base64ToBytes(salt);
-      const authKeyHash = await deriveAuthKey(password, saltBytes);
-      const response = await apiClient.loginEmail({ email, auth_key_hash: authKeyHash });
+      const localPasswordHash = await deriveAuthKey(password, saltBytes);
+      const response = await apiClient.loginEmail({ email, local_password_hash: localPasswordHash });
       await saveSession({
         email,
-        loginSalt: response.login_salt,
+        localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
-        recovery_salt: response.recovery_salt,
-        has_master_password: response.has_master_password,
-        password_version: 0,
+        mnemonic_salt: response.mnemonic_salt,
+        has_passphrase: response.has_passphrase,
+        local_password_version: 0,
       });
       await handleLoginResponse(response, password);
     } catch (e) {
@@ -145,17 +145,17 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const { login_salt: salt } = await apiClient.getSalt(undefined, phone);
+      const { local_salt: salt } = await apiClient.getSalt(undefined, phone);
       const saltBytes = base64ToBytes(salt);
-      const authKeyHash = await deriveAuthKey(phonePassword, saltBytes);
-      const response = await apiClient.loginPhone({ phone, verification_code: code, auth_key_hash: authKeyHash });
+      const localPasswordHash = await deriveAuthKey(phonePassword, saltBytes);
+      const response = await apiClient.loginPhone({ phone, verification_code: code, local_password_hash: localPasswordHash });
       await saveSession({
         email: phone,
-        loginSalt: response.login_salt,
+        localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
-        recovery_salt: response.recovery_salt,
-        has_master_password: response.has_master_password,
-        password_version: 0,
+        mnemonic_salt: response.mnemonic_salt,
+        has_passphrase: response.has_passphrase,
+        local_password_version: 0,
       });
       await handleLoginResponse(response, phonePassword);
     } catch (e) {
@@ -175,11 +175,11 @@ export function LoginPage() {
       const response = await apiClient.loginGoogle({ google_id_token: googleIdToken });
       await saveSession({
         email: "google",
-        loginSalt: response.login_salt,
+        localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
-        recovery_salt: response.recovery_salt,
-        has_master_password: response.has_master_password,
-        password_version: 0,
+        mnemonic_salt: response.mnemonic_salt,
+        has_passphrase: response.has_passphrase,
+        local_password_version: 0,
       });
       await handleLoginResponse(response, googlePassword);
     } catch (e) {

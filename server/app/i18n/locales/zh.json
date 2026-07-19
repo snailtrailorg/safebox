@@ -20,7 +20,7 @@
   "email_body_expiry": "验证码 {minutes} 分钟内有效。",
   "email_body_ignore": "如果您没有请求此验证码，请忽略此邮件。",
   "sms_body": "[SafeBox] 您的验证码为 {code}，{minutes} 分钟内有效。",
-  "recovery_code_invalid": "恢复码无效",
+  "mnemonic_invalid": "助记词无效",
   "recovery_already_pending": "恢复流程已在处理中，请勿重复操作",
   "recovery_not_pending": "没有进行中的恢复流程",
   "account_in_cooldown": "账户恢复冷却中，请稍后再试",

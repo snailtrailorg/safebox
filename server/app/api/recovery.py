@@ -1,4 +1,4 @@
-"""恢复码 API：生成、发起恢复、加速、冻结、状态查询、作废。"""
+"""助记词 API：生成、发起恢复、加速、冻结、状态查询、作废。"""
 
 from typing import Optional
 import hashlib
@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.i18n import get_lang, get_text
 from app.middleware import get_current_user_id
-from app.models.recovery_code import RecoveryCode
+from app.models.mnemonic import Mnemonic
 from app.models.user import User, UserKeys
 from app.services.auth_service import (
     find_user_by_email,
@@ -27,12 +27,12 @@ from app.services.recovery_service import (
     _clear_pending_initiate,
     accelerate_recovery,
     confirm_recovery,
-    create_recovery_code,
-    find_valid_recovery_code,
+    create_mnemonic,
+    find_valid_mnemonic,
     freeze_recovery,
     initiate_recovery_step1,
     sign_recovery_token,
-    verify_recovery_code,
+    verify_mnemonic,
     verify_recovery_token,
 )
 from app.services.token_service import revoke_all_user_tokens
@@ -51,14 +51,14 @@ def _t(request: Request, key: str, **kw: object) -> str:
 class InitiateRecoveryRequest(BaseModel):
     target: str = Field(..., pattern="^(phone|email)$")
     value: str
-    recovery_code: str
-    new_auth_key_hash: str
-    new_login_salt: str
+    mnemonic: str
+    new_local_password_hash: str
+    new_local_salt: str
 
 
 class InitiateRecoveryResponse(BaseModel):
-    encrypted_user_key: str     # 客户端用 K=PBKDF2(恢复码[+主密码],recovery_salt) 解出 User Key
-    recovery_salt: str          # K 派生用盐
+    encrypted_user_key: str     # 客户端用 K=PBKDF2(助记词[+Passphrase],mnemonic_salt) 解出 User Key
+    mnemonic_salt: str          # K 派生用盐
     initiate_token: str         # 步骤2 confirm 用（15min 有效）
 
 
@@ -83,7 +83,7 @@ class RecoveryStatusResponse(BaseModel):
     status: str  # none | active | cooldown
     cooldown_until: Optional[str] = None
 
-# -- 恢复：步骤 1（验证恢复码 + 建待确认态）-
+# -- 恢复：步骤 1（验证助记词 + 建待确认态）-
 
 @router.post("/initiate", response_model=InitiateRecoveryResponse)
 async def initiate(
@@ -91,9 +91,9 @@ async def initiate(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """步骤 1：验证恢复码。验通过后返回 encrypted_user_key + recovery_salt + initiate_token。
+    """步骤 1：验证助记词。验通过后返回 encrypted_user_key + mnemonic_salt + initiate_token。
 
-    此时**不改正式字段**、不进冷却。客户端用 K=PBKDF2(恢复码[+主密码], recovery_salt) 本地解出 User Key、
+    此时**不改正式字段**、不进冷却。客户端用 K=PBKDF2(助记词[+Passphrase], mnemonic_salt) 本地解出 User Key、
     调 /auth/recovery/confirm 完成（K/User Key 不变，无需传 wrapped）。
     """
     user = (
@@ -102,20 +102,20 @@ async def initiate(
         else await find_user_by_phone(db, req.value)
     )
     if not user:
-        # 不返回 404（账户枚举 oracle），与恢复码错误返回一致的 401
-        raise HTTPException(401, detail=_t(request, "recovery_code_invalid"))
+        # 不返回 404（账户枚举 oracle），与助记词错误返回一致的 401
+        raise HTTPException(401, detail=_t(request, "mnemonic_invalid"))
 
     # 检查是否已在冷却期
     result = await db.execute(
-        select(RecoveryCode).where(RecoveryCode.user_id == user.id)
+        select(Mnemonic).where(Mnemonic.user_id == user.id)
     )
     existing = result.scalar_one_or_none()
     if existing is not None and existing.status == "cooldown":
-        if verify_recovery_code(
-            req.recovery_code, existing.recovery_code_salt, existing.recovery_code_hash
+        if verify_mnemonic(
+            req.mnemonic, existing.mnemonic_hmac_salt, existing.mnemonic_hash
         ):
             raise HTTPException(409, detail=_t(request, "recovery_already_pending"))
-        raise HTTPException(401, detail=_t(request, "recovery_code_invalid"))
+        raise HTTPException(401, detail=_t(request, "mnemonic_invalid"))
     # 检查 pending_initiate：已有未过期 -> 409（不允许覆盖）；过期 -> 清除继续
     if existing is not None and existing.status == "active" and existing.pending_initiate_at:
         pending_at = existing.pending_initiate_at
@@ -126,22 +126,22 @@ async def initiate(
             raise HTTPException(409, detail=_t(request, "recovery_already_pending"))
         _clear_pending_initiate(existing)
 
-    # 验证 active 恢复码（含失败计数 / 锁定）
-    rc = await find_valid_recovery_code(db, user.id, req.recovery_code)
+    # 验证 active 助记词（含失败计数 / 锁定）
+    rc = await find_valid_mnemonic(db, user.id, req.mnemonic)
     if not rc:
-        raise HTTPException(401, detail=_t(request, "recovery_code_invalid"))
+        raise HTTPException(401, detail=_t(request, "mnemonic_invalid"))
 
-    new_hash = hash_auth_key(req.new_auth_key_hash)
+    new_hash = hash_auth_key(req.new_local_password_hash)
     token, eu_key, rec_salt = await initiate_recovery_step1(
         db, rc, user,
-        new_auth_key_hash=new_hash,
-        new_login_salt=req.new_login_salt,
+        new_local_password_hash=new_hash,
+        new_local_salt=req.new_local_salt,
     )
     await db.commit()
 
     return InitiateRecoveryResponse(
         encrypted_user_key=eu_key,
-        recovery_salt=rec_salt,
+        mnemonic_salt=rec_salt,
         initiate_token=token,
     )
 
@@ -154,13 +154,13 @@ async def confirm(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """步骤 2：验 token + 真正发起恢复（写登录密码+进冷却+吊销旧token）。
+    """步骤 2：验 token + 真正发起恢复（写本地密码+进冷却+吊销旧token）。
     K/User Key 不变，无需客户端传 wrapped key。
     """
-    # 按 token 哈希找对应 recovery_code（FOR UPDATE 防并发 confirm 双成功）
+    # 按 token 哈希找对应 mnemonic（FOR UPDATE 防并发 confirm 双成功）
     token_hash = hashlib.sha256(req.initiate_token.encode()).hexdigest()
     result = await db.execute(
-        select(RecoveryCode).where(RecoveryCode.pending_initiate_token == token_hash).with_for_update()
+        select(Mnemonic).where(Mnemonic.pending_initiate_token == token_hash).with_for_update()
     )
     rc = result.scalar_one_or_none()
     if not rc:
@@ -199,9 +199,9 @@ async def get_status(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """查询当前用户的恢复码状态（前端倒计时用）。纯读，不触发激活。"""
+    """查询当前用户的助记词状态（前端倒计时用）。纯读，不触发激活。"""
     result = await db.execute(
-        select(RecoveryCode).where(RecoveryCode.user_id == user_id)
+        select(Mnemonic).where(Mnemonic.user_id == user_id)
     )
     rc = result.scalar_one_or_none()
 
@@ -238,7 +238,7 @@ async def accelerate(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
-    rc = await db.get(RecoveryCode, rc_id)
+    rc = await db.get(Mnemonic, rc_id)
     if not rc or rc.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
@@ -294,7 +294,7 @@ async def freeze(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
-    rc = await db.get(RecoveryCode, rc_id)
+    rc = await db.get(Mnemonic, rc_id)
     if not rc or rc.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 

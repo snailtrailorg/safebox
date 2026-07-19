@@ -80,7 +80,7 @@ def _t(request: Request, key: str, **kw: object) -> str:
 
 @router.get("/salt")
 async def get_salt(email: Optional[str] = None, phone: Optional[str] = None, db: AsyncSession = Depends(get_db)):
-    """返回 login_salt + kdf_settings + recovery_salt（换设备/恢复时客户端派生 K 用）。"""
+    """返回 local_salt + kdf_settings + mnemonic_salt（换设备/恢复时客户端派生 K 用）。"""
     user = None
     if email:
         user = await find_user_by_email(db, email)
@@ -91,16 +91,16 @@ async def get_salt(email: Optional[str] = None, phone: Optional[str] = None, db:
         kdf = json.loads(user.kdf_settings) if user.kdf_settings else DEFAULT_KDF_SETTINGS
         keys = await get_user_keys(db, user.id)
         return {
-            "login_salt": user.login_salt or "",
+            "local_salt": user.local_salt or "",
             "kdf_settings": kdf,
-            "recovery_salt": keys.recovery_salt if keys else "",
-            "has_master_password": user.has_master_password or False,
+            "mnemonic_salt": keys.mnemonic_salt if keys else "",
+            "has_passphrase": user.has_passphrase or False,
         }
     target = email or phone or ""
-    return {"login_salt": _derive_fake_salt(target),
+    return {"local_salt": _derive_fake_salt(target),
             "kdf_settings": DEFAULT_KDF_SETTINGS,
-            "recovery_salt": _derive_fake_salt(target),
-            "has_master_password": False}
+            "mnemonic_salt": _derive_fake_salt(target),
+            "has_passphrase": False}
 
 def _derive_fake_salt(target: str) -> str:
     """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。
@@ -148,15 +148,15 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
     # 清除该邮箱的历史登录失败计数（防止他人攻击导致的锁影响真正注册用户）
     await clear_login_failures("email", req.email)
 
-    # 服务端计算恢复码 HMAC hash 并存储
-    from app.services.recovery_service import hash_recovery_code
-    recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
+    # 服务端计算助记词 HMAC hash 并存储
+    from app.services.recovery_service import hash_mnemonic
+    recovery_hash = hash_mnemonic(req.mnemonic, req.mnemonic_hmac_salt)
 
     user = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
-        auth_key_hash=req.auth_key_hash, login_salt=req.login_salt,
-        encrypted_user_key=req.encrypted_user_key, recovery_salt=req.recovery_salt,
-        has_master_password=req.has_master_password,
-        recovery_code_hash=recovery_hash, recovery_code_salt=req.recovery_code_salt,
+        local_password_hash=req.local_password_hash, local_salt=req.local_salt,
+        encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
+        has_passphrase=req.has_passphrase,
+        mnemonic_hash=recovery_hash, mnemonic_hmac_salt=req.mnemonic_hmac_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     access_token = create_access_token(user.id)
@@ -175,14 +175,14 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
     # 清除该手机号的历史登录失败计数（与 email 注册一致）
     await clear_login_failures("phone", req.phone)
 
-    from app.services.recovery_service import hash_recovery_code
-    recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
+    from app.services.recovery_service import hash_mnemonic
+    recovery_hash = hash_mnemonic(req.mnemonic, req.mnemonic_hmac_salt)
 
     user = await create_user_with_keys(db=db, email=None, phone=req.phone, google_id=None,
-        auth_key_hash=req.auth_key_hash, login_salt=req.login_salt,
-        encrypted_user_key=req.encrypted_user_key, recovery_salt=req.recovery_salt,
-        has_master_password=req.has_master_password,
-        recovery_code_hash=recovery_hash, recovery_code_salt=req.recovery_code_salt,
+        local_password_hash=req.local_password_hash, local_salt=req.local_salt,
+        encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
+        has_passphrase=req.has_passphrase,
+        mnemonic_hash=recovery_hash, mnemonic_hmac_salt=req.mnemonic_hmac_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     access_token = create_access_token(user.id)
@@ -199,14 +199,14 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "google_already_registered"))
 
-    from app.services.recovery_service import hash_recovery_code
-    recovery_hash = hash_recovery_code(req.recovery_code, req.recovery_code_salt)
+    from app.services.recovery_service import hash_mnemonic
+    recovery_hash = hash_mnemonic(req.mnemonic, req.mnemonic_hmac_salt)
 
     user = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
-        auth_key_hash=req.auth_key_hash, login_salt=req.login_salt,
-        encrypted_user_key=req.encrypted_user_key, recovery_salt=req.recovery_salt,
-        has_master_password=req.has_master_password,
-        recovery_code_hash=recovery_hash, recovery_code_salt=req.recovery_code_salt,
+        local_password_hash=req.local_password_hash, local_salt=req.local_salt,
+        encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
+        has_passphrase=req.has_passphrase,
+        mnemonic_hash=recovery_hash, mnemonic_hmac_salt=req.mnemonic_hmac_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     access_token = create_access_token(user.id)
@@ -217,7 +217,7 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
 # ── 登录 ──────────────────────────────────────────
 
 async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
-    """构建登录响应（公共逻辑）。模型 D：返回 encrypted_user_key + recovery_salt。"""
+    """构建登录响应（公共逻辑）。模型 D：返回 encrypted_user_key + mnemonic_salt。"""
     access_token = create_access_token(user.id)
     refresh_token = await create_refresh_token(db, user.id)
     keys = await get_user_keys(db, user.id)
@@ -225,10 +225,10 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
     return LoginResponse(
         user_id=str(user.id),
         access_token=access_token, refresh_token=refresh_token,
-        login_salt=user.login_salt or "",
+        local_salt=user.local_salt or "",
         encrypted_user_key=keys.encrypted_user_key if keys else "",
-        recovery_salt=keys.recovery_salt if keys else "",
-        has_master_password=user.has_master_password or False,
+        mnemonic_salt=keys.mnemonic_salt if keys else "",
+        has_passphrase=user.has_passphrase or False,
         devices=[DeviceInfo(id=str(d.id), device_name=d.device_name, device_wrapped=d.device_wrapped) for d in devices],
     )
 
@@ -242,13 +242,13 @@ async def login_email(req: LoginEmailRequest, request: Request, db: AsyncSession
     user = await find_user_by_email(db, req.email)
     if not user:
         # 恒等时间：不存在时也跑一次 bcrypt，防止枚举侧信道
-        hash_auth_key(req.auth_key_hash)
+        hash_auth_key(req.local_password_hash)
         await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
     # 恢复冷却期：账户锁定，拒绝登录（纯读，零写入）
     if await is_in_cooldown(db, user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
-    if not verify_auth_key(req.auth_key_hash, user.auth_key_hash):
+    if not verify_auth_key(req.local_password_hash, user.local_password_hash):
         await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
     await clear_login_failures("email", req.email)
@@ -267,13 +267,13 @@ async def login_phone(req: LoginPhoneRequest, request: Request, db: AsyncSession
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
     user = await find_user_by_phone(db, req.phone)
     if not user:
-        hash_auth_key(req.auth_key_hash)
+        hash_auth_key(req.local_password_hash)
         await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
     # 恢复冷却期：账户锁定，拒绝登录（纯读，零写入）
     if await is_in_cooldown(db, user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
-    if not verify_auth_key(req.auth_key_hash, user.auth_key_hash):
+    if not verify_auth_key(req.local_password_hash, user.local_password_hash):
         await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
     await clear_login_failures("phone", req.phone)
@@ -313,12 +313,12 @@ async def change_password(
     user_id: UUID = Depends(require_not_in_cooldown),
     db: AsyncSession = Depends(get_db),
 ):
-    """模型 D 改密：只改登录密码认证字段（authKey+login_salt+password_version），不改 K/User Key。"""
+    """模型 D 改密：只改本地密码认证字段（authKey+local_salt+local_password_version），不改 K/User Key。"""
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
-    if not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash):
+    if not verify_auth_key(req.current_local_password_hash, user.local_password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "current_password_wrong"))
 
     # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
@@ -327,9 +327,9 @@ async def change_password(
     if not code_ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "verification_code_invalid"))
 
-    user.auth_key_hash = hash_auth_key(req.new_auth_key_hash)
-    user.login_salt = req.new_login_salt
-    user.password_version += 1
+    user.local_password_hash = hash_auth_key(req.new_local_password_hash)
+    user.local_salt = req.new_local_salt
+    user.local_password_version += 1
     await revoke_all_user_tokens(db, user.id)  # 同一事务吊销旧 token（单次 commit，原子）
     await db.commit()
 
@@ -350,20 +350,20 @@ async def verify_password(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """语义1：每次解锁校验 authKey + password_version。
+    """语义1：每次解锁校验 authKey + local_password_version。
     401 密码错误 / 409 密码已在别处修改 / 200 ok。
     """
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
-    if not verify_auth_key(req.auth_key_hash, user.auth_key_hash):
+    if not verify_auth_key(req.local_password_hash, user.local_password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
 
-    if req.password_version != user.password_version:
+    if req.local_password_version != user.local_password_version:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "password_changed_elsewhere"))
 
-    return VerifyResponse(password_version=user.password_version, status="ok")
+    return VerifyResponse(local_password_version=user.local_password_version, status="ok")
 
 # ── Token 刷新 ─────────────────────────────────────
 
@@ -408,7 +408,7 @@ async def delete_account(
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
-    if not verify_auth_key(req.current_auth_key_hash, user.auth_key_hash or ""):
+    if not verify_auth_key(req.current_local_password_hash, user.local_password_hash or ""):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "current_password_wrong"))
     # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
     code_ok = (user.email and await verify_and_consume("email", user.email, req.verification_code)) or \

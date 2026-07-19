@@ -42,7 +42,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     async def override_get_db():
         # 忠实复刻生产 get_db：成功 commit、异常 rollback。
-        # 否则端点抛 4xx 时的中间写入（如恢复码失败计数）不会被回滚，
+        # 否则端点抛 4xx 时的中间写入（如助记词失败计数）不会被回滚，
         # 测试无法复现「异常回滚」相关的生产行为。
         try:
             yield db_session

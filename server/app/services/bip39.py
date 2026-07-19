@@ -1,8 +1,8 @@
-"""BIP39 标准 2048 词表 + 恢复码生成。
+"""BIP39 标准 2048 词表 + 助记词生成。
 
 词表为官方 BIP39 英文词表（https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt）。
-恢复码由服务端生成，HMAC-SHA256 哈希存储，校验不依赖词表（仅生成时选词），
-因此更换词表不影响已存在的恢复码。
+助记词由服务端生成，HMAC-SHA256 哈希存储，校验不依赖词表（仅生成时选词），
+因此更换词表不影响已存在的助记词。
 """
 
 import secrets
@@ -270,7 +270,7 @@ assert len(BIP39_WORDS) == 2048, f"Expected 2048 words, got {len(BIP39_WORDS)}"
 
 
 def generate_bip39_code(n_words: int = 12) -> str:
-    """生成 BIP39 恢复码（n 个单词，空格分隔）。
+    """生成 BIP39 助记词（n 个单词，空格分隔）。
 
     使用 secrets.randbelow(2048) 均匀选取。
     熵 = n_words * 11 bit = 132 bit (12 词)。

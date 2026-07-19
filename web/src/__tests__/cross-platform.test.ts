@@ -6,7 +6,7 @@
  *
  * Android 交叉验证步骤：
  * 1. 在 Android 端用固定密码和盐生成密钥
- * 2. 导出 authKeyHash / passwordWrapped / rsaPublicKey 等
+ * 2. 导出 localPasswordHash / passwordWrapped / rsaPublicKey 等
  * 3. 填入下方 ANDROID_TEST_VECTORS
  * 4. 运行此测试验证 Web 端产生相同输出
  */
