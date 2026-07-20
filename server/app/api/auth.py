@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.i18n import get_lang, get_text
-from app.middleware import get_current_user_id, require_not_in_cooldown
+from app.middleware import get_current_user_id
 from app.models import User, UserDevice
 from app.schemas.auth import (
     ChangePasswordRequest,
@@ -35,8 +35,6 @@ from app.schemas.auth import (
     RegisterResponse,
     SendCodeRequest,
     SendCodeResponse,
-    VerifyRequest,
-    VerifyResponse,
 )
 from app.services.auth_service import (
     DEFAULT_KDF_SETTINGS,
@@ -55,7 +53,6 @@ from app.services.auth_service import (
 )
 from app.services.email_service import send_recovery_alert, send_verification_email
 from app.services.google_auth_service import verify_google_id_token
-from app.services.recovery_service import clear_rollback_after_login, is_in_cooldown
 from app.services.sms_service import send_sms
 from app.services.verification_service import (
     check_rate_limit,
@@ -94,13 +91,12 @@ async def get_salt(email: Optional[str] = None, phone: Optional[str] = None, db:
             "local_salt": user.local_salt or "",
             "kdf_settings": kdf,
             "mnemonic_salt": keys.mnemonic_salt if keys else "",
-            "has_passphrase": user.has_passphrase or False,
         }
     target = email or phone or ""
     return {"local_salt": _derive_fake_salt(target),
             "kdf_settings": DEFAULT_KDF_SETTINGS,
             "mnemonic_salt": _derive_fake_salt(target),
-            "has_passphrase": False}
+}
 
 def _derive_fake_salt(target: str) -> str:
     """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。
@@ -155,7 +151,6 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
     user = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
         local_password_hash=req.local_password_hash, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
-        has_passphrase=req.has_passphrase,
         mnemonic_hash=recovery_hash, mnemonic_hmac_salt=req.mnemonic_hmac_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
@@ -181,7 +176,6 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
     user = await create_user_with_keys(db=db, email=None, phone=req.phone, google_id=None,
         local_password_hash=req.local_password_hash, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
-        has_passphrase=req.has_passphrase,
         mnemonic_hash=recovery_hash, mnemonic_hmac_salt=req.mnemonic_hmac_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
@@ -205,7 +199,6 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
     user = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
         local_password_hash=req.local_password_hash, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
-        has_passphrase=req.has_passphrase,
         mnemonic_hash=recovery_hash, mnemonic_hmac_salt=req.mnemonic_hmac_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
@@ -228,7 +221,6 @@ async def _build_login_response(db: AsyncSession, user) -> LoginResponse:
         local_salt=user.local_salt or "",
         encrypted_user_key=keys.encrypted_user_key if keys else "",
         mnemonic_salt=keys.mnemonic_salt if keys else "",
-        has_passphrase=user.has_passphrase or False,
         devices=[DeviceInfo(id=str(d.id), device_name=d.device_name, device_wrapped=d.device_wrapped) for d in devices],
     )
 
@@ -245,15 +237,10 @@ async def login_email(req: LoginEmailRequest, request: Request, db: AsyncSession
         hash_auth_key(req.local_password_hash)
         await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
-    # 恢复冷却期：账户锁定，拒绝登录（纯读，零写入）
-    if await is_in_cooldown(db, user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
     if not verify_auth_key(req.local_password_hash, user.local_password_hash):
         await record_login_failure("email", req.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
     await clear_login_failures("email", req.email)
-    # 冷却已结束且新密码登录成功 -> 清理 rollback（押后，清不掉无害）
-    await clear_rollback_after_login(db, user.id)
     return await _build_login_response(db, user)
 
 
@@ -270,15 +257,10 @@ async def login_phone(req: LoginPhoneRequest, request: Request, db: AsyncSession
         hash_auth_key(req.local_password_hash)
         await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
-    # 恢复冷却期：账户锁定，拒绝登录（纯读，零写入）
-    if await is_in_cooldown(db, user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
     if not verify_auth_key(req.local_password_hash, user.local_password_hash):
         await record_login_failure("phone", req.phone)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "phone_or_password_wrong"))
     await clear_login_failures("phone", req.phone)
-    # 冷却已结束且新密码登录成功 -> 清理 rollback（押后，清不掉无害）
-    await clear_rollback_after_login(db, user.id)
     return await _build_login_response(db, user)
 
 
@@ -295,12 +277,7 @@ async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSessi
     if not user:
         await record_login_failure("google", google_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "google_not_registered"))
-    # 恢复冷却期：账户锁定（与 email/phone 登录一致，零窗口）
-    if await is_in_cooldown(db, user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_t(request, "account_in_cooldown"))
     await clear_login_failures("google", google_id)
-    # 冷却已结束且新密码登录成功 -> 清理 rollback（押后，清不掉无害）
-    await clear_rollback_after_login(db, user.id)
     return await _build_login_response(db, user)
 
 
@@ -310,10 +287,10 @@ async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSessi
 async def change_password(
     req: ChangePasswordRequest,
     request: Request,
-    user_id: UUID = Depends(require_not_in_cooldown),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """模型 D 改密：只改本地密码认证字段（authKey+local_salt+local_password_version），不改 K/User Key。"""
+    """改主密码：主密码参与 K 派生，更新 encrypted_user_key（前端用助记词+新主密码派生新 K 重新包裹）。"""
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
@@ -329,7 +306,9 @@ async def change_password(
 
     user.local_password_hash = hash_auth_key(req.new_local_password_hash)
     user.local_salt = req.new_local_salt
-    user.local_password_version += 1
+    keys = await get_user_keys(db, user_id)
+    if keys:
+        keys.encrypted_user_key = req.new_encrypted_user_key
     await revoke_all_user_tokens(db, user.id)  # 同一事务吊销旧 token（单次 commit，原子）
     await db.commit()
 
@@ -340,30 +319,6 @@ async def change_password(
     return ChangePasswordResponse(success=True, access_token=access_token, refresh_token=refresh_token)
 
 
-
-# ── 密码校验（语义1：每次解锁服务端校验）──────────
-
-@router.post("/verify", response_model=VerifyResponse)
-async def verify_password(
-    req: VerifyRequest,
-    request: Request,
-    user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
-):
-    """语义1：每次解锁校验 authKey + local_password_version。
-    401 密码错误 / 409 密码已在别处修改 / 200 ok。
-    """
-    user = await db.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
-
-    if not verify_auth_key(req.local_password_hash, user.local_password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "email_or_password_wrong"))
-
-    if req.local_password_version != user.local_password_version:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "password_changed_elsewhere"))
-
-    return VerifyResponse(local_password_version=user.local_password_version, status="ok")
 
 # ── Token 刷新 ─────────────────────────────────────
 
@@ -387,7 +342,7 @@ async def logout(user_id: UUID = Depends(get_current_user_id), db: AsyncSession 
 # ── 设备注册 ─────────────────────────────────────
 
 @router.post("/register-device", response_model=RegisterDeviceResponse)
-async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(require_not_in_cooldown), db: AsyncSession = Depends(get_db)):
+async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     device = UserDevice(user_id=user_id, device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
     db.add(device)
     await db.commit()
@@ -401,7 +356,7 @@ async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(re
 async def delete_account(
     req: DeleteAccountRequest,
     request: Request,
-    user_id: UUID = Depends(require_not_in_cooldown),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """注销账号。需当前密码 + 验证码（绑定用户注册联系方式）确认。"""

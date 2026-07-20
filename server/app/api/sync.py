@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.config import settings
-from app.middleware import require_not_in_cooldown
+from app.middleware import get_current_user_id
 from app.models import Item
 from app.schemas.sync import (
     SyncDeleteRequest,
@@ -31,7 +31,7 @@ async def sync_pull(
     since: str = Query(..., description="ISO8601 时间戳，拉取此时间之后更新的条目"),
     since_id: Optional[UUID] = Query(None, description="上一页最后一条 id，与 since 组成复合游标防同 updated_at 跨页丢失"),
     limit: int = Query(settings.sync_batch_limit, ge=1, le=500),
-    user_id: UUID = Depends(require_not_in_cooldown),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """拉取自 since 以来更新的条目（包括软删除的）。
@@ -88,7 +88,7 @@ async def sync_pull(
 @router.post("/push", response_model=SyncPushResponse)
 async def sync_push(
     req: SyncPushRequest,
-    user_id: UUID = Depends(require_not_in_cooldown),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """上传本地修改的条目。乐观并发：按 version 检测冲突（不依赖时钟）。
@@ -176,7 +176,7 @@ async def sync_push(
 @router.post("/delete", response_model=SyncDeleteResponse)
 async def sync_delete(
     req: SyncDeleteRequest,
-    user_id: UUID = Depends(require_not_in_cooldown),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """软删除条目。"""

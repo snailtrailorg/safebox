@@ -12,29 +12,27 @@
 | 邮箱登录 | authKey 比对 | `POST /auth/login/email` |
 | 手机号登录 | 验证码 + authKey | `POST /auth/login/phone` |
 | Google 登录 | 仅凭 Google ID Token 登录（不校验 authKey） | `POST /auth/login/google` |
-| 密码校验 | 每次解锁服务端校验 authKey + local_password_version | `POST /auth/verify` |
-| 改密 | 当前密码 + 验证码双因子，改 authKey + local_salt + local_password_version+1 | `POST /auth/change-password` |
-| GET salt | 返回 local_salt + kdf_settings + mnemonic_salt + has_passphrase | `GET /auth/salt` |
-| 设备注册 | 已登录用户添加设备（串行化模型下字段值为占位） | `POST /auth/register-device` |
+| 改密 | 当前密码 + 验证码双因子，改 authKey + local_salt + 重新包裹 encrypted_user_key（K 变，需助记词） | `POST /auth/change-password` |
+| GET salt | 返回 local_salt + kdf_settings + mnemonic_salt | `GET /auth/salt` |
+| 设备注册 | 已登录用户添加设备（合并主密码模型下字段值为占位） | `POST /auth/register-device` |
 | 登出 | 撤销该用户所有 token family | `POST /auth/logout` |
 | 注销 | 验证码确认 | `DELETE /auth/account` |
 | refresh 轮换 | TokenFamily + FOR UPDATE 行锁，重放全线失效 | `POST /auth/refresh-token` |
 
-> 注册请求体含 `device_name / device_public_key / device_wrapped`（optional，串行化模型下传占位值 `"web"` / `"Web Browser"`）。
+> 注册请求体含 `device_name / device_public_key / device_wrapped`（optional，合并主密码模型下传占位值 `"web"` / `"Web Browser"`）。
 
-## 二、密钥层次（模型 D 串行化）
+## 二、密钥层次（合并主密码模型）
 
 | 功能 | 描述 |
 |------|------|
-| K 派生 | `K = PBKDF2(助记词 [+ Passphrase], mnemonic_salt, 600k)`，永久不变，K 不存服务器 |
+| K 派生 | `K = PBKDF2(助记词+主密码, mnemonic_salt, 600k)`，永久不变，K 不存服务器 |
 | User Key | 随机 AES-256，包裹 Item Keys |
 | encrypted_user_key | `AES(K, User Key)`，存服务器 |
 | cached_K | `AES(localDerivedKey, K)`，存本地 IndexedDB session store |
-| authKey | `PBKDF2(本地密码, local_salt+"auth", 600k)` base64，服务端认证（bcrypt） |
-| localDerivedKey | `PBKDF2(本地密码, local_salt, 600k)`，本地缓存 K |
-| 改本地密码 | K/User Key 不变，本地重包 cached_K（`rewrapCachedK`） |
-| Passphrase（可选） | K 的加强因子，永久不可改；当前 UI 默认空（`has_passphrase=false`） |
-| 助记词解锁 | `K = PBKDF2(助记词, mnemonic_salt)` → 解 encrypted_user_key → User Key |
+| authKey | `PBKDF2(主密码, local_salt+"auth", 600k)` base64，服务端认证（bcrypt） |
+| localDerivedKey | `PBKDF2(主密码, local_salt, 600k)`，本地缓存 K |
+| 改主密码 | K 变（主密码参与派生），需助记词重派生 K + 重新包裹 encrypted_user_key + 新 cached_K（`changeMasterPassword`，替代 `rewrapCachedK`） |
+| 助记词解锁 | `K = PBKDF2(助记词+主密码, mnemonic_salt)` → 解 encrypted_user_key → User Key |
 | PBKDF2 迭代数 | 600,000，可配置（`kdf_settings` JSON：`{algorithm, iterations}`） |
 | auth salt 域 | `deriveAuthKey` 在 salt 后追加 4 字节 `"auth"`，与 authKey 派生隔离 |
 
@@ -57,14 +55,9 @@
 | 助记词生成 | 客户端 BIP39 12 词（132bit），注册时生成并上传明文，模态框展示一次 | 注册时（RegisterPage） |
 | mnemonic_hmac_salt | 客户端生成（32 字节 hex），随注册上传，HMAC 验码用盐 | 注册时 |
 | HMAC 验证 | `HMAC-SHA256(server_key, salt + normalized_mnemonic)` hex 存储 | initiate |
-| 两步 initiate | 步骤1 验码返回 encrypted_user_key + mnemonic_salt + initiate_token（15min）/ 步骤2 confirm 写正式 | `POST /auth/recovery/initiate` + `/confirm` |
-| 冷却期 24h | confirm 时 `status=cooldown, cooldown_until=now+24h`，吊销所有 token | confirm |
-| 加速通道 | 验证码 + 签名 token 立即解除冷却 | `POST /auth/recovery/accelerate` |
-| 冻结 | 签名 token 回滚旧 authKey + local_salt + local_password_version | `POST /auth/recovery/freeze` |
-| 状态查询 | 返回 status + cooldown_until（纯读，不挂冷却门） | `GET /auth/recovery/status` |
+| initiate | 验助记词返回 encrypted_user_key + mnemonic_salt（换设备用；web 实际走 login + recoverAndRewrap，端点为死代码） | `POST /auth/recovery/initiate` |
 | 无失败锁定 | 助记词 132bit 不可暴破，不累积计数、不锁定 | initiate |
-| 冷却零窗口 | revoke refresh + `require_not_in_cooldown` 中间件挡 sync/register-device/account/change-password | confirm + middleware |
-| 签名 token | JWT HS256，密钥 `recovery_signing_key`（未配置回退 `jwt_secret_key`），24h | accelerate/freeze |
+| 忘主密码 | 主密码参与 K 派生，忘主密码 = 数据丢失（无恢复，无冷却/加速/冻结） | - |
 
 ## 五、条目同步
 
@@ -107,7 +100,6 @@
 | JWT type 校验 | 中间件强制 type="access"，防 refresh 冒充 |
 | JWT 参数 | access 30 分钟 / refresh 30 天，HS256 |
 | refresh rotation | TokenFamily + FOR UPDATE + 重放全线失效 |
-| 冷却门 | `require_not_in_cooldown` 挂数据访问端点 |
 | CORS | 通配符源时 disable credentials |
 | Google OAuth | 未配置 `google_client_id` 抛 RuntimeError |
 
@@ -117,7 +109,7 @@
 |------|------|
 | 登录页 | 三种登录方式 Tab | `/login` |
 | 注册页 | 三种注册方式 Tab + 助记词模态框展示一次 | `/register` |
-| 恢复页 | 两步 initiate + 冷却倒计时 | `/recovery` |
+| 恢复页 | 换设备：助记词 + 主密码派生 K 解 encrypted_user_key + 建本地缓存 | `/recovery` |
 | 密码库列表 | 条目列表 + FAB 新建 + 左滑删除 | `/` |
 | 条目详情 | 5 种类型查看 | `/item/:did` |
 | 条目编辑 | 新建显示类型选择器（radio 横排 + 说明），编辑跳过 | `/item/new/:type`、`/item/:did/edit` |
@@ -126,7 +118,7 @@
 | 备份导入 | 解密 .safebox 还原条目（置脏触发同步） | `/settings/import` |
 | 自动锁定 | useAutoLock，20 分钟空闲超时，提前 60 秒倒计时告警 | 全局 |
 | IndexedDB | session + items（by-uid/by-serverId/by-dirty 索引）+ fileBlobs |
-| keyChain 单例 | generateKeys / unlockWithPassword / unlockFromMnemonic / rewrapCachedK / encryptItemField / decryptItemField / encryptFileBlob / decryptFileBlob |
+| keyChain 单例 | generateKeys(mnemonic, masterPassword) / unlockWithPassword / unlockFromMnemonic / recoverAndRewrap / changeMasterPassword / encryptItemField / decryptItemField / encryptFileBlob / decryptFileBlob |
 | i18n | 中/英双语，navigator.language 检测 |
 | AuthGuard/GuestGuard | 路由守卫；401 自动 refresh token |
 
@@ -134,9 +126,9 @@
 
 | 表 | 关键字段 |
 |------|---------|
-| users | id, email, phone, google_id, local_password_hash, local_salt, kdf_settings, local_password_version, has_passphrase, created_at, updated_at |
+| users | id, email, phone, google_id, local_password_hash, local_salt, kdf_settings, created_at, updated_at |
 | user_keys | user_id, encrypted_user_key, mnemonic_salt, created_at, updated_at |
-| mnemonics | user_id, mnemonic_hash, mnemonic_hmac_salt, status, cooldown_until, rollback_local_password_hash, rollback_local_salt, rollback_local_password_version, pending_initiate_token, pending_initiate_at, pending_new_local_password_hash, pending_new_local_salt |
+| mnemonics | user_id, mnemonic_hash, mnemonic_hmac_salt, created_at |
 | token_families | user_id, family, active_token_hash, used_at |
 | user_devices | user_id, device_name, device_public_key, device_wrapped, last_active_at |
 | items | id, user_id, client_did, type, icon, name(EncryptedField JSON), description, data, version, is_deleted, updated_at, created_at |
@@ -151,12 +143,11 @@
 
 | 项 | 说明 |
 |------|------|
-| register-device 占位 | 串行化模型下跨设备用助记词，`device_public_key/device_wrapped` 传占位值 `"web"` |
+| register-device 占位 | 合并主密码模型下跨设备用助记词，`device_public_key/device_wrapped` 传占位值 `"web"` |
 | RSA 工具死代码 | `crypto/rsa.ts` 保留但全项目无引用；keyChain 无 RSA v1 兼容函数 |
 | 文件 blob 不同步 | 多设备间文件内容不同步，仅元数据同步 |
 | logout 不清本地密钥 | 退出只清 token，保留 cached_K / encrypted_user_key（重新登录可解锁） |
 | sync_batch_limit | config.py 声明=100，但代码未引用（pull limit 用 Query 默认，max 500 硬编码） |
 | Google Client ID | 前端 constants.ts 有调试 fallback 写死在 bundle 内 |
-| 死路由 | `/register/recovery` + MnemonicPage 无 navigate 指向，注册成功直接 `/` |
 | 登录限流无 8 秒档 | 实际序列 0,0,1,2,4 → 锁 1h |
 | 助记词永久有效 | 不过期/不重置/不重生成；无作废机制（revoke 端点已移除，助记词不可主动作废） |

@@ -15,8 +15,6 @@ const EMPTY_SESSION: SessionData = {
   cached_K: "",
   encrypted_user_key: "",
   mnemonic_salt: "",
-  local_password_version: 0,
-  has_passphrase: false,
   lastSyncTime: "2020-01-01T00:00:00+00:00",
   lastSyncId: null,
 };

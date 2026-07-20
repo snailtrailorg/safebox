@@ -8,7 +8,6 @@ REGISTER_PAYLOAD = {
     "local_salt": "salt",
     "encrypted_user_key": "fake-euk",
     "mnemonic_salt": "rec-salt",
-    "has_passphrase": False,
     "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
     "mnemonic_hmac_salt": "rec-code-salt",
     "device_name": "Test Device",
@@ -300,7 +299,8 @@ async def test_change_password(client: AsyncClient):
         "target": "email", "value": "cp@safebox.example.com",
         "verification_code": "123456",
         "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
-        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt"
+        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt",
+        "new_encrypted_user_key": "new_euk"
     }, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["success"] is True
@@ -322,7 +322,8 @@ async def test_change_password_sends_security_alert(client: AsyncClient):
             "target": "email", "value": "cpalert@safebox.example.com",
             "verification_code": "123456",
             "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
-            "new_local_password_hash": "new_hash", "new_local_salt": "new_salt"
+            "new_local_password_hash": "new_hash", "new_local_salt": "new_salt",
+            "new_encrypted_user_key": "new_euk"
         }, headers=headers)
         assert resp.status_code == 200
         # 告警已发送，event=password_changed
@@ -343,7 +344,8 @@ async def test_change_password_wrong_current(client: AsyncClient):
         "target": "email", "value": "cpwrong@safebox.example.com",
         "verification_code": "123456",
         "current_local_password_hash": "wrong_current_hash",
-        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt"
+        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt",
+        "new_encrypted_user_key": "new_euk"
     }, headers=headers)
     assert resp.status_code == 401
 

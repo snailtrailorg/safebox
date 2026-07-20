@@ -23,21 +23,12 @@ def upgrade() -> None:
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('mnemonic_hash', sa.String(length=128), nullable=False),
         sa.Column('mnemonic_hmac_salt', sa.String(length=64), nullable=False),
-        sa.Column('status', sa.String(length=32), nullable=False, server_default='active'),
-        sa.Column('cooldown_until', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('rollback_local_password_hash', sa.String(length=128), nullable=True),
-        sa.Column('rollback_local_salt', sa.String(length=128), nullable=True),
-        sa.Column('rollback_local_password_version', sa.Integer(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('pending_initiate_token', sa.String(length=128), nullable=True),
-        sa.Column('pending_initiate_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('pending_new_local_password_hash', sa.String(length=128), nullable=True),
-        sa.Column('pending_new_local_salt', sa.String(length=128), nullable=True),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('user_id')
     )
-    op.create_index('idx_mnemonics_user', 'mnemonics', ['user_id', 'status'])
+    op.create_index('idx_mnemonics_user', 'mnemonics', ['user_id'])
 
 
 def downgrade() -> None:

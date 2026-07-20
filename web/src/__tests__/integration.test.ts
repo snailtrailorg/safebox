@@ -198,7 +198,6 @@ describe("IndexedDB — sessionStore", () => {
       localSalt: "salt-base64",
       encrypted_user_key: "wrapped-base64",
       mnemonic_salt: "enc-priv-base64",
-      has_passphrase: false,
       lastSyncTime: "2025-06-01T00:00:00+00:00",
     });
 

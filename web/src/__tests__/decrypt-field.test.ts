@@ -10,7 +10,6 @@ describe("keyChain encryptItemField / decryptItemField round-trip", () => {
     // generateKeys 设 userKey（单例），供字段加解密使用
     await keyChain.generateKeys(
       "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
-      "",
       "test-login-password",
     );
   });

@@ -63,21 +63,19 @@ async def create_user_with_keys(
     phone: Optional[str],
     google_id: Optional[str],
     local_password_hash: str,          # 客户端 PBKDF2 派生的 authKey（base64），服务端再 bcrypt
-    local_salt: str,             # 本地密码派生用盐
+    local_salt: str,                   # 主密码派生用盐
     kdf_settings: Optional[dict],
-    encrypted_user_key: str,     # AES(K, User Key)，K = PBKDF2(助记词[+Passphrase], mnemonic_salt)
-    mnemonic_salt: str,          # K 派生用盐
-    has_passphrase: bool,
-    mnemonic_hash: str,    # HMAC(server_key, salt+mnemonic)
-    mnemonic_hmac_salt: str,    # HMAC 验码用盐
+    encrypted_user_key: str,           # AES(K, User Key)，K = PBKDF2(助记词+主密码, mnemonic_salt)
+    mnemonic_salt: str,                # K 派生用盐
+    mnemonic_hash: str,               # HMAC(server_key, salt+mnemonic)
+    mnemonic_hmac_salt: str,           # HMAC 验码用盐
     device_name: Optional[str] = None,
     device_public_key: str = "web",
     device_wrapped: str = "web",
 ) -> User:
-    """模型 D 注册：创建 user + user_keys + mnemonic + device。
+    """注册：创建 user + user_keys + mnemonic + device。
 
-    服务端不存任何密码密文（无 password_wrapped）。
-    encrypted_user_key 用 K 包裹 User Key，K 不在服务器。
+    服务端不存任何密码密文。encrypted_user_key 用 K 包裹 User Key，K 不在服务器。
     """
     hashed_auth_key = hash_auth_key(local_password_hash)
 
@@ -88,8 +86,6 @@ async def create_user_with_keys(
         local_password_hash=hashed_auth_key,
         local_salt=local_salt,
         kdf_settings=json.dumps(kdf_settings or DEFAULT_KDF_SETTINGS),
-        local_password_version=0,
-        has_passphrase=has_passphrase,
     )
     db.add(user)
     await db.flush()
@@ -106,7 +102,6 @@ async def create_user_with_keys(
         user_id=user.id,
         mnemonic_hash=mnemonic_hash,
         mnemonic_hmac_salt=mnemonic_hmac_salt,
-        status="active",
     )
     db.add(rc)
 

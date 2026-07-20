@@ -48,8 +48,6 @@ export interface SessionData {
   cached_K: string;             // AES(K, PBKDF2(本地密码))，本地缓存 K
   encrypted_user_key: string;   // AES(K, User Key)，从服务器获取
   mnemonic_salt: string;        // K 派生用盐
-  local_password_version: number;     // 改本地密码 +1
-  has_passphrase: boolean;
   lastSyncTime: string;
   lastSyncId: string | null;     // 上次同步最后一条 server_id，与 lastSyncTime 组成复合游标
 }

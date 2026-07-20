@@ -41,7 +41,6 @@ export function RegisterPage() {
   const [tab, setTab] = useState<RegisterTab>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [passphrase, setMasterPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -118,7 +117,7 @@ export function RegisterPage() {
       // 生成助记词（BIP39 12 词）+ salt，用于派生 K
       const mnemonic = generateMnemonic();
       const mnemonicHmacSalt = generateMnemonicSalt();
-      const keys = await keyChain.generateKeys(mnemonic, passphrase, password);
+      const keys = await keyChain.generateKeys(mnemonic, password);
       let tokens: { access_token: string; refresh_token: string; user_id: string } | null = null;
       if (tab === "email") {
         const response = await apiClient.registerEmail({
@@ -133,7 +132,6 @@ export function RegisterPage() {
         await saveSession({
           email, localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
-          has_passphrase: !!passphrase, local_password_version: 0,
         });
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
@@ -148,7 +146,6 @@ export function RegisterPage() {
         await saveSession({
           email: phone, localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
-          has_passphrase: !!passphrase, local_password_version: 0,
         });
       } else {
         const response = await apiClient.registerGoogle({
@@ -163,7 +160,6 @@ export function RegisterPage() {
         await saveSession({
           email: "google", localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
-          has_passphrase: !!passphrase, local_password_version: 0,
         });
       }
 
@@ -268,14 +264,6 @@ export function RegisterPage() {
         )}
       </div>
 
-      {/* 可选Passphrase - 与助记词一起派生 K，加强加密；永久不可改 */}
-      <div style={{ marginTop: "0.75rem", padding: "0.75rem", background: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-        <PasswordInput label={t("auth.register.passphraseLabel")} value={passphrase} onChange={(e) => setMasterPassword(e.target.value)} placeholder={t("auth.register.passphrasePlaceholder")} />
-        <p style={{ fontSize: "0.75rem", color: "#999", marginTop: "0.4rem", lineHeight: 1.4 }}>
-          {t("auth.register.passphraseHint")}
-        </p>
-      </div>
-
       <button onClick={handleRegister} disabled={loading}
         style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
         {loading ? t("common.registering") : t("auth.register.submitBtn")}
@@ -291,7 +279,7 @@ export function RegisterPage() {
           <div style={{ background: "#fff", borderRadius: 12, padding: "2rem", maxWidth: 480, width: "90%", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
             <h2 style={{ color: "#0f3460", marginBottom: "0.5rem" }}>🔐 助记词</h2>
             <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: "1rem" }}>
-              请妥善保存以下 12 个词，这是您忘记本地密码后恢复数据的唯一途径。此助记词仅显示一次，无法再次查看。
+              请妥善保存以下 12 个词。主密码参与加密密钥派生，忘主密码后需凭助记词在新设备恢复数据。此助记词仅显示一次，无法再次查看。
             </p>
             <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "1rem", fontFamily: "monospace", fontSize: "1rem", lineHeight: 1.8, wordBreak: "break-all", marginBottom: "1rem" }}>
               {mnemonic}
@@ -301,13 +289,8 @@ export function RegisterPage() {
               {t("auth.register.copyMnemonic")}
             </button>
             <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
-              ⚠️ 丢失助记词 + 忘记本地密码 = 数据永久丢失
+              ⚠️ 忘主密码且无助记词 = 数据永久丢失（主密码参与加密，无法重置）
             </p>
-            {passphrase && (
-              <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
-                ⚠️ 您设置了Passphrase，恢复数据时需同时输入助记词和Passphrase。请一并妥善保存Passphrase（永久不可改）。
-              </p>
-            )}
             <button onClick={() => {
               if (pendingTokens) {
                 login(pendingTokens.access_token, pendingTokens.refresh_token, pendingTokens.user_id);

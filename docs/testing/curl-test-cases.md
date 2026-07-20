@@ -40,7 +40,7 @@ curl -s $BASE/health
 
 ```bash
 curl -s "$BASE/api/v1/auth/salt?email=$EMAIL"
-# 200 {"local_salt":"...","kdf_settings":{"algorithm":"pbkdf2","iterations":600000},"mnemonic_salt":"...","has_passphrase":false}
+# 200 {"local_salt":"...","kdf_settings":{"algorithm":"pbkdf2","iterations":600000},"mnemonic_salt":"..."}
 # 不存在的用户返回确定性伪造 salt（base64(HMAC-SHA256(jwt_secret, target))），不可区分
 ```
 
@@ -66,7 +66,6 @@ curl -s -X POST $BASE/api/v1/auth/register/email \
     \"local_salt\":\"$LOGIN_SALT\",
     \"encrypted_user_key\":\"fake-euk\",
     \"mnemonic_salt\":\"$RECOVERY_SALT\",
-    \"has_passphrase\":false,
     \"mnemonic\":\"$RECOVERY_CODE\",
     \"mnemonic_hmac_salt\":\"$RECOVERY_CODE_SALT\",
     \"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"
@@ -86,7 +85,6 @@ curl -s -X POST $BASE/api/v1/auth/register/phone \
     \"local_salt\":\"$LOGIN_SALT\",
     \"encrypted_user_key\":\"fake-euk\",
     \"mnemonic_salt\":\"$RECOVERY_SALT\",
-    \"has_passphrase\":false,
     \"mnemonic\":\"$RECOVERY_CODE\",
     \"mnemonic_hmac_salt\":\"$RECOVERY_CODE_SALT\",
     \"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"
@@ -106,7 +104,6 @@ curl -s -X POST $BASE/api/v1/auth/register/google \
     \"local_salt\":\"$LOGIN_SALT\",
     \"encrypted_user_key\":\"fake-euk\",
     \"mnemonic_salt\":\"$RECOVERY_SALT\",
-    \"has_passphrase\":false,
     \"mnemonic\":\"$RECOVERY_CODE\",
     \"mnemonic_hmac_salt\":\"$RECOVERY_CODE_SALT\",
     \"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"
@@ -121,9 +118,8 @@ curl -s -X POST $BASE/api/v1/auth/register/google \
 curl -s -X POST $BASE/api/v1/auth/login/email \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"local_password_hash\":\"$AUTH_HASH\"}"
-# 200 {"user_id":"...","access_token":"...","refresh_token":"...","local_salt":"...","encrypted_user_key":"...","mnemonic_salt":"...","has_passphrase":false,"devices":[...]}
+# 200 {"user_id":"...","access_token":"...","refresh_token":"...","local_salt":"...","encrypted_user_key":"...","mnemonic_salt":"...","devices":[...]}
 # 限流：第 1 次不限制；2-4 次 1/2/4 秒退避；第 5 次起 429 login_rate_limited(seconds=N) + 锁 1h
-# 恢复冷却期 -> 403 account_in_cooldown
 ```
 
 ## TC-08 手机号登录
@@ -142,25 +138,12 @@ curl -s -X POST $BASE/api/v1/auth/login/google \
   -H "Content-Type: application/json" \
   -d "{\"google_id_token\":\"$GOOGLE_ID_TOKEN\"}"
 # 200 响应同 login/email（凭 Google ID Token 登录，不校验 local_password_hash）
-# 冷却期内 403 account_in_cooldown（与 email/phone 登录一致，零窗口）
-```
-
-## TC-10 密码校验（每次解锁）
-
-```bash
-TOKEN="<从 TC-07 获取>"
-curl -s -X POST $BASE/api/v1/auth/verify \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"local_password_hash\":\"$AUTH_HASH\",\"local_password_version\":0}"
-# 200 {"local_password_version":0,"status":"ok"}
-# 密码错 -> 401；别处改密 version 不符 -> 409 password_changed_elsewhere
-# 冷却期仍 200（纯认证校验，不下发数据）
 ```
 
 ## TC-11 改密
 
 ```bash
+TOKEN="<从 TC-07 获取>"
 curl -s -X POST $BASE/api/v1/auth/change-password \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -168,11 +151,12 @@ curl -s -X POST $BASE/api/v1/auth/change-password \
     \"target\":\"email\",\"value\":\"$EMAIL\",\"verification_code\":\"123456\",
     \"current_local_password_hash\":\"$AUTH_HASH\",
     \"new_local_password_hash\":\"new_hash\",
-    \"new_local_salt\":\"new_salt\"
+    \"new_local_salt\":\"new_salt\",
+    \"new_encrypted_user_key\":\"fake-euk-new\"
   }"
 # 200 {"success":true,"access_token":"...","refresh_token":"..."}
 # target/value 字段保留兼容但服务端忽略，验证码必须发到用户注册邮箱/手机
-# local_password_version+1 + 单 commit 原子吊销所有 token
+# 主密码参与 K 派生，K 变 -> new_encrypted_user_key 重新包裹 + 单 commit 原子吊销所有 token
 ```
 
 ## TC-12 refresh token
@@ -203,7 +187,7 @@ curl -s -X POST $BASE/api/v1/auth/register-device \
   -H "Content-Type: application/json" \
   -d "{\"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"}"
 # 200 {"device_id":"..."}
-# 串行化模型下 device_public_key/device_wrapped 为占位值，跨设备用助记词
+# 合并主密码模型下 device_public_key/device_wrapped 为占位值，跨设备用助记词
 ```
 
 ## TC-15 注销账号
@@ -223,68 +207,18 @@ curl -s -X DELETE $BASE/api/v1/auth/account \
 
 # 二、助记词
 
-## TC-16 恢复 initiate（步骤1）
+## TC-16 恢复 initiate（换设备）
 
 ```bash
 curl -s -X POST $BASE/api/v1/auth/recovery/initiate \
   -H "Content-Type: application/json" \
   -d "{
     \"target\":\"email\",\"value\":\"$EMAIL\",
-    \"mnemonic\":\"$RECOVERY_CODE\",
-    \"new_local_password_hash\":\"new_hash\",
-    \"new_local_salt\":\"new_salt\"
+    \"mnemonic\":\"$RECOVERY_CODE\"
   }"
-# 200 {"encrypted_user_key":"...","mnemonic_salt":"...","initiate_token":"..."}
-# 15min 有效；不改正式字段、不进冷却
+# 200 {"encrypted_user_key":"...","mnemonic_salt":"..."}
+# 验助记词返回 encrypted_user_key + mnemonic_salt（换设备用；web 实际走 login + recoverAndRewrap，端点为死代码）
 # 助记词错 / 用户不存在 -> 均返回 401 mnemonic_invalid（防枚举，不返回 404）
-# 已有未过期 pending_initiate -> 409 recovery_already_pending
-```
-
-## TC-17 恢复 confirm（步骤2）
-
-```bash
-INIT_TOKEN="<从 TC-16 获取>"
-curl -s -X POST $BASE/api/v1/auth/recovery/confirm \
-  -H "Content-Type: application/json" \
-  -d "{\"initiate_token\":\"$INIT_TOKEN\"}"
-# 200 {"cooldown_until":"<ISO8601, now+24h>"}
-# 写正式新密码 + 存 rollback + status=cooldown + revoke 所有 token + 发告警（含 accelerate/freeze 签名链接）
-```
-
-## TC-18 恢复 status
-
-```bash
-curl -s $BASE/api/v1/auth/recovery/status \
-  -H "Authorization: Bearer $TOKEN"
-# 200 {"status":"active|cooldown","cooldown_until":"ISO8601|null"}
-```
-
-## TC-19 恢复 accelerate（验证码 + 签名 token 解除冷却）
-
-```bash
-# signed_token 从 TC-17 confirm 的告警邮件获取（含 cd 绑定本次冷却实例，24h 有效，一次性）
-SIGNED_TOKEN="<从告警邮件 accelerate 链接获取>"
-curl -s -X POST $BASE/api/v1/auth/recovery/accelerate \
-  -H "Content-Type: application/json" \
-  -d "{\"signed_token\":\"$SIGNED_TOKEN\",\"verification_code\":\"123456\"}"
-# 204（验证码发到用户注册联系方式；手机用户走 SMS；status=active，清 rollback）
-# cd 与当前冷却实例不符 -> 400 recovery_token_invalid（防跨冷却周期重放）
-```
-
-> dev 模式无邮件，可手动签发（密钥为 `SAFEBOX_RECOVERY_SIGNING_KEY`，留空回退 `jwt_secret_key`）：
-> ```python
-> import jwt
-> tok = jwt.encode({"sub":"<user_id>","action":"accelerate","rc_id":"<rc_id>","cd":"<cooldown_until iso>"}, RECOVERY_SIGNING_KEY or JWT_SECRET, algorithm="HS256")
-> ```
-
-## TC-20 恢复 freeze（签名 token 回滚旧密码）
-
-```bash
-SIGNED_TOKEN="<从告警邮件 freeze 链接获取>"
-curl -s -X POST $BASE/api/v1/auth/recovery/freeze \
-  -H "Content-Type: application/json" \
-  -d "{\"signed_token\":\"$SIGNED_TOKEN\"}"
-# 204（无需验证码；回滚 authKey+local_salt+local_password_version = rollback_*；status=active）
 ```
 
 ---
@@ -358,14 +292,4 @@ for i in 1 2 3 4 5; do
     -d "{\"email\":\"$EMAIL\",\"local_password_hash\":\"wrong\"}"
 done
 # 401 401 401 401 429（第 5 次起 429 login_rate_limited(seconds=3600)）
-```
-
-## TC-28 冷却期访问 403
-
-```bash
-# TC-17 confirm 后账户进 24h 冷却期
-curl -s -X GET "$BASE/api/v1/sync/pull?since=2020-01-01T00%3A00%3A00%2B00%3A00" \
-  -H "Authorization: Bearer $TOKEN"
-# 403 account_in_cooldown（require_not_in_cooldown 挡所有数据访问端点，零窗口）
-# /verify 仍 200（纯认证）；accelerate/freeze/status 豁免
 ```

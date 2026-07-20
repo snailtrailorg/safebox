@@ -15,10 +15,10 @@ export interface RegisterEmailRequest {
   verification_code: string;
   local_password_hash: string;
   local_salt: string;
-  encrypted_user_key: string;     // AES(K, User Key), K=PBKDF2(助记词[+Passphrase],mnemonic_salt)
+  encrypted_user_key: string;     // AES(K, User Key), K=PBKDF2(助记词+主密码,mnemonic_salt)
   mnemonic_salt: string;          // K 派生用盐
   kdf_settings?: Record<string, unknown>;
-  has_passphrase?: boolean;
+
   mnemonic: string;          // 助记词明文（服务端接收一次，HMAC hash 存储）
   mnemonic_hmac_salt: string;     // HMAC 验码用盐
   device_name?: string;
@@ -35,7 +35,7 @@ export interface RegisterGoogleRequest {
   encrypted_user_key: string;
   mnemonic_salt: string;
   kdf_settings?: Record<string, unknown>;
-  has_passphrase?: boolean;
+
   mnemonic: string;
   mnemonic_hmac_salt: string;
   device_name?: string;
@@ -67,15 +67,13 @@ export interface LoginResponse {
   local_salt: string;
   encrypted_user_key: string;
   mnemonic_salt: string;
-  has_passphrase: boolean;
+
   devices?: DeviceInfo[];
 }
 export interface DeviceInfo { id: string; device_name?: string | null; device_wrapped: string }
 
 // ── Verify ────────────────────────────────────────
 
-export interface VerifyRequest { local_password_hash: string; local_password_version: number }
-export interface VerifyResponse { local_password_version: number; status: string }
 
 // ── 改密 ──────────────────────────────────────────
 
@@ -86,6 +84,7 @@ export interface ChangePasswordRequest {
   current_local_password_hash: string;
   new_local_password_hash: string;
   new_local_salt: string;
+  new_encrypted_user_key: string;   // AES(新K, UserKey)，主密码参与 K 派生，改密重包裹
 }
 export interface ChangePasswordResponse {
   success: boolean;
@@ -103,30 +102,16 @@ export interface RefreshTokenResponse { access_token: string; refresh_token: str
 export interface RegisterDeviceRequest { device_name?: string; device_public_key: string; device_wrapped: string }
 export interface RegisterDeviceResponse { device_id: string }
 
-// ── Recovery ──────────────────────────────────────
+// ── Recovery（换设备：验助记词返回 encrypted_user_key）─────────────
 
 export interface InitiateRecoveryRequest {
   target: "phone" | "email";
   value: string;
   mnemonic: string;
-  new_local_password_hash: string;
-  new_local_salt: string;
 }
 export interface InitiateRecoveryResponse {
-  encrypted_user_key: string;
-  mnemonic_salt: string;
-  initiate_token: string;
-}
-export interface ConfirmRecoveryRequest {
-  initiate_token: string;
-}
-export interface ConfirmRecoveryResponse { cooldown_until: string }
-export interface AccelerateRecoveryRequest { signed_token: string; verification_code: string }
-export interface FreezeRecoveryRequest { signed_token: string }
-export interface RecoveryStatusResponse {
-  status: string;
-  cooldown_until: string | null;
-  failed_attempt_count?: number;
+  encrypted_user_key: string;   // 客户端用 K=PBKDF2(助记词+主密码, mnemonic_salt) 解出 User Key
+  mnemonic_salt: string;        // K 派生用盐
 }
 
 // ── Sync ──────────────────────────────────────────

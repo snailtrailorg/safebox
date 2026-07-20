@@ -26,8 +26,6 @@ def upgrade() -> None:
     sa.Column('local_password_hash', sa.Text(), nullable=True),
     sa.Column('local_salt', sa.Text(), nullable=True),
     sa.Column('kdf_settings', sa.Text(), nullable=True),
-    sa.Column('local_password_version', sa.Integer(), nullable=False, server_default='0'),
-    sa.Column('has_passphrase', sa.Boolean(), nullable=False, server_default='false'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id'),

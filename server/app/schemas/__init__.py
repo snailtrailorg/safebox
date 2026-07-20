@@ -16,8 +16,6 @@ from app.schemas.auth import (
     RegisterResponse,
     SendCodeRequest,
     SendCodeResponse,
-    VerifyRequest,
-    VerifyResponse,
 )
 from app.schemas.sync import (
     SyncDeleteRequest,

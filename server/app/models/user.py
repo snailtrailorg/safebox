@@ -27,8 +27,6 @@ class User(Base):
     local_password_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     local_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 本地密码派生用盐
     kdf_settings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
-    local_password_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 改本地密码+1，多设备同步用
-    has_passphrase: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否设了Passphrase
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

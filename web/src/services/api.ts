@@ -21,11 +21,6 @@ import type {
   RegisterDeviceResponse,
   InitiateRecoveryRequest,
   InitiateRecoveryResponse,
-  ConfirmRecoveryRequest,
-  ConfirmRecoveryResponse,
-  AccelerateRecoveryRequest,
-  FreezeRecoveryRequest,
-  RecoveryStatusResponse,
   SyncPushRequest,
   SyncPushResponse,
   SyncPullResponse,
@@ -160,7 +155,7 @@ class ApiClient {
     return this.request("POST", "/auth/register/google", req, true);
   }
 
-  async getSalt(email?: string, phone?: string): Promise<{ local_salt: string; kdf_settings: any; mnemonic_salt: string; has_passphrase: boolean }> {
+  async getSalt(email?: string, phone?: string): Promise<{ local_salt: string; kdf_settings: any; mnemonic_salt: string }> {
     const params = new URLSearchParams();
     if (email) params.set("email", email);
     if (phone) params.set("phone", phone);
@@ -187,24 +182,6 @@ class ApiClient {
 
   async initiateRecovery(req: InitiateRecoveryRequest): Promise<InitiateRecoveryResponse> {
     return this.request("POST", "/auth/recovery/initiate", req, true);
-  }
-
-  async confirmRecovery(req: ConfirmRecoveryRequest): Promise<ConfirmRecoveryResponse> {
-    return this.request("POST", "/auth/recovery/confirm", req, true);
-  }
-
-
-
-  async getRecoveryStatus(): Promise<RecoveryStatusResponse> {
-    return this.request("GET", "/auth/recovery/status");
-  }
-
-  async accelerateRecovery(req: AccelerateRecoveryRequest): Promise<void> {
-    return this.request("POST", "/auth/recovery/accelerate", req, true);
-  }
-
-  async freezeRecovery(req: FreezeRecoveryRequest): Promise<void> {
-    return this.request("POST", "/auth/recovery/freeze", req, true);
   }
 
   async registerDevice(req: RegisterDeviceRequest): Promise<RegisterDeviceResponse> {

@@ -121,8 +121,6 @@ export function LoginPage() {
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
-        has_passphrase: response.has_passphrase,
-        local_password_version: 0,
       });
       await handleLoginResponse(response, password);
     } catch (e) {
@@ -154,8 +152,6 @@ export function LoginPage() {
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
-        has_passphrase: response.has_passphrase,
-        local_password_version: 0,
       });
       await handleLoginResponse(response, phonePassword);
     } catch (e) {
@@ -178,8 +174,6 @@ export function LoginPage() {
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
-        has_passphrase: response.has_passphrase,
-        local_password_version: 0,
       });
       await handleLoginResponse(response, googlePassword);
     } catch (e) {

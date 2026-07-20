@@ -25,6 +25,7 @@ export function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
+  const [mnemonic, setMnemonic] = useState("");
   const [changing, setChanging] = useState(false);
 
   const handleSendVerifyCode = async () => {
@@ -37,7 +38,7 @@ export function ChangePasswordPage() {
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !verifyCode) {
+    if (!currentPassword || !newPassword || !verifyCode || !mnemonic.trim()) {
       setToast({ message: t("settings.enterNewPwAndCode"), type: "error" });
       return;
     }
@@ -51,33 +52,42 @@ export function ChangePasswordPage() {
       const session = await getSession();
       const contact = session.email || "";
 
-      // 用「当前盐」派生当前密码的 auth key，供服务端二次校验当前密码
+      // 1. 用当前主密码解锁（载入 UserKey 到内存，changeMasterPassword 需要）
+      const unlocked = await keyChain.unlockWithPassword(
+        currentPassword, session.localSalt, session.encrypted_user_key, session.cached_K,
+      );
+      if (!unlocked) {
+        setToast({ message: t("settings.currentPasswordWrong"), type: "error" });
+        return;
+      }
+
+      // 2. 当前主密码 auth hash（服务端二次校验）
       const currentAuthKeyHash = await deriveAuthKey(currentPassword, base64ToBytes(session.localSalt));
 
+      // 3. 新盐 + 助记词+新主密码重派生 K + 重包裹 encrypted_user_key（主密码参与 K 派生，K 变）
       const newSalt = new Uint8Array(32);
       crypto.getRandomValues(newSalt);
-      const newAuthKeyHash = await deriveAuthKey(newPassword, newSalt);
       const saltBase64 = btoa(String.fromCharCode(...newSalt));
 
-      // 重包 cached_K：K 不变、User Key 不变、encrypted_user_key 不变，只把 K 换用新本地密码派生的 localDerivedKey 包裹
-      const newCachedK = await keyChain.rewrapCachedK(
-        currentPassword, session.localSalt, session.cached_K,
-        newPassword, saltBase64,
-      );
+      const { new_encrypted_user_key, new_cached_K, new_local_password_hash } =
+        await keyChain.changeMasterPassword(mnemonic, session.mnemonic_salt, newPassword, saltBase64);
 
+      // 4. 提交（服务端验当前密码 + 验证码，写新 encrypted_user_key + 新 auth hash）
       const resp = await apiClient.changePassword({
         target: contact.includes("@") ? "email" : "phone",
         value: contact,
         verification_code: verifyCode,
         current_local_password_hash: currentAuthKeyHash,
-        new_local_password_hash: newAuthKeyHash,
+        new_local_password_hash: new_local_password_hash,
         new_local_salt: saltBase64,
+        new_encrypted_user_key,
       });
 
-      // 用新盐 + 新 cached_K 覆盖本地，并用响应的新 token 替换被吊销的旧 token
+      // 5. 本地落库：新盐 + 新 cached_K + 新 encrypted_user_key + 新 token（旧 token 已吊销）
       await saveSession({
         localSalt: saltBase64,
-        cached_K: newCachedK,
+        cached_K: new_cached_K,
+        encrypted_user_key: new_encrypted_user_key,
         ...(resp.access_token && resp.refresh_token
           ? { accessToken: resp.access_token, refreshToken: resp.refresh_token }
           : {}),
@@ -87,6 +97,7 @@ export function ChangePasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setVerifyCode("");
+      setMnemonic("");
     } catch (e: any) {
       setToast({ message: e.message || t("settings.changeFailed"), type: "error" });
     } finally {
@@ -113,6 +124,14 @@ export function ChangePasswordPage() {
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder={t("settings.newPasswordPlaceholder")}
           />
+          <div style={{ marginTop: "0.5rem" }}>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>
+              {t("settings.mnemonicLabel")}
+            </label>
+            <textarea value={mnemonic} onChange={(e) => setMnemonic(e.target.value)}
+              placeholder={t("settings.mnemonicPlaceholder")} rows={3}
+              style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" }} />
+          </div>
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginTop: "0.5rem" }}>
             <input
               value={verifyCode}

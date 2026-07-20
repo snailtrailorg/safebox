@@ -8,7 +8,6 @@ REG = {
     "local_salt": "salt",
     "encrypted_user_key": "fake-euk",
     "mnemonic_salt": "rec-salt",
-    "has_passphrase": False,
     "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
     "mnemonic_hmac_salt": "rec-code-salt",
     "device_name": "Test",

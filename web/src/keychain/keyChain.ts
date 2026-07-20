@@ -1,10 +1,12 @@
 /**
- * KeyChain - User Key 生命周期（模型 D 串行化）
+ * KeyChain - User Key 生命周期（合并主密码模型）
  *
- * K = PBKDF2(助记词 [+ Passphrase], mnemonic_salt) - 永久，不存服务器
+ * K = PBKDF2(助记词 + 主密码, mnemonic_salt) - 永久，不存服务器（主密码参与派生）
  * User Key = 随机 AES-256 - 包裹 Item Keys
  * encrypted_user_key = AES(K, User Key) - 存服务器
- * 本地密码只做认证 + 本地缓存 K
+ * 主密码：既派生 K（加密），又派生 auth hash（认证）+ 本地缓存 K
+ * 改主密码：K 变 -> 重新包裹 encrypted_user_key + 新 cached_K + 新 auth hash（需助记词）
+ * 忘主密码 = 数据丢失（主密码参与 K 派生，无法恢复）
  */
 import {
   generateAesKey, importAesKey,
@@ -22,7 +24,7 @@ class KeyChain {
 
   // ── 注册时生成密钥 ──────────────────────────────
 
-  async generateKeys(mnemonic: string, passphrase: string, localPassword: string): Promise<{
+  async generateKeys(mnemonic: string, masterPassword: string): Promise<{
     localPasswordHash: string;
     localSalt: string;
     encrypted_user_key: string;
@@ -35,9 +37,8 @@ class KeyChain {
     const mnemonicSalt = new Uint8Array(32);
     crypto.getRandomValues(mnemonicSalt);
 
-    // K = PBKDF2(助记词 [+ Passphrase], mnemonic_salt)
-    const kSeed = mnemonic + (passphrase || "");
-    const K = await deriveKey(kSeed, mnemonicSalt);
+    // K = PBKDF2(助记词 + 主密码, mnemonic_salt) - 主密码参与派生
+    const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
 
     // User Key（随机，不变）
     this.userKey = await generateAesKey();
@@ -46,14 +47,14 @@ class KeyChain {
     // encrypted_user_key = AES(K, User Key) - 存服务器
     const encrypted_user_key = await aesEncrypt(K, userKeyRaw);
 
-    // localDerivedKey = PBKDF2(本地密码, localSalt) - 本地缓存 K
-    const localDerivedKey = await deriveKey(localPassword, localSalt);
+    // localDerivedKey = PBKDF2(主密码, localSalt) - 本地缓存 K
+    const localDerivedKey = await deriveKey(masterPassword, localSalt);
     // cached_K = AES(localDerivedKey, K)，K 是派生的主密钥，不在服务器
     const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
     const cached_K = await aesEncrypt(localDerivedKey, kRaw);
 
     // authKey - 服务端认证
-    const localPasswordHash = await deriveAuthKey(localPassword, localSalt);
+    const localPasswordHash = await deriveAuthKey(masterPassword, localSalt);
 
     const saltBase64 = this.bytesToBase64(localSalt);
     const recSaltBase64 = this.bytesToBase64(mnemonicSalt);
@@ -68,17 +69,17 @@ class KeyChain {
     };
   }
 
-  // ── 日常解锁（Web: 本地密码 -> localDerivedKey -> K -> UserKey）─────────
+  // ── 日常解锁（Web: 主密码 -> localDerivedKey -> K -> UserKey）─────────
 
   async unlockWithPassword(
-    localPassword: string,
+    masterPassword: string,
     localSaltBase64: string,
     encryptedUserKey: string,
     cached_K: string,
   ): Promise<boolean> {
     try {
       const localSalt = this.base64ToBytes(localSaltBase64);
-      const localDerivedKey = await deriveKey(localPassword, localSalt);
+      const localDerivedKey = await deriveKey(masterPassword, localSalt);
       // K = AES 解密(cached_K, localDerivedKey)
       const kRaw = await aesDecrypt(localDerivedKey, cached_K);
       if (!kRaw) return false;
@@ -91,18 +92,17 @@ class KeyChain {
     } catch { return false; }
   }
 
-  // ── 助记词解锁（忘本地密码/换设备）─────────────────
+  // ── 助记词解锁（换设备：助记词 + 主密码 -> K -> UserKey）─────────────────
 
   async unlockFromMnemonic(
     mnemonic: string,
-    passphrase: string,
+    masterPassword: string,
     mnemonicSaltBase64: string,
     encryptedUserKey: string,
   ): Promise<boolean> {
     try {
       const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
-      const kSeed = mnemonic + (passphrase || "");
-      const K = await deriveKey(kSeed, mnemonicSalt);
+      const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return false;
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
@@ -111,49 +111,63 @@ class KeyChain {
     } catch { return false; }
   }
 
-  // ── 助记词解锁 + 重包 cached_K（忘密码恢复流程专用）──
+  // ── 换设备：助记词 + 主密码派生 K 解 UserKey + 用主密码建本地缓存 ──
 
-  /** 用助记词派生 K -> 解 User Key 设到内存 + 用新本地密码重包 cached_K。
-   *  一次派生 K，避免重复 PBKDF2。返回新 cached_K 供 saveSession。 */
+  /** 一次派生 K：解 User Key 设到内存 + 用主密码重包 cached_K 供本地缓存。
+   *  换设备专用（无 cached_K，需助记词 + 主密码重新派生）。主密码同时用于 K 派生与本地缓存。 */
   async recoverAndRewrap(
     mnemonic: string,
-    passphrase: string,
+    masterPassword: string,
     mnemonicSaltBase64: string,
     encryptedUserKey: string,
-    newLoginPassword: string,
-    newLoginSaltBase64: string,
+    localSaltBase64: string,
   ): Promise<{ ok: boolean; newCachedK?: string }> {
     try {
       const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
-      const kSeed = mnemonic + (passphrase || "");
-      const K = await deriveKey(kSeed, mnemonicSalt);
+      const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return { ok: false };
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
       this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
-      // 重包 cached_K = AES(newLoginDerivedKey, K_raw)
+      // 建本地缓存：cached_K = AES(localDerivedKey, K_raw)
       const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
-      const newSalt = this.base64ToBytes(newLoginSaltBase64);
-      const newLoginDerivedKey = await deriveKey(newLoginPassword, newSalt);
-      const newCachedK = await aesEncrypt(newLoginDerivedKey, kRaw);
+      const localSalt = this.base64ToBytes(localSaltBase64);
+      const localDerivedKey = await deriveKey(masterPassword, localSalt);
+      const newCachedK = await aesEncrypt(localDerivedKey, kRaw);
       return { ok: true, newCachedK };
     } catch { return { ok: false }; }
   }
 
-  // ── 改本地密码（K 不变，只更新本地缓存）─────────────
+  // ── 改主密码（K 变：主密码参与派生，需助记词重派生 K + 重包裹 encrypted_user_key）──
 
-  async rewrapCachedK(
-    oldLoginPassword: string, oldLoginSaltBase64: string,
-    oldCached_K: string,
-    newLoginPassword: string, newLoginSaltBase64: string,
-  ): Promise<string> {
-    const oldSalt = this.base64ToBytes(oldLoginSaltBase64);
-    const oldLoginDerivedKey = await deriveKey(oldLoginPassword, oldSalt);
-    const kRaw = await aesDecrypt(oldLoginDerivedKey, oldCached_K);
-    if (!kRaw) throw new Error("unlock_failed");
-    const newSalt = this.base64ToBytes(newLoginSaltBase64);
-    const newLoginDerivedKey = await deriveKey(newLoginPassword, newSalt);
-    return aesEncrypt(newLoginDerivedKey, kRaw);
+  /** 改主密码：主密码参与 K 派生，故 K 变。
+   *  需助记词（派生新 K）+ 已解锁的 User Key（内存中，不变）。
+   *  重新包裹 encrypted_user_key = AES(新K, UserKey) + 新 cached_K + 新 auth hash。
+   *  旧主密码验证由服务端 change-password 端点完成（current_local_password_hash）。 */
+  async changeMasterPassword(
+    mnemonic: string,
+    mnemonicSaltBase64: string,
+    newMasterPassword: string,
+    newLocalSaltBase64: string,
+  ): Promise<{
+    new_encrypted_user_key: string;
+    new_cached_K: string;
+    new_local_password_hash: string;
+  }> {
+    if (!this.userKey) throw new Error("not_unlocked");
+    const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
+    // 新 K = PBKDF2(助记词 + 新主密码, mnemonic_salt)
+    const newK = await deriveKey(mnemonic + newMasterPassword, mnemonicSalt);
+    const userKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
+    // 重新包裹 User Key（User Key 不变，K 变）
+    const new_encrypted_user_key = await aesEncrypt(newK, userKeyRaw);
+    // 新本地缓存：cached_K = AES(新 localDerivedKey, 新 K_raw)
+    const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", newK));
+    const newSalt = this.base64ToBytes(newLocalSaltBase64);
+    const newLocalDerivedKey = await deriveKey(newMasterPassword, newSalt);
+    const new_cached_K = await aesEncrypt(newLocalDerivedKey, kRaw);
+    const new_local_password_hash = await deriveAuthKey(newMasterPassword, newSalt);
+    return { new_encrypted_user_key, new_cached_K, new_local_password_hash };
   }
 
   /** 导出 User Key 的 raw bytes */

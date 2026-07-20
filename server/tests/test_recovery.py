@@ -1,11 +1,9 @@
-"""助记词服务 + API 级测试（模型 D）。"""
+"""助记词服务 + API 级测试（主密码合并模型）。"""
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.recovery_service import (
     hash_mnemonic, verify_mnemonic,
     generate_mnemonic_plaintext, generate_mnemonic_hmac_salt,
-    sign_recovery_token, verify_recovery_token,
 )
 
 REG = {
@@ -14,7 +12,6 @@ REG = {
     "local_salt": "salt",
     "encrypted_user_key": "fake-euk",
     "mnemonic_salt": "rec-salt",
-    "has_passphrase": False,
     "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
     "mnemonic_hmac_salt": "rec-code-salt",
     "device_name": "Test Device",
@@ -55,15 +52,6 @@ def test_hash_whitespace_sensitive():
     assert hash_mnemonic("a b", "s") == hash_mnemonic("a  b", "s")
 
 
-def test_sign_and_verify_token():
-    tok = sign_recovery_token({"sub": "u", "action": "a", "rc_id": "r"})
-    assert verify_recovery_token(tok)
-
-
-def test_verify_invalid_token():
-    assert verify_recovery_token("x") is None
-
-
 def test_generate_salt_unique():
     salts = {generate_mnemonic_hmac_salt() for _ in range(50)}
     assert len(salts) == 50
@@ -72,203 +60,28 @@ def test_generate_salt_unique():
 # ── API 级测试 ──────────────────────────────────────
 
 
-def _step1(email, code=PT, nh="new_hash"):
-    return {"target": "email", "value": email,
-            "mnemonic": code, "new_local_password_hash": nh, "new_local_salt": "ns"}
-
-
-async def _init(client, email, code=PT):
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1(email, code))
-    assert r.status_code == 200
-    tok = r.json()["initiate_token"]
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": tok})
-    assert r2.status_code == 200
-    return r2
-
-
 @pytest.mark.asyncio
-async def test_recovery_no_permanent_lockout(client: AsyncClient):
-    """助记词 132bit 不可暴力枚举，不累积失败计数、不永久锁定。
-    连错 5 次后仍可用正确助记词发起恢复。"""
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "lock@safebox.example.com",
-    })
-    assert resp.status_code in (200, 201)
-    w = {**_step1("lock@safebox.example.com"), "mnemonic": "wrong " * 11 + "wrong"}
-    for _ in range(5):
-        assert (await client.post("/api/v1/auth/recovery/initiate", json=w)).status_code == 401
-    # 正确助记词仍可用（不锁定）
-    g = _step1("lock@safebox.example.com", PT)
-    assert (await client.post("/api/v1/auth/recovery/initiate", json=g)).status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_recovery_reinitiate_during_cooldown_returns_409(client: AsyncClient):
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "cooldown@safebox.example.com",
-    })
-    p = _step1("cooldown@safebox.example.com")
-    r = await client.post("/api/v1/auth/recovery/initiate", json=p)
-    assert r.status_code == 200
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
-    assert r2.status_code == 200
-    assert (await client.post("/api/v1/auth/recovery/initiate", json=p)).status_code == 409
-    w = {**p, "mnemonic": "wrong " * 11 + "wrong"}
-    assert (await client.post("/api/v1/auth/recovery/initiate", json=w)).status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_initiate_writes_new_password_and_enters_cooldown(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "init@safebox.example.com",
-    })
-    token = resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("init@safebox.example.com"))
+async def test_initiate_returns_encrypted_user_key(client: AsyncClient):
+    """initiate 验助记词 -> 返回 encrypted_user_key + mnemonic_salt（换设备用）。"""
+    await client.post("/api/v1/auth/register/email", json={**REG, "email": "init@safebox.example.com"})
+    r = await client.post("/api/v1/auth/recovery/initiate", json={
+        "target": "email", "value": "init@safebox.example.com", "mnemonic": PT})
     assert r.status_code == 200
     data = r.json()
-    assert "encrypted_user_key" in data and "mnemonic_salt" in data and "initiate_token" in data
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": data["initiate_token"]})
-    assert r2.status_code == 200
-    assert "cooldown_until" in r2.json()
-    st = await client.get("/api/v1/auth/recovery/status", headers=headers)
-    assert st.json()["status"] == "cooldown"
+    assert "encrypted_user_key" in data and "mnemonic_salt" in data
 
 
 @pytest.mark.asyncio
-async def test_login_blocked_during_cooldown(client: AsyncClient):
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "block@safebox.example.com",
-    })
-    await _init(client, "block@safebox.example.com")
-    lp = {"email": "block@safebox.example.com"}
-    assert (await client.post("/api/v1/auth/login/email", json={**lp, "local_password_hash": "new_hash"})).status_code == 403
-    assert (await client.post("/api/v1/auth/login/email", json={**lp, "local_password_hash": REG["local_password_hash"]})).status_code == 403
+async def test_initiate_wrong_mnemonic_returns_401(client: AsyncClient):
+    await client.post("/api/v1/auth/register/email", json={**REG, "email": "wrong@safebox.example.com"})
+    r = await client.post("/api/v1/auth/recovery/initiate", json={
+        "target": "email", "value": "wrong@safebox.example.com", "mnemonic": "wrong " * 11 + "wrong"})
+    assert r.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_accelerate_clears_cooldown_and_allows_login(client: AsyncClient, db_session: AsyncSession):
-    from app.models.mnemonic import Mnemonic
-    from sqlalchemy import select
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "acc@safebox.example.com",
-    })
-    rc = (await db_session.execute(select(Mnemonic))).scalar_one()
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("acc@safebox.example.com"))
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
-    assert r2.status_code == 200
-    await db_session.refresh(rc)
-    cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
-    at = sign_recovery_token({"sub": str(rc.user_id), "action": "accelerate", "rc_id": str(rc.id), "cd": cd})
-    assert (await client.post("/api/v1/auth/recovery/accelerate", json={
-        "signed_token": at, "verification_code": "123456"})).status_code == 204
-    await db_session.refresh(rc)
-    assert rc.status == "active"
-    lp = {"email": "acc@safebox.example.com", "local_password_hash": "new_hash"}
-    assert (await client.post("/api/v1/auth/login/email", json=lp)).status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_freeze_rolls_back_to_old_password(client: AsyncClient, db_session: AsyncSession):
-    from app.models.mnemonic import Mnemonic
-    from sqlalchemy import select
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "frz@safebox.example.com",
-    })
-    rc = (await db_session.execute(select(Mnemonic))).scalar_one()
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("frz@safebox.example.com"))
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
-    assert r2.status_code == 200
-    await db_session.refresh(rc)
-    cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
-    ft = sign_recovery_token({"sub": str(rc.user_id), "action": "freeze", "rc_id": str(rc.id), "cd": cd})
-    assert (await client.post("/api/v1/auth/recovery/freeze", json={"signed_token": ft})).status_code == 204
-    lp = {"email": "frz@safebox.example.com"}
-    assert (await client.post("/api/v1/auth/login/email", json={**lp, "local_password_hash": REG["local_password_hash"]})).status_code == 200
-    assert (await client.post("/api/v1/auth/login/email", json={**lp, "local_password_hash": "new_hash"})).status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_cooldown_expired_new_password_login_clears_rollback(client: AsyncClient, db_session: AsyncSession):
-    from datetime import datetime, timedelta, timezone
-    from app.models.mnemonic import Mnemonic
-    from sqlalchemy import select
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "expire@safebox.example.com",
-    })
-    rc = (await db_session.execute(select(Mnemonic))).scalar_one()
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("expire@safebox.example.com"))
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
-    assert r2.status_code == 200
-    rc.cooldown_until = datetime.now(timezone.utc) - timedelta(hours=1)
-    await db_session.commit()
-    lp = {"email": "expire@safebox.example.com", "local_password_hash": "new_hash"}
-    assert (await client.post("/api/v1/auth/login/email", json=lp)).status_code == 200
-    await db_session.refresh(rc)
-    assert rc.status == "active" and rc.rollback_local_password_hash is None
-    assert (await client.post("/api/v1/auth/login/email", json={
-        "email": "expire@safebox.example.com", "local_password_hash": REG["local_password_hash"]})).status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_confirm_with_wrong_or_replayed_token_rejected(client: AsyncClient):
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "tok@safebox.example.com",
-    })
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("tok@safebox.example.com"))
-    tok = r.json()["initiate_token"]
-    assert (await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": "deadbeef" * 8})).status_code == 401
-    assert (await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": tok})).status_code == 200
-    assert (await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": tok})).status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_step1_does_not_enter_cooldown(client: AsyncClient, db_session: AsyncSession):
-    from app.models.mnemonic import Mnemonic
-    from sqlalchemy import select
-    await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "s1@safebox.example.com",
-    })
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("s1@safebox.example.com"))
-    assert r.status_code == 200
-    rc = (await db_session.execute(select(Mnemonic))).scalar_one()
-    assert rc.status == "active" and rc.pending_initiate_token is not None
-
-
-@pytest.mark.asyncio
-async def test_cooldown_blocks_sync_data_access(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "cdsync@safebox.example.com",
-    })
-    token = resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("cdsync@safebox.example.com"))
-    r2 = await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
-    assert r2.status_code == 200
-    since = "2020-01-01T00%3A00%3A00%2B00%3A00"
-    assert (await client.get(f"/api/v1/sync/pull?since={since}", headers=headers)).status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_reset_password_endpoint_removed(client: AsyncClient):
-    assert (await client.post("/api/v1/auth/reset-password", json={})).status_code == 404
-
-
-@pytest.mark.asyncio
-async def test_freeze_after_accelerate_returns_409(client: AsyncClient, db_session: AsyncSession):
-    """加速成功后不能再冻结（互斥）。"""
-    from app.models.mnemonic import Mnemonic
-    from sqlalchemy import select
-    await client.post("/api/v1/auth/register/email", json={**REG, "email": "mutex@safebox.example.com"})
-    rc = (await db_session.execute(select(Mnemonic))).scalar_one()
-    r = await client.post("/api/v1/auth/recovery/initiate", json=_step1("mutex@safebox.example.com"))
-    await client.post("/api/v1/auth/recovery/confirm", json={"initiate_token": r.json()["initiate_token"]})
-    await db_session.refresh(rc)
-    cd = rc.cooldown_until.isoformat() if rc.cooldown_until else ""
-    at = sign_recovery_token({"sub": str(rc.user_id), "action": "accelerate", "rc_id": str(rc.id), "cd": cd})
-    ft = sign_recovery_token({"sub": str(rc.user_id), "action": "freeze", "rc_id": str(rc.id), "cd": cd})
-    assert (await client.post("/api/v1/auth/recovery/accelerate", json={
-        "signed_token": at, "verification_code": "123456"})).status_code == 204
-    # 加速后 status=active，freeze 应 409
-    fr = await client.post("/api/v1/auth/recovery/freeze", json={"signed_token": ft})
-    assert fr.status_code == 409, f"expected 409, got {fr.status_code}: {fr.text}"
+async def test_initiate_nonexistent_user_returns_401(client: AsyncClient):
+    """不存在用户 -> 401（不返回 404，防枚举）。"""
+    r = await client.post("/api/v1/auth/recovery/initiate", json={
+        "target": "email", "value": "noexist@safebox.example.com", "mnemonic": PT})
+    assert r.status_code == 401

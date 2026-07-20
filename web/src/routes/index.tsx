@@ -6,8 +6,6 @@ import { AuthGuard, GuestGuard } from "./AuthGuard";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
 import { RecoveryPage } from "../pages/auth/RecoveryPage";
-import { AccelerateRecoveryPage } from "../pages/auth/AccelerateRecoveryPage";
-import { FreezeRecoveryPage } from "../pages/auth/FreezeRecoveryPage";
 import { VaultListPage } from "../pages/vault/VaultListPage";
 import { ItemDetailPage } from "../pages/vault/ItemDetailPage";
 import { ItemEditPage } from "../pages/vault/ItemEditPage";
@@ -39,22 +37,6 @@ export function AppRoutes() {
         element={
           <GuestGuard>
             <RecoveryPage />
-          </GuestGuard>
-        }
-      />
-      <Route
-        path="/recovery/accelerate"
-        element={
-          <GuestGuard>
-            <AccelerateRecoveryPage />
-          </GuestGuard>
-        }
-      />
-      <Route
-        path="/recovery/freeze"
-        element={
-          <GuestGuard>
-            <FreezeRecoveryPage />
           </GuestGuard>
         }
       />
