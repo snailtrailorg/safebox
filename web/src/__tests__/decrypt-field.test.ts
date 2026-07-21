@@ -11,6 +11,7 @@ describe("keyChain encryptItemField / decryptItemField round-trip", () => {
     await keyChain.generateKeys(
       "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
       "test-login-password",
+      "test@example.com",
     );
   });
 

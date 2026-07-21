@@ -1,19 +1,11 @@
-"""认证 API 集成测试。"""
+"""认证 API 集成测试（SRP-6a）。"""
 import pytest
 from httpx import AsyncClient
 
-REGISTER_PAYLOAD = {
-    "verification_code": "123456",
-    "local_password_hash": "pbkdf2_hashed",
-    "local_salt": "salt",
-    "encrypted_user_key": "fake-euk",
-    "mnemonic_salt": "rec-salt",
-    "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
-    "mnemonic_hmac_salt": "rec-code-salt",
-    "device_name": "Test Device",
-    "device_public_key": "device_pub",
-    "device_wrapped": "device_wrapped",
-}
+from tests._srp import (
+    TEST_PASSWORD, TEST_SRP_SALT_HEX,
+    make_srp_verifier, register_payload, srp_login,
+)
 
 SYNC_SINCE = "2020-01-01T00%3A00%3A00%2B00%3A00"
 
@@ -42,9 +34,7 @@ async def test_send_code_rate_limit(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_email_and_login(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "test@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("test@safebox.example.com"))
     assert resp.status_code == 201
     data = resp.json()
     assert "access_token" in data
@@ -60,17 +50,13 @@ async def test_register_email_and_login(client: AsyncClient):
     assert pull_data["has_more"] is False
 
     # 重复注册应返回 409
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "test@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("test@safebox.example.com"))
     assert resp.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_sync_push_and_pull(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "sync@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("sync@safebox.example.com"))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -88,9 +74,7 @@ async def test_sync_push_and_pull(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_sync_delete(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "del@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("del@safebox.example.com"))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -111,9 +95,7 @@ async def test_sync_delete(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_refresh_token(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "refresh@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("refresh@safebox.example.com"))
     refresh = resp.json()["refresh_token"]
 
     resp = await client.post("/api/v1/auth/refresh-token", json={"refresh_token": refresh})
@@ -125,14 +107,8 @@ async def test_refresh_token(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_refresh_replay_cascades_all_families(client: AsyncClient):
-    """重放已轮换的旧 refresh token -> 撤销该用户全部 family（全线失效，M1）。
-
-    修复前：轮换新建 family 并删旧行，旧 token 重放只 401、新 token 仍可用（级联不可达）。
-    修复后：同 family 复用更新 hash，旧 token 重放触发级联，新 token 也失效。
-    """
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "replay@safebox.example.com",
-    })
+    """重放已轮换的旧 refresh token -> 撤销该用户全部 family（全线失效）。"""
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("replay@safebox.example.com"))
     r1 = resp.json()["refresh_token"]
 
     # 轮换：r1 失效，得到 r2
@@ -151,13 +127,11 @@ async def test_refresh_replay_cascades_all_families(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_refresh_token_without_family_rejected(client: AsyncClient):
-    """无 family 字段的 refresh token 被拒绝（M2，不再降级刷新绕过轮换/重放检测）。"""
+    """无 family 字段的 refresh token 被拒绝（不再降级刷新绕过轮换/重放检测）。"""
     import jwt
     from app.config import settings
 
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "nofamily@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("nofamily@safebox.example.com"))
     user_id = resp.json()["user_id"]
 
     # 伪造一个无 family 的 refresh token（签名有效、type 正确）
@@ -179,9 +153,7 @@ async def test_unauthorized_access(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_device(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "device@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("device@safebox.example.com"))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -194,136 +166,144 @@ async def test_register_device(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_get_salt(client: AsyncClient):
-    """GET /salt 只返回 password_salt + kdf_settings，不返回密钥材料。"""
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "salt@safebox.example.com",
-    })
+    """GET /salt 返回 SRP 参数 + salt，不返回密钥材料。"""
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("salt@safebox.example.com"))
     assert resp.status_code == 201
 
     resp = await client.get("/api/v1/auth/salt?email=salt@safebox.example.com")
     assert resp.status_code == 200
     data = resp.json()
+    assert "srp_salt" in data
     assert "local_salt" in data
+    assert "mnemonic_salt" in data
     assert "kdf_settings" in data
-    assert "recovery_wrapped" not in data  # v2: 不再返回密钥材料
+    assert "N" in data
+    assert "g" in data
+    assert "recovery_wrapped" not in data  # 不返回旧 RSA 密钥材料
     assert "encrypted_private" not in data
     assert "rsa_public_key" not in data
 
 
 @pytest.mark.asyncio
 async def test_register_persists_kdf_settings(client: AsyncClient):
-    """注册时 kdf_settings 落库，GET /salt 返回该账户的 kdf_settings（M3）。
-
-    修复前：kdf_settings 从不落库，GET /salt 恒返回默认 600k。
-    """
-    custom_kdf = {"algorithm": "pbkdf2", "iterations": 100_000}
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "kdf@safebox.example.com"
-    })
+    """注册时 kdf_settings 落库，GET /salt 返回该账户的 kdf_settings。"""
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("kdf@safebox.example.com"))
     assert resp.status_code == 201
 
     resp = await client.get("/api/v1/auth/salt?email=kdf@safebox.example.com")
     assert resp.status_code == 200
-    assert resp.json()["kdf_settings"]["iterations"] == 600000  # 落库的是自定义值，非默认 600k
+    assert resp.json()["kdf_settings"]["iterations"] == 600000
 
 
 @pytest.mark.asyncio
 async def test_salt_nonexistent_user_not_enumerable(client: AsyncClient):
-    """不存在用户的 salt 稳定且格式与真实用户一致（M4 防枚举）。
-
-    修复前：不存在用户每次返回新随机 hex(16)（不稳定 + 格式与真实 base64(32) 不同），
-    两次查询即可判断用户是否存在。
-    """
+    """不存在用户的 salt 稳定且格式与真实用户一致（防枚举）。"""
     import base64
 
     # 两次查询同一不存在邮箱
     r1 = await client.get("/api/v1/auth/salt?email=nonexist-m4@safebox.example.com")
     r2 = await client.get("/api/v1/auth/salt?email=nonexist-m4@safebox.example.com")
     assert r1.status_code == 200 and r2.status_code == 200
-    s1, s2 = r1.json()["local_salt"], r2.json()["local_salt"]
-    # 稳定：同一 target 每次相同（与真实用户一致）
+    s1, s2 = r1.json()["srp_salt"], r2.json()["srp_salt"]
+    # 稳定：同一 target 每次相同
     assert s1 == s2
     # 格式与真实用户一致：base64(32 字节) = 44 字符
     assert len(base64.b64decode(s1)) == 32
 
-    # 不同不存在邮箱 -> 不同 salt（避免批量枚举共用一个值）
+    # 不同不存在邮箱 -> 不同 salt
     r3 = await client.get("/api/v1/auth/salt?email=other-m4@safebox.example.com")
-    assert r3.json()["local_salt"] != s1
+    assert r3.json()["srp_salt"] != s1
 
     # 真实用户与不存在用户的 salt 格式无法区分
-    import base64 as _b64
-    real_salt_b64 = _b64.b64encode(__import__("secrets").token_bytes(32)).decode()
-    await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "real-m4@safebox.example.com",
-        "local_salt": real_salt_b64,
-    })
+    real_salt_b64 = base64.b64encode(__import__("secrets").token_bytes(32)).decode()
+    await client.post("/api/v1/auth/register/email", json=register_payload("real-m4@safebox.example.com", local_salt=real_salt_b64))
     real = (await client.get("/api/v1/auth/salt?email=real-m4@safebox.example.com")).json()["local_salt"]
     fake = s1
-    # 真实 salt 也是 base64(32)，与派生 salt 同格式同长度
     assert len(base64.b64decode(real)) == 32
     assert len(real) == len(fake)
 
 
 @pytest.mark.asyncio
-async def test_local_password_hash_flow(client: AsyncClient):
-    """验证 local_password_hash 字段名工作和向后兼容。"""
-    # 新字段名
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "ak1@safebox.example.com",
-    })
+async def test_srp_login_flow(client: AsyncClient):
+    """SRP 两步登录：正确密码成功（含 M2），错密码失败。"""
+    email = "srp-login@safebox.example.com"
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     assert resp.status_code == 201
 
-    # 新字段名登录
-    resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "ak1@safebox.example.com", "local_password_hash": "pbkdf2_hashed",
-    })
+    # 正确密码登录
+    resp = await srp_login(client, "email", email, password=TEST_PASSWORD)
     assert resp.status_code == 200
+    data = resp.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert "M2" in data and data["M2"]           # 服务端证据
+    assert "encrypted_user_key" in data
+    assert "mnemonic_salt" in data
 
-    # 旧字段名（别名）登录 — 向后兼容
-    resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "ak1@safebox.example.com", "local_password_hash": "pbkdf2_hashed",
-    })
-    assert resp.status_code == 200
+    # 错密码登录失败
+    resp = await srp_login(client, "email", email, password="wrong-password")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_srp_login_wrong_mnemonic(client: AsyncClient):
+    """错助记词登录失败（2SKD：助记词参与 x 派生）。"""
+    email = "srp-mn@safebox.example.com"
+    await client.post("/api/v1/auth/register/email", json=register_payload(email))
+    resp = await srp_login(client, "email", email,
+                          mnemonic="abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_srp_login_nonexistent_user(client: AsyncClient):
+    """不存在用户 SRP 登录失败（fake verifier，verify 必失败，防枚举）。"""
+    resp = await srp_login(client, "email", "nope@safebox.example.com")
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_change_password(client: AsyncClient):
-    """已登录用户修改密码：当前密码 + 验证码双因子。"""
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "cp@safebox.example.com",
-    })
+    """改密：fresh token + 验证码 + 新 SRP 材料（旧密码由前置 SRP 登录验）。"""
+    email = "cp@safebox.example.com"
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
     resp = await client.post("/api/v1/auth/change-password", json={
-        "target": "email", "value": "cp@safebox.example.com",
+        "target": "email", "value": email,
         "verification_code": "123456",
-        "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
-        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt",
-        "new_encrypted_user_key": "new_euk"
+        "new_srp_verifier": make_srp_verifier(email, password="NewPass456!"),
+        "new_srp_salt": TEST_SRP_SALT_HEX,
+        "new_local_salt": "new_salt",
+        "new_encrypted_user_key": "new_euk",
     }, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
+    # 改密后用新密码可登录
+    resp = await srp_login(client, "email", email, password="NewPass456!")
+    assert resp.status_code == 200
+
 
 @pytest.mark.asyncio
 async def test_change_password_sends_security_alert(client: AsyncClient):
-    """改密成功后发送安全告警邮件（M11）。"""
+    """改密成功后发送安全告警邮件。"""
     from unittest.mock import patch, AsyncMock
 
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "cpalert@safebox.example.com",
-    })
+    email = "cpalert@safebox.example.com"
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
     with patch("app.api.auth.send_recovery_alert", new_callable=AsyncMock) as mock_alert:
         resp = await client.post("/api/v1/auth/change-password", json={
-            "target": "email", "value": "cpalert@safebox.example.com",
+            "target": "email", "value": email,
             "verification_code": "123456",
-            "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
-            "new_local_password_hash": "new_hash", "new_local_salt": "new_salt",
-            "new_encrypted_user_key": "new_euk"
+            "new_srp_verifier": make_srp_verifier(email, password="NewPass456!"),
+            "new_srp_salt": TEST_SRP_SALT_HEX,
+            "new_local_salt": "new_salt",
+            "new_encrypted_user_key": "new_euk",
         }, headers=headers)
         assert resp.status_code == 200
         # 告警已发送，event=password_changed
@@ -332,43 +312,14 @@ async def test_change_password_sends_security_alert(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_change_password_wrong_current(client: AsyncClient):
-    """当前密码错误时改密被拒（401），且不改动 local_password_hash。"""
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "cpwrong@safebox.example.com",
-    })
-    token = resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    resp = await client.post("/api/v1/auth/change-password", json={
-        "target": "email", "value": "cpwrong@safebox.example.com",
-        "verification_code": "123456",
-        "current_local_password_hash": "wrong_current_hash",
-        "new_local_password_hash": "new_hash", "new_local_salt": "new_salt",
-        "new_encrypted_user_key": "new_euk"
-    }, headers=headers)
-    assert resp.status_code == 401
-
-    # 原密码仍可登录（改密未生效）
-    resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "cpwrong@safebox.example.com",
-        "local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
-    })
-    assert resp.status_code == 200
-
-
-@pytest.mark.asyncio
 async def test_delete_account_requires_verification(client: AsyncClient):
-    """注销账号需要验证码。"""
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REGISTER_PAYLOAD, "email": "delacct@safebox.example.com",
-    })
+    """注销账号需 fresh token + 验证码（旧密码由前置 SRP 登录验）。"""
+    email = "delacct@safebox.example.com"
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 需验证码 + 当前密码（验证码绑定用户注册邮箱，不接受客户端自带 target/value）
     resp = await client.request("DELETE", "/api/v1/auth/account", json={
         "verification_code": "123456",
-        "current_local_password_hash": REGISTER_PAYLOAD["local_password_hash"],
     }, headers=headers)
     assert resp.status_code == 204

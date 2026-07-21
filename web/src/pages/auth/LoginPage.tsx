@@ -9,8 +9,11 @@ import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
 import { saveSession, getSession } from "../../db/sessionStore";
-import { deriveAuthKey } from "../../crypto/kdf";
-import { base64ToBytes } from "../../crypto/aes";
+import {
+  generatePrivateEphemeral, computeClientPublic, computeU, computeClientS,
+  computeK, computeM1, verifyM2, deriveX,
+  bigIntToHex, hexToBigInt, hexToBytes, bytesToHex,
+} from "../../crypto/srp";
 import { GOOGLE_CLIENT_ID } from "../../config/constants";
 import type { LoginResponse } from "../../types/api";
 
@@ -105,6 +108,43 @@ export function LoginPage() {
     navigate("/");
   };
 
+  // ── SRP 两步登录（email/phone 共用）─────────────────
+  const srpLogin = async (targetType: "email" | "phone", target: string, pw: string) => {
+    // 1. 拿 srp_salt/local_salt
+    const salt = targetType === "email"
+      ? await apiClient.getSalt(target)
+      : await apiClient.getSalt(undefined, target);
+    // 2. 从本地缓存解出 mnemonic（同设备登录算 SRP x 用）
+    const session = await getSession();
+    if (!session.mnemonic_encrypted || !session.cached_K) {
+      throw new Error(t("auth.login.needRecovery"));
+    }
+    const mnemonic = await keyChain.getMnemonicFromCache(pw, salt.local_salt, session.mnemonic_encrypted);
+    if (!mnemonic) {
+      throw new Error(t("auth.login.unlockFailed"));
+    }
+    // 3. challenge: A -> B
+    const a = generatePrivateEphemeral();
+    const A = computeClientPublic(a);
+    const chal = await apiClient.loginSrpChallenge({
+      target_type: targetType, target, A: bigIntToHex(A),
+    });
+    const B = hexToBigInt(chal.B);
+    // 4. 算 x/S/K/M1
+    const x = await deriveX(pw, mnemonic, hexToBytes(salt.srp_salt), target);
+    const u = await computeU(A, B);
+    const S = await computeClientS(B, a, u, x);
+    const K = await computeK(S);
+    const M1 = await computeM1(A, B, K);
+    // 5. verify: M1 -> M2 + token
+    const resp = await apiClient.loginSrpVerify({ session_id: chal.session_id, M1: bytesToHex(M1) });
+    // 6. 验证服务端 M2
+    if (!await verifyM2(A, M1, K, resp.M2)) {
+      throw new Error(t("auth.login.loginFailed"));
+    }
+    return resp;
+  };
+
   const handleEmailLogin = async () => {
     if (!email || !password) {
       setToast({ message: t("auth.login.fillEmailAndPassword"), type: "error" });
@@ -112,15 +152,13 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const { local_salt: salt } = await apiClient.getSalt(email);
-      const saltBytes = base64ToBytes(salt);
-      const localPasswordHash = await deriveAuthKey(password, saltBytes);
-      const response = await apiClient.loginEmail({ email, local_password_hash: localPasswordHash });
+      const response = await srpLogin("email", email, password);
       await saveSession({
         email,
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
+        // cached_K / mnemonic_encrypted 保留（merge）
       });
       await handleLoginResponse(response, password);
     } catch (e) {
@@ -143,10 +181,7 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const { local_salt: salt } = await apiClient.getSalt(undefined, phone);
-      const saltBytes = base64ToBytes(salt);
-      const localPasswordHash = await deriveAuthKey(phonePassword, saltBytes);
-      const response = await apiClient.loginPhone({ phone, verification_code: code, local_password_hash: localPasswordHash });
+      const response = await srpLogin("phone", phone, phonePassword);
       await saveSession({
         email: phone,
         localSalt: response.local_salt,
@@ -242,7 +277,7 @@ export function LoginPage() {
         </button>
       </div>
 
-      {/* Google tab — 始终在 DOM 中，只隐藏不销毁 */}
+      {/* Google tab - 始终在 DOM 中，只隐藏不销毁 */}
       <div style={{ display: tab === "google" ? "block" : "none" }}>
         {!googleAuthed ? (
           <div style={{ textAlign: "center", padding: "1rem 0" }}>

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.database import Base, get_db
 from app.main import app
+from tests._srp import FakeRedis
 
 # 测试用 SQLite 数据库
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
@@ -42,8 +43,6 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     async def override_get_db():
         # 忠实复刻生产 get_db：成功 commit、异常 rollback。
-        # 否则端点抛 4xx 时的中间写入（如助记词失败计数）不会被回滚，
-        # 测试无法复现「异常回滚」相关的生产行为。
         try:
             yield db_session
             await db_session.commit()
@@ -53,7 +52,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Mock Redis 依赖的验证/限流函数，测试中用 SQLite 运行
+    # Mock Redis 依赖的验证/限流函数；SRP session 走 FakeRedis（无真 Redis）
+    fake_redis = FakeRedis()
     with (
         patch("app.api.auth.verify_and_consume", new_callable=AsyncMock) as mock_verify,
         patch("app.api.auth.check_rate_limit", new_callable=AsyncMock) as mock_rl,
@@ -64,11 +64,13 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         patch("app.api.auth.send_verification_email", new_callable=AsyncMock),
         patch("app.api.auth.send_sms", new_callable=AsyncMock),
         patch("app.middleware.rate_limit.check_rate_key", new_callable=AsyncMock) as mock_rate,
+        patch("app.services.verification_service._get_redis", new_callable=AsyncMock) as mock_redis,
     ):
         mock_verify.return_value = True
         mock_rl.return_value = True
         mock_wait.return_value = 0
         mock_rate.return_value = False  # 不限流
+        mock_redis.return_value = fake_redis
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:

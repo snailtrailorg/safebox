@@ -74,7 +74,8 @@
       "codeSent": "验证码已发送",
       "sendFailed": "发送失败",
       "loginFailed": "登录失败",
-      "enterPassword": "请输入密码"
+      "enterPassword": "请输入密码",
+      "needRecovery": "此设备未缓存助记词，请使用恢复入口换设备登录"
     },
     "register": {
       "title": "注册",
@@ -260,6 +261,7 @@
     "confirmChange": "确认修改",
     "logoutConfirm": "确定退出登录？密钥将从内存中清除。",
     "deleteAccount": "🗑️ 注销账号",
+    "deleteAccountEnterCode": "请输入发送到您邮箱/手机的验证码：",
     "deleteAccountConfirm1": "请在下框中输入 DELETE 以确认注销：",
     "deleteAccountConfirmAnswer": "DELETE",
     "deleteAccountConfirm2": "所有数据将被永久删除，此操作不可撤销。确认注销？",

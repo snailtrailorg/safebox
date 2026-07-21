@@ -5,7 +5,6 @@ import { describe, it, expect } from "vitest";
 import {
   generateSalt,
   deriveKey,
-  deriveAuthKey,
 } from "../crypto/kdf";
 import {
   aesEncrypt,
@@ -90,21 +89,6 @@ describe("PBKDF2", () => {
     const ct = await aesEncrypt(key1, plaintext);
     const pt = await aesDecrypt(key2, ct);
     expect(pt).toBeNull(); // 不同密钥应该解密失败
-  });
-
-  it("deriveAuthKey produces base64 string", async () => {
-    const salt = generateSalt();
-    const hash = await deriveAuthKey("password", salt);
-    expect(typeof hash).toBe("string");
-    expect(hash.length).toBeGreaterThan(0);
-    expect(/^[A-Za-z0-9+/=]+$/.test(hash)).toBe(true);
-  });
-
-  it("deriveAuthKey is deterministic", async () => {
-    const salt = generateSalt();
-    const h1 = await deriveAuthKey("test", salt);
-    const h2 = await deriveAuthKey("test", salt);
-    expect(h1).toBe(h2);
   });
 });
 

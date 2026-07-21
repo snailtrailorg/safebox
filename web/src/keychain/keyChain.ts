@@ -1,11 +1,12 @@
 /**
- * KeyChain - User Key 生命周期（合并主密码模型）
+ * KeyChain - User Key 生命周期（SRP-6a + 合并主密码模型）
  *
  * K = PBKDF2(助记词 + 主密码, mnemonic_salt) - 永久，不存服务器（主密码参与派生）
  * User Key = 随机 AES-256 - 包裹 Item Keys
  * encrypted_user_key = AES(K, User Key) - 存服务器
- * 主密码：既派生 K（加密），又派生 auth hash（认证）+ 本地缓存 K
- * 改主密码：K 变 -> 重新包裹 encrypted_user_key + 新 cached_K + 新 auth hash（需助记词）
+ * SRP verifier v = g^x mod N，x = deriveX(主密码, 助记词, srp_salt, 邮箱) - 客户端派生，存服务器
+ * mnemonic_encrypted = AES(localDerivedKey, 助记词) - 本地缓存，同设备登录算 SRP x 用
+ * 改主密码：K 变 -> 重新包裹 encrypted_user_key + 新 cached_K + 新 mnemonic_encrypted + 新 SRP verifier（需助记词+邮箱）
  * 忘主密码 = 数据丢失（主密码参与 K 派生，无法恢复）
  */
 import {
@@ -14,7 +15,10 @@ import {
   aesDecryptField,
   makeFieldAAD,
 } from "../crypto/aes";
-import { deriveKey, deriveAuthKey, type KdfSettings, DEFAULT_KDF } from "../crypto/kdf";
+import { deriveKey, type KdfSettings, DEFAULT_KDF } from "../crypto/kdf";
+import {
+  deriveX, computeVerifier, generateSrpSalt, bigIntToHex, bytesToHex,
+} from "../crypto/srp";
 import type { ItemKey, EncryptedField } from "./types";
 
 class KeyChain {
@@ -24,18 +28,21 @@ class KeyChain {
 
   // ── 注册时生成密钥 ──────────────────────────────
 
-  async generateKeys(mnemonic: string, masterPassword: string): Promise<{
-    localPasswordHash: string;
+  async generateKeys(mnemonic: string, masterPassword: string, email: string): Promise<{
+    srp_verifier: string;
+    srp_salt: string;
     localSalt: string;
     encrypted_user_key: string;
     mnemonic_salt: string;
     cached_K: string;
+    mnemonic_encrypted: string;
     kdfSettings: KdfSettings;
   }> {
     const localSalt = new Uint8Array(32);
     crypto.getRandomValues(localSalt);
     const mnemonicSalt = new Uint8Array(32);
     crypto.getRandomValues(mnemonicSalt);
+    const srpSalt = generateSrpSalt(); // 16 字节
 
     // K = PBKDF2(助记词 + 主密码, mnemonic_salt) - 主密码参与派生
     const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
@@ -47,24 +54,26 @@ class KeyChain {
     // encrypted_user_key = AES(K, User Key) - 存服务器
     const encrypted_user_key = await aesEncrypt(K, userKeyRaw);
 
-    // localDerivedKey = PBKDF2(主密码, localSalt) - 本地缓存 K
+    // localDerivedKey = PBKDF2(主密码, localSalt) - 本地缓存 K + mnemonic 缓存
     const localDerivedKey = await deriveKey(masterPassword, localSalt);
-    // cached_K = AES(localDerivedKey, K)，K 是派生的主密钥，不在服务器
     const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
     const cached_K = await aesEncrypt(localDerivedKey, kRaw);
 
-    // authKey - 服务端认证
-    const localPasswordHash = await deriveAuthKey(masterPassword, localSalt);
+    // mnemonic_encrypted = AES(localDerivedKey, mnemonic) - 供同设备登录算 SRP x
+    const mnemonic_encrypted = await aesEncryptString(localDerivedKey, mnemonic);
 
-    const saltBase64 = this.bytesToBase64(localSalt);
-    const recSaltBase64 = this.bytesToBase64(mnemonicSalt);
+    // SRP verifier: x = deriveX(主密码, 助记词, srp_salt, 邮箱)；v = g^x mod N
+    const x = await deriveX(masterPassword, mnemonic, srpSalt, email);
+    const v = computeVerifier(x);
 
     return {
-      localPasswordHash,
-      localSalt: saltBase64,
+      srp_verifier: bigIntToHex(v),
+      srp_salt: bytesToHex(srpSalt),
+      localSalt: this.bytesToBase64(localSalt),
       encrypted_user_key,
-      mnemonic_salt: recSaltBase64,
+      mnemonic_salt: this.bytesToBase64(mnemonicSalt),
       cached_K,
+      mnemonic_encrypted,
       kdfSettings: DEFAULT_KDF,
     };
   }
@@ -92,6 +101,20 @@ class KeyChain {
     } catch { return false; }
   }
 
+  // ── 从本地缓存解出助记词（同设备 SRP 登录算 x 用）──────────
+
+  async getMnemonicFromCache(
+    masterPassword: string,
+    localSaltBase64: string,
+    mnemonicEncrypted: string,
+  ): Promise<string | null> {
+    try {
+      const localSalt = this.base64ToBytes(localSaltBase64);
+      const localDerivedKey = await deriveKey(masterPassword, localSalt);
+      return await aesDecryptString(localDerivedKey, mnemonicEncrypted);
+    } catch { return null; }
+  }
+
   // ── 助记词解锁（换设备：助记词 + 主密码 -> K -> UserKey）─────────────────
 
   async unlockFromMnemonic(
@@ -113,15 +136,15 @@ class KeyChain {
 
   // ── 换设备：助记词 + 主密码派生 K 解 UserKey + 用主密码建本地缓存 ──
 
-  /** 一次派生 K：解 User Key 设到内存 + 用主密码重包 cached_K 供本地缓存。
-   *  换设备专用（无 cached_K，需助记词 + 主密码重新派生）。主密码同时用于 K 派生与本地缓存。 */
+  /** 一次派生 K：解 User Key 设到内存 + 用主密码重包 cached_K + mnemonic_encrypted 供本地缓存。
+   *  换设备专用（无缓存，需助记词 + 主密码重新派生）。主密码同时用于 K 派生与本地缓存。 */
   async recoverAndRewrap(
     mnemonic: string,
     masterPassword: string,
     mnemonicSaltBase64: string,
     encryptedUserKey: string,
     localSaltBase64: string,
-  ): Promise<{ ok: boolean; newCachedK?: string }> {
+  ): Promise<{ ok: boolean; newCachedK?: string; mnemonicEncrypted?: string }> {
     try {
       const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
       const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
@@ -129,30 +152,34 @@ class KeyChain {
       if (!ukRaw) return { ok: false };
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
       this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
-      // 建本地缓存：cached_K = AES(localDerivedKey, K_raw)
+      // 建本地缓存：cached_K + mnemonic_encrypted（均用 localDerivedKey 包裹）
       const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
       const localSalt = this.base64ToBytes(localSaltBase64);
       const localDerivedKey = await deriveKey(masterPassword, localSalt);
       const newCachedK = await aesEncrypt(localDerivedKey, kRaw);
-      return { ok: true, newCachedK };
+      const mnemonicEncrypted = await aesEncryptString(localDerivedKey, mnemonic);
+      return { ok: true, newCachedK, mnemonicEncrypted };
     } catch { return { ok: false }; }
   }
 
   // ── 改主密码（K 变：主密码参与派生，需助记词重派生 K + 重包裹 encrypted_user_key）──
 
   /** 改主密码：主密码参与 K 派生，故 K 变。
-   *  需助记词（派生新 K）+ 已解锁的 User Key（内存中，不变）。
-   *  重新包裹 encrypted_user_key = AES(新K, UserKey) + 新 cached_K + 新 auth hash。
-   *  旧主密码验证由服务端 change-password 端点完成（current_local_password_hash）。 */
+   *  需助记词 + 邮箱（派生新 K + 新 SRP x）+ 已解锁的 User Key（内存中，不变）。
+   *  重新包裹 encrypted_user_key = AES(新K, UserKey) + 新 cached_K + 新 mnemonic_encrypted + 新 SRP verifier。
+   *  旧主密码验证由前置 SRP 登录完成（fresh token），此函数只产新材料。 */
   async changeMasterPassword(
     mnemonic: string,
+    email: string,
     mnemonicSaltBase64: string,
     newMasterPassword: string,
     newLocalSaltBase64: string,
   ): Promise<{
     new_encrypted_user_key: string;
     new_cached_K: string;
-    new_local_password_hash: string;
+    new_srp_verifier: string;
+    new_srp_salt: string;
+    new_mnemonic_encrypted: string;
   }> {
     if (!this.userKey) throw new Error("not_unlocked");
     const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
@@ -161,13 +188,23 @@ class KeyChain {
     const userKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
     // 重新包裹 User Key（User Key 不变，K 变）
     const new_encrypted_user_key = await aesEncrypt(newK, userKeyRaw);
-    // 新本地缓存：cached_K = AES(新 localDerivedKey, 新 K_raw)
+    // 新本地缓存：cached_K + mnemonic_encrypted（新 localDerivedKey 包裹）
     const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", newK));
     const newSalt = this.base64ToBytes(newLocalSaltBase64);
     const newLocalDerivedKey = await deriveKey(newMasterPassword, newSalt);
     const new_cached_K = await aesEncrypt(newLocalDerivedKey, kRaw);
-    const new_local_password_hash = await deriveAuthKey(newMasterPassword, newSalt);
-    return { new_encrypted_user_key, new_cached_K, new_local_password_hash };
+    const new_mnemonic_encrypted = await aesEncryptString(newLocalDerivedKey, mnemonic);
+    // 新 SRP verifier
+    const newSrpSalt = generateSrpSalt();
+    const x = await deriveX(newMasterPassword, mnemonic, newSrpSalt, email);
+    const v = computeVerifier(x);
+    return {
+      new_encrypted_user_key,
+      new_cached_K,
+      new_srp_verifier: bigIntToHex(v),
+      new_srp_salt: bytesToHex(newSrpSalt),
+      new_mnemonic_encrypted,
+    };
   }
 
   /** 导出 User Key 的 raw bytes */

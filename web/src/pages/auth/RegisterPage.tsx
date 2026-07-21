@@ -12,12 +12,6 @@ import { saveSession } from "../../db/sessionStore";
 import { GOOGLE_CLIENT_ID, checkPasswordStrength } from "../../config/constants";
 import { generateMnemonic } from "../../crypto/bip39";
 
-function generateMnemonicSalt(): string {
-  const salt = new Uint8Array(32);
-  crypto.getRandomValues(salt);
-  return Array.from(salt).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 type RegisterTab = "email" | "phone" | "google";
 
 declare global {
@@ -114,52 +108,58 @@ export function RegisterPage() {
 
     setLoading(true);
     try {
-      // 生成助记词（BIP39 12 词）+ salt，用于派生 K
+      // 生成助记词（BIP39 12 词），用于派生 K + SRP x（助记词 = Secret Key，仅本地）
       const mnemonic = generateMnemonic();
-      const mnemonicHmacSalt = generateMnemonicSalt();
-      const keys = await keyChain.generateKeys(mnemonic, password);
+      const identifier = tab === "email" ? email : tab === "phone" ? phone : "google";
+      const keys = await keyChain.generateKeys(mnemonic, password, identifier);
       let tokens: { access_token: string; refresh_token: string; user_id: string } | null = null;
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
-          local_password_hash: keys.localPasswordHash, local_salt: keys.localSalt,
+          srp_verifier: keys.srp_verifier, srp_salt: keys.srp_salt,
+          local_salt: keys.localSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          mnemonic_salt: keys.mnemonic_salt, mnemonic: mnemonic, mnemonic_hmac_salt: mnemonicHmacSalt,
+          mnemonic_salt: keys.mnemonic_salt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         tokens = response;
         await saveSession({
           email, localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
+          mnemonic_encrypted: keys.mnemonic_encrypted,
         });
       } else if (tab === "phone") {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
-          local_password_hash: keys.localPasswordHash, local_salt: keys.localSalt,
+          srp_verifier: keys.srp_verifier, srp_salt: keys.srp_salt,
+          local_salt: keys.localSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          mnemonic_salt: keys.mnemonic_salt, mnemonic: mnemonic, mnemonic_hmac_salt: mnemonicHmacSalt,
+          mnemonic_salt: keys.mnemonic_salt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         tokens = response;
         await saveSession({
           email: phone, localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
+          mnemonic_encrypted: keys.mnemonic_encrypted,
         });
       } else {
         const response = await apiClient.registerGoogle({
           google_id_token: googleIdToken,
-          local_password_hash: keys.localPasswordHash, local_salt: keys.localSalt,
+          srp_verifier: keys.srp_verifier, srp_salt: keys.srp_salt,
+          local_salt: keys.localSalt,
           encrypted_user_key: keys.encrypted_user_key,
           kdf_settings: keys.kdfSettings,
-          mnemonic_salt: keys.mnemonic_salt, mnemonic: mnemonic, mnemonic_hmac_salt: mnemonicHmacSalt,
+          mnemonic_salt: keys.mnemonic_salt,
           device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
         });
         tokens = response;
         await saveSession({
           email: "google", localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
+          mnemonic_encrypted: keys.mnemonic_encrypted,
         });
       }
 
@@ -205,7 +205,7 @@ export function RegisterPage() {
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.register.emailPlaceholder")}
               style={{ flex: 1, padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
-              <SendCodeButton onClick={() => handleSendCode("email")} disabled={!email} />
+            <SendCodeButton onClick={() => handleSendCode("email")} disabled={!email} />
           </div>
         </div>
         <div style={{ marginBottom: "0.75rem" }}>
@@ -234,7 +234,7 @@ export function RegisterPage() {
         <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
       </div>
 
-      {/* Google tab — 始终在 DOM 中，只隐藏不销毁 */}
+      {/* Google tab - 始终在 DOM 中，只隐藏不销毁 */}
       <div style={{ display: tab === "google" ? "block" : "none" }}>
         {!googleAuthed ? (
           <div style={{ textAlign: "center", padding: "1rem 0" }}>
@@ -279,7 +279,7 @@ export function RegisterPage() {
           <div style={{ background: "#fff", borderRadius: 12, padding: "2rem", maxWidth: 480, width: "90%", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
             <h2 style={{ color: "#0f3460", marginBottom: "0.5rem" }}>🔐 助记词</h2>
             <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: "1rem" }}>
-              请妥善保存以下 12 个词。主密码参与加密密钥派生，忘主密码后需凭助记词在新设备恢复数据。此助记词仅显示一次，无法再次查看。
+              请妥善保存以下 12 个词。主密码与助记词共同参与加密密钥派生，换设备时需凭助记词恢复数据。此助记词仅显示一次，无法再次查看。
             </p>
             <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "1rem", fontFamily: "monospace", fontSize: "1rem", lineHeight: 1.8, wordBreak: "break-all", marginBottom: "1rem" }}>
               {mnemonic}

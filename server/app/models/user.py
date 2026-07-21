@@ -24,8 +24,9 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String(320), unique=True, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
     google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
-    local_password_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    local_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 本地密码派生用盐
+    srp_verifier: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # SRP verifier v 的 hex（对标 1Password，替代 bcrypt hash）
+    srp_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # SRP salt 的 hex（16 字节）
+    local_salt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 本地 cached_K 派生用盐（保留，非认证用）
     kdf_settings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

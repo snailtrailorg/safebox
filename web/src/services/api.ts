@@ -1,5 +1,5 @@
 /**
- * API 客户端 — fetch 封装 + JWT 注入 + 401 自动刷新
+ * API 客户端 - fetch 封装 + JWT 注入 + 401 自动刷新
  * 对应 Android ApiService.kt + AuthInterceptor.kt
  */
 import type {
@@ -9,8 +9,10 @@ import type {
   RegisterPhoneRequest,
   RegisterGoogleRequest,
   RegisterResponse,
-  LoginEmailRequest,
-  LoginPhoneRequest,
+  SaltResponse,
+  SRPChallengeRequest,
+  SRPChallengeResponse,
+  SRPVerifyRequest,
   LoginGoogleRequest,
   LoginResponse,
   ChangePasswordRequest,
@@ -19,8 +21,7 @@ import type {
   RefreshTokenResponse,
   RegisterDeviceRequest,
   RegisterDeviceResponse,
-  InitiateRecoveryRequest,
-  InitiateRecoveryResponse,
+  DeleteAccountRequest,
   SyncPushRequest,
   SyncPushResponse,
   SyncPullResponse,
@@ -112,7 +113,7 @@ class ApiClient {
       throw new ApiError(response.status, message);
     }
 
-    // 204 No Content — 无 body，跳过 json 解析
+    // 204 No Content - 无 body，跳过 json 解析
     if (response.status === 204) {
       return undefined as T;
     }
@@ -155,19 +156,19 @@ class ApiClient {
     return this.request("POST", "/auth/register/google", req, true);
   }
 
-  async getSalt(email?: string, phone?: string): Promise<{ local_salt: string; kdf_settings: any; mnemonic_salt: string }> {
+  async getSalt(email?: string, phone?: string): Promise<SaltResponse> {
     const params = new URLSearchParams();
     if (email) params.set("email", email);
     if (phone) params.set("phone", phone);
     return this.request("GET", `/auth/salt?${params.toString()}`, undefined, true);
   }
 
-  async loginEmail(req: LoginEmailRequest): Promise<LoginResponse> {
-    return this.request("POST", "/auth/login/email", req, true);
+  async loginSrpChallenge(req: SRPChallengeRequest): Promise<SRPChallengeResponse> {
+    return this.request("POST", "/auth/login/srp/challenge", req, true);
   }
 
-  async loginPhone(req: LoginPhoneRequest): Promise<LoginResponse> {
-    return this.request("POST", "/auth/login/phone", req, true);
+  async loginSrpVerify(req: SRPVerifyRequest): Promise<LoginResponse> {
+    return this.request("POST", "/auth/login/srp/verify", req, true);
   }
 
   async loginGoogle(req: LoginGoogleRequest): Promise<LoginResponse> {
@@ -176,12 +177,6 @@ class ApiClient {
 
   async changePassword(req: ChangePasswordRequest): Promise<ChangePasswordResponse> {
     return this.request("POST", "/auth/change-password", req, true);
-  }
-
-  // ── Recovery 端点 ─────────────────────────────────
-
-  async initiateRecovery(req: InitiateRecoveryRequest): Promise<InitiateRecoveryResponse> {
-    return this.request("POST", "/auth/recovery/initiate", req, true);
   }
 
   async registerDevice(req: RegisterDeviceRequest): Promise<RegisterDeviceResponse> {
@@ -206,8 +201,8 @@ class ApiClient {
 
   // ── 账号管理 ────────────────────────────────────
 
-  async deleteAccount(): Promise<void> {
-    await this.request("DELETE", "/auth/account");
+  async deleteAccount(req: DeleteAccountRequest): Promise<void> {
+    await this.request("DELETE", "/auth/account", req);
   }
 
   async logout(): Promise<void> {

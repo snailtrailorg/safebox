@@ -1,67 +1,42 @@
-"""API 边界场景测试。"""
+"""API 边界场景测试（SRP-6a）。"""
 import pytest
 from httpx import AsyncClient
 
-REG = {
-    "verification_code": "123456",
-    "local_password_hash": "hash",
-    "local_salt": "salt",
-    "encrypted_user_key": "fake-euk",
-    "mnemonic_salt": "rec-salt",
-    "mnemonic": "abandon ability able about above absent absorb abstract accuse achieve acid acoustic",
-    "mnemonic_hmac_salt": "rec-code-salt",
-    "device_name": "Test",
-    "device_public_key": "device_pub",
-    "device_wrapped": "device_wrapped",
-}
+from tests._srp import register_payload, srp_login
 
 
 @pytest.mark.asyncio
 async def test_login_after_register(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "login-test@safebox.example.com",
-        "local_password_hash": "login_test_hash", "local_salt": "login_test_salt",
-        "local_salt": "login_test_wrapped", "recovery_wrapped": "login_test_recovery",
-        "encrypted_private": "login_test_enc_priv", "rsa_public_key": "login_test_rsa_pub",
-    })
+    email = "login-test@safebox.example.com"
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     assert resp.status_code == 201
 
-    resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "login-test@safebox.example.com", "local_password_hash": "login_test_hash",
-    })
+    resp = await srp_login(client, "email", email)
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert data["local_salt"] == "login_test_wrapped"
+    assert data["local_salt"] == "salt"
 
 
 @pytest.mark.asyncio
 async def test_login_wrong_password(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "wrong-pw@safebox.example.com",
-        "local_password_hash": "correct_hash",
-    })
+    email = "wrong-pw@safebox.example.com"
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     assert resp.status_code == 201
 
-    resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "wrong-pw@safebox.example.com", "local_password_hash": "wrong_hash",
-    })
+    resp = await srp_login(client, "email", email, password="wrong-password")
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_login_nonexistent_user(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/login/email", json={
-        "email": "nonexistent@safebox.example.com", "local_password_hash": "some_hash",
-    })
+    resp = await srp_login(client, "email", "nonexistent@safebox.example.com")
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_sync_push_empty(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "empty-push@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("empty-push@safebox.example.com"))
     token = resp.json()["access_token"]
     resp = await client.post("/api/v1/sync/push", json={"items": []},
         headers={"Authorization": f"Bearer {token}"})
@@ -71,7 +46,7 @@ async def test_sync_push_empty(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client: AsyncClient):
-    payload = {**REG, "email": "dup@safebox.example.com"}
+    payload = register_payload("dup@safebox.example.com")
     resp = await client.post("/api/v1/auth/register/email", json=payload)
     assert resp.status_code == 201
     resp = await client.post("/api/v1/auth/register/email", json=payload)
@@ -80,9 +55,7 @@ async def test_register_duplicate_email(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_push_multiple_item_types(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "types@safebox.example.com",
-    })
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("types@safebox.example.com"))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     resp = await client.post("/api/v1/sync/push", json={"items": [
@@ -96,14 +69,8 @@ async def test_push_multiple_item_types(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_push_matches_by_server_id_cross_device(client: AsyncClient):
-    """跨设备 re-push 已同步条目：带 server_id 时按 server_id 匹配更新，不新建重复（M6）。
-
-    设备 A 创建（client_did=1）-> 得 server_id。设备 B 拉取后本地 did 不同，
-    再编辑 push 时带不同 client_did 但同 server_id -> 应更新同一条，而非新建。
-    """
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "crossdev@safebox.example.com",
-    })
+    """跨设备 re-push 已同步条目：带 server_id 时按 server_id 匹配更新，不新建重复。"""
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("crossdev@safebox.example.com"))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -116,8 +83,7 @@ async def test_push_matches_by_server_id_cross_device(client: AsyncClient):
     server_id = resp.json()["results"][0]["server_id"]
     assert server_id
 
-    # 设备 B（不同 client_did）带 server_id 重新推送更新。
-    # version=1 是客户端持有的基线（== 服务端当前 1），按乐观并发接受。
+    # 设备 B（不同 client_did）带 server_id 重新推送更新
     resp = await client.post("/api/v1/sync/push", json={"items": [
         {"client_did": 999, "server_id": server_id, "type": "login", "icon": None,
          "name": "updated", "description": None, "data": None, "version": 1,
@@ -125,7 +91,7 @@ async def test_push_matches_by_server_id_cross_device(client: AsyncClient):
     ]}, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["results"][0]["status"] == "updated"
-    assert resp.json()["results"][0]["server_id"] == server_id  # 同一条
+    assert resp.json()["results"][0]["server_id"] == server_id
 
     # 服务端应只有 1 条该用户的条目（无重复）
     resp = await client.get(
@@ -139,14 +105,8 @@ async def test_push_matches_by_server_id_cross_device(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_push_version_optimistic_concurrency(client: AsyncClient):
-    """冲突按 version 乐观并发检测（方案 A，不依赖时钟）：
-
-    - base version == 服务端当前 -> 接受，version+1
-    - base version < 服务端当前（客户端基于旧版编辑）-> conflict
-    """
-    resp = await client.post("/api/v1/auth/register/email", json={
-        **REG, "email": "verocc@safebox.example.com",
-    })
+    """冲突按 version 乐观并发检测（方案 A，不依赖时钟）。"""
+    resp = await client.post("/api/v1/auth/register/email", json=register_payload("verocc@safebox.example.com"))
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -189,7 +149,7 @@ async def test_push_version_optimistic_concurrency(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_health_check(client: AsyncClient):
     resp = await client.get("/health")
-    # 503 偶发：测试隔离导致的 asyncpg 跨 loop / DB 连接池问题（与 test_auth::test_health 一致）
+    # 503 偶发：测试隔离导致的 DB 连接池问题
     assert resp.status_code in (200, 503)
     if resp.status_code == 200:
         assert resp.json() == {"status": "ok"}

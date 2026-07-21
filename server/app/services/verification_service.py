@@ -4,6 +4,7 @@ from typing import Optional
 import secrets
 import time
 import uuid
+import json
 from datetime import timedelta
 
 import redis.asyncio as aioredis
@@ -100,6 +101,43 @@ async def clear_login_failures(target: str, value: str) -> None:
     await r.delete(key)
 
 
+# ── SRP session（登录握手中间态，Redis TTL 5min）──────────────────
+
+SRP_SESSION_TTL = 300  # 5 分钟
+
+
+def _srp_session_key(session_id: str) -> str:
+    return f"srp_session:{session_id}"
+
+
+async def create_srp_session(
+    b_hex: str, v_hex: str, A_hex: str,
+    user_id: Optional[str], target_type: str, target: str,
+) -> str:
+    """存 SRP 握手中间态（b/v/A/user_id/target），返回 session_id。"""
+    r = await _get_redis()
+    session_id = secrets.token_urlsafe(32)
+    payload = json.dumps({
+        "b": b_hex, "v": v_hex, "A": A_hex,
+        "user_id": user_id, "target_type": target_type, "target": target,
+    })
+    await r.setex(_srp_session_key(session_id), timedelta(seconds=SRP_SESSION_TTL), payload)
+    return session_id
+
+
+async def get_srp_session(session_id: str) -> Optional[dict]:
+    r = await _get_redis()
+    payload = await r.get(_srp_session_key(session_id))
+    if payload is None:
+        return None
+    return json.loads(payload)
+
+
+async def delete_srp_session(session_id: str) -> None:
+    r = await _get_redis()
+    await r.delete(_srp_session_key(session_id))
+
+
 # ── IP 频率限制（滑动窗口）─────────────────────────────
 
 IP_RATE_WINDOW = 3600       # 滑动窗口 1 小时
@@ -109,7 +147,7 @@ IP_RATE_LIMIT_MAX = 500     # 单 IP 每小时最多请求次数
 async def check_ip_rate(ip: str) -> bool:
     """检查 IP 请求频率。滑动窗口 1 小时，超限返回 True（拒绝本次请求）。
 
-    每个请求：移走窗口外旧记录 → ZCARD 检查当前计数 → ZADD 记录本次。
+    每个请求：移走窗口外旧记录 -> ZCARD 检查当前计数 -> ZADD 记录本次。
     EXPIRE 兜底回收：IP 停止请求后 1 小时 key 自动消失。
     """
     if not ip:

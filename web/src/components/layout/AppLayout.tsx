@@ -58,11 +58,25 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
 
   const handleDeleteAccount = async () => {
     setDropdownOpen(false);
+    const session = await getSession();
+    const contact = session.email || "";
+    // Google 用户无 email/phone，无法收验证码（OAuth 登录限制）
+    if (contact && contact !== "google") {
+      try {
+        await apiClient.sendCode({ target: contact.includes("@") ? "email" : "phone", value: contact });
+        alert(t("settings.codeSent"));
+      } catch (e: any) {
+        alert(e.message || "Failed to send code");
+        return;
+      }
+    }
+    const code = prompt(t("settings.deleteAccountEnterCode"));
+    if (!code) return;
     const confirm1 = prompt(t("settings.deleteAccountConfirm1"));
     if (confirm1 !== t("settings.deleteAccountConfirmAnswer")) return;
     if (!confirm(t("settings.deleteAccountConfirm2"))) return;
     try {
-      await apiClient.deleteAccount();
+      await apiClient.deleteAccount({ verification_code: code });
       await logout();
       navigate("/login");
     } catch (e: any) {

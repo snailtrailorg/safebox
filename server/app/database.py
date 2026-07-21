@@ -17,7 +17,17 @@ def get_engine():
     if _engine is None:
         from app.config import settings
 
-        _engine = create_async_engine(settings.database_url, echo=False)
+        _engine = create_async_engine(
+            settings.database_url,
+            echo=False,
+            # 连接池健壮性：默认 pool_pre_ping=False / pool_recycle=-1 会在 PG 或
+            # 防火墙断开空闲连接后留死连接，借出时 hang 到 pool_timeout（默认 30s）。
+            pool_pre_ping=True,   # 借出前 ping，自动剔除死连接
+            pool_recycle=1800,    # 30 分钟主动回收，防空闲连接被对端断开
+            pool_size=10,          # 每 worker 常驻 10（gunicorn -w 2 共 20）
+            max_overflow=20,       # 单 worker 上限 30
+            pool_timeout=10,       # 等连接超时 10s，快速失败留日志（默认 30s）
+        )
         _session_factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
     return _engine
 

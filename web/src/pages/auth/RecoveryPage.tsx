@@ -1,12 +1,12 @@
 /**
- * RecoveryPage - 换设备登录（新模型：主密码参与 K 派生，忘主密码=数据丢失）
+ * RecoveryPage - 换设备登录（SRP-6a + 合并主密码模型）
  *
  * 流程（对应 1Password 换设备）：
- * 1. GET /auth/salt -> local_salt + mnemonic_salt
- * 2. POST /auth/login/email（主密码 hash）-> token + encrypted_user_key（服务器验主密码）
- * 3. recoverAndRewrap：助记词 + 主密码派生 K -> 解 UserKey + 建本地缓存
+ * 1. GET /auth/salt -> srp_salt + local_salt + mnemonic_salt
+ * 2. SRP 两步登录（助记词 + 主密码派生 x）-> token + encrypted_user_key + M2
+ * 3. recoverAndRewrap：助记词 + 主密码派生 K -> 解 UserKey + 建本地缓存（cached_K + mnemonic_encrypted）
  *
- * 助记词对不对靠解密成败判断（服务器不单独验，同 1Password 不验 Secret Key）。
+ * SRP 的 x 含助记词，故 SRP 登录同时验主密码 + 助记词。
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,10 +16,13 @@ import { PasswordInput } from "../../components/ui/PasswordInput";
 import { Toast } from "../../components/ui/Toast";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
-import { deriveAuthKey } from "../../crypto/kdf";
-import { base64ToBytes } from "../../crypto/aes";
 import { saveSession } from "../../db/sessionStore";
 import { useAuth } from "../../context/AuthContext";
+import {
+  generatePrivateEphemeral, computeClientPublic, computeU, computeClientS,
+  computeK, computeM1, verifyM2, deriveX,
+  bigIntToHex, hexToBigInt, hexToBytes, bytesToHex,
+} from "../../crypto/srp";
 
 export function RecoveryPage() {
   const { t } = useTranslation();
@@ -47,18 +50,33 @@ export function RecoveryPage() {
     }
     setLoading(true);
     try {
-      // 1. 取 salt（local_salt + mnemonic_salt）
-      const saltInfo = await apiClient.getSalt(email);
+      // 1. 取 salt
+      const salt = await apiClient.getSalt(email);
 
-      // 2. 主密码 hash -> 登录拿 token + encrypted_user_key（服务器验主密码）
-      const localPasswordHash = await deriveAuthKey(masterPassword, base64ToBytes(saltInfo.local_salt));
-      const resp = await apiClient.loginEmail({ email, local_password_hash: localPasswordHash });
+      // 2. SRP 两步登录（用输入的助记词 + 主密码派生 x）
+      const a = generatePrivateEphemeral();
+      const A = computeClientPublic(a);
+      const chal = await apiClient.loginSrpChallenge({
+        target_type: "email", target: email, A: bigIntToHex(A),
+      });
+      const B = hexToBigInt(chal.B);
+      const x = await deriveX(masterPassword, mnemonic, hexToBytes(salt.srp_salt), email);
+      const u = await computeU(A, B);
+      const S = await computeClientS(B, a, u, x);
+      const K = await computeK(S);
+      const M1 = await computeM1(A, B, K);
+      const resp = await apiClient.loginSrpVerify({
+        session_id: chal.session_id, M1: bytesToHex(M1),
+      });
+      if (!await verifyM2(A, M1, K, resp.M2)) {
+        throw new Error(t("auth.recovery.recoverFailed"));
+      }
 
-      // 3. 助记词 + 主密码派生 K -> 解 UserKey + 建本地缓存（换设备无 cached_K）
+      // 3. 助记词 + 主密码派生 K -> 解 UserKey + 建本地缓存（换设备无 cached_K/mnemonic_encrypted）
       const rec = await keyChain.recoverAndRewrap(
         mnemonic, masterPassword, resp.mnemonic_salt, resp.encrypted_user_key, resp.local_salt,
       );
-      if (!rec.ok || !rec.newCachedK) {
+      if (!rec.ok || !rec.newCachedK || !rec.mnemonicEncrypted) {
         throw new Error(t("auth.recovery.recoverFailed"));
       }
 
@@ -72,6 +90,7 @@ export function RecoveryPage() {
         encrypted_user_key: resp.encrypted_user_key,
         mnemonic_salt: resp.mnemonic_salt,
         cached_K: rec.newCachedK,
+        mnemonic_encrypted: rec.mnemonicEncrypted,
       });
       login(resp.access_token, resp.refresh_token, resp.user_id);
       navigate("/");

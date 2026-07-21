@@ -74,7 +74,8 @@
       "codeSent": "Code sent.",
       "sendFailed": "Failed to send code.",
       "loginFailed": "Sign in failed.",
-      "enterPassword": "Please enter password."
+      "enterPassword": "Please enter password.",
+      "needRecovery": "No mnemonic cached on this device. Use recovery to sign in on a new device."
     },
     "register": {
       "title": "Sign Up",
@@ -260,6 +261,7 @@
     "confirmChange": "Confirm Change",
     "logoutConfirm": "Sign out? Your keys will be cleared from memory.",
     "deleteAccount": "🗑️ Delete Account",
+    "deleteAccountEnterCode": "Enter the verification code sent to your email/phone:",
     "deleteAccountConfirm1": "To confirm, type DELETE below:",
     "deleteAccountConfirmAnswer": "DELETE",
     "deleteAccountConfirm2": "All your data will be permanently deleted. This action cannot be undone. Continue?",

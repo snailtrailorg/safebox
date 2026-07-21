@@ -48,6 +48,7 @@ export interface SessionData {
   cached_K: string;             // AES(K, PBKDF2(本地密码))，本地缓存 K
   encrypted_user_key: string;   // AES(K, User Key)，从服务器获取
   mnemonic_salt: string;        // K 派生用盐
+  mnemonic_encrypted?: string;  // AES(localDerivedKey, mnemonic)，同设备登录算 SRP x 用（换设备后写入）
   lastSyncTime: string;
   lastSyncId: string | null;     // 上次同步最后一条 server_id，与 lastSyncTime 组成复合游标
 }
