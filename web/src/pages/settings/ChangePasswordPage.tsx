@@ -14,11 +14,8 @@ import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { getSession, saveSession } from "../../db/sessionStore";
-import {
-  generatePrivateEphemeral, computeClientPublic, computeU, computeClientS,
-  computeK, computeM1, verifyM2, deriveX,
-  bigIntToHex, hexToBigInt, hexToBytes, bytesToHex,
-} from "../../crypto/srp";
+import { bytesToHex } from "../../crypto/srp";
+import { performSrpLogin } from "../../services/srpAuth";
 import { checkPasswordStrength } from "../../config/constants";
 
 export function ChangePasswordPage() {
@@ -73,24 +70,9 @@ export function ChangePasswordPage() {
         const salt = targetType === "email"
           ? await apiClient.getSalt(contact)
           : await apiClient.getSalt(undefined, contact);
-        const a = generatePrivateEphemeral();
-        const A = computeClientPublic(a);
-        const chal = await apiClient.loginSrpChallenge({
-          target_type: targetType, target: contact, A: bigIntToHex(A),
-        });
-        const B = hexToBigInt(chal.B);
-        const x = await deriveX(currentPassword, mnemonic, hexToBytes(salt.srp_salt), identifier);
-        const u = await computeU(A, B);
-        const S = await computeClientS(B, a, u, x);
-        const K = await computeK(S);
-        const M1 = await computeM1(A, B, K);
-        const resp = await apiClient.loginSrpVerify({
-          session_id: chal.session_id, M1: bytesToHex(M1),
-        });
-        if (!await verifyM2(A, M1, K, resp.M2)) {
-          throw new Error(t("settings.currentPasswordWrong"));
-        }
-        await saveSession({ accessToken: resp.access_token, refreshToken: resp.refresh_token });
+        // 同设备传 device_id（验未 revoked）；fresh SRP 建 K 续用（改密不重握手，session_K 保留直到重登）
+        const { resp, K } = await performSrpLogin(targetType, contact, currentPassword, mnemonic, salt, session.device_id);
+        await saveSession({ accessToken: resp.access_token, refreshToken: resp.refresh_token, session_K: bytesToHex(K) });
       }
 
       // 3. 新盐 + 助记词+新主密码重派生 K + 重包裹 encrypted_user_key + 新 SRP verifier

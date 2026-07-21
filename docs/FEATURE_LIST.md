@@ -132,8 +132,8 @@
 |------|---------|
 | users | id, email, phone, google_id, srp_verifier, srp_salt, local_salt, kdf_settings, created_at, updated_at |
 | user_keys | user_id, encrypted_user_key, mnemonic_salt, created_at, updated_at |
-| token_families | user_id, family, active_token_hash, used_at |
-| user_devices | user_id, device_name, device_public_key, device_wrapped, last_active_at |
+| token_families | user_id, family, active_token_hash, device_id(FK), used_at |
+| user_devices | user_id, device_name, device_public_key, device_wrapped, client_name, os_name, last_auth_ip, is_revoked, revoked_at, last_active_at, created_at, updated_at |
 | items | id, user_id, client_did, type, icon, name(EncryptedField JSON), description, data, version, is_deleted, updated_at, created_at |
 
 > `mnemonics` 表已删（SRP 改造，助记词不上传）
@@ -144,14 +144,24 @@
 |------|------|------|
 | 健康检查 | `GET /health` -> `{status:"ok"}` | `GET /health` |
 
+## 设备 deauthorize + SRP K 通信（Phase 2）
+
+| 功能 | 描述 | 端点 |
+|------|------|------|
+| device_id 绑 token | access/refresh 含 device_id claim；UserDevice 加 is_revoked/revoked_at | - |
+| 设备列表 | 当前用户所有设备（含 client_name/os_name/last_auth_ip/is_current/is_revoked/last_active_at） | GET /auth/devices |
+| deauthorize | 撤销设备（access 立即失效，Redis revoked TTL 30min；删该 device TokenFamily） | DELETE /auth/devices/{id} |
+| SRP K 通信加密 | 认证 POST body + 响应 AES-256-GCM(K) 加密（K session 级 30 天，不存拒 401；强制 X-Safebox-Encrypted 防 downgrade） | middleware |
+
+对标 1Password SRP+GCM 传输层（白皮书 L1706/L1948）。不做：分享（RSA）、device_key 并行 UserKey（SSO 专用）。
+
 ## 十一、已知限制与技术债
 
 | 项 | 说明 |
 |------|------|
-| register-device 占位 | `device_public_key/device_wrapped` 传占位值 `"web"` |
 | RSA 工具死代码 | `crypto/rsa.ts` 保留但全项目无引用 |
 | 文件 blob 不同步 | 多设备间文件内容不同步，仅元数据同步 |
-| logout 不清本地密钥 | 退出只清 token，保留 cached_K/mnemonic_encrypted（重新登录可解锁） |
+| logout 清本地密钥 | 决策 A：退出清 cached_K/mnemonic_encrypted/session_K/token，重登需助记词+主密码（走 RecoveryPage） |
 | Google 用户改密/删号 | 用当前 token（无 email/phone 走 SRP 登录），验证码可能失败（无 email/phone） |
 | Google 用户 SRP identifier | 固定 "google"（注册/改密一致） |
 | sync_batch_limit | config.py 声明=100，但代码未引用（pull limit 用 Query 默认，max 500 硬编码） |

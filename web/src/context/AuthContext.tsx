@@ -86,15 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.logout();
+      await apiClient.logout();  // server 撤销 token + 清 session_key
     } catch {
       // 网络错误不影响本地登出
     }
     keyChain.lock();
-    // 只清 token，保留密钥材料（cached_K/encrypted_user_key 等）
-    // 否则退出后重新登录需要助记词（cached_K 丢了，密码单独解不出 User Key）
-    const { saveSession } = await import("../db/sessionStore");
-    await saveSession({ accessToken: "", refreshToken: "" });
+    // 决策A（对标 1Password）：清整个 session（cached_K + mnemonic_encrypted + session_K + token），
+    // 重登要主密码 + 助记词（走换设备流程 SRP + recoverAndRewrap 重建缓存）
+    await clearSession();
     setState({ status: "guest", userId: "", dbUnavailable: false, countdown: 0 });
   }, []);
 

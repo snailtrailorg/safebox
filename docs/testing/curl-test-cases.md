@@ -192,18 +192,7 @@ curl -s -X POST $BASE/api/v1/auth/refresh-token \
 curl -s -X POST $BASE/api/v1/auth/logout \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{}"
-# 204（撤销该用户所有 token family；本地 cached_K/mnemonic_encrypted 保留）
-```
-
-## TC-14 设备注册
-
-```bash
-curl -s -X POST $BASE/api/v1/auth/register-device \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"device_name\":\"Web\",\"device_public_key\":\"web\",\"device_wrapped\":\"web\"}"
-# 200 {"device_id":"..."}
-# device_public_key/device_wrapped 为占位值
+# 204（撤销所有 token family + 清所有 device session_key；本地 cached_K/mnemonic_encrypted/session_K 也清，决策 A）
 ```
 
 ## TC-15 注销账号
@@ -216,6 +205,50 @@ curl -s -X DELETE $BASE/api/v1/auth/account \
   -d "{\"verification_code\":\"123456\"}"
 # 204（fresh token + 验证码；验证码绑定用户注册联系方式；FK 级联删全数据，不可恢复）
 ```
+
+---
+
+## Phase 2：device + K 通信
+
+### device 绑定（SRP challenge）
+- SRP challenge 传 `device_id`（同设备，from IndexedDB）或 `device_name`（新设备，建 UserDevice）
+- verify 响应含 `device_id`（token 绑定）
+- challenge/verify 从 `User-Agent` + `X-Real-IP` 解析填充 device 的 `client_name`/`os_name`/`last_auth_ip`
+
+### 设备管理
+```bash
+TOKEN="<登录 token>"
+# 响应是 K 加密密文（X-Safebox-Encrypted:1），curl 看不到明文，需 K 解密
+curl -s "$BASE/api/v1/auth/devices" -H "Authorization: Bearer $TOKEN"
+# 200（密文）解密后: [{id, device_name, device_wrapped, client_name, os_name, last_auth_ip, last_active_at, created_at, is_revoked, is_current}]
+
+curl -s -X DELETE "$BASE/api/v1/auth/devices/<device_id>" -H "Authorization: Bearer $TOKEN" -H "X-Safebox-Encrypted: 1"
+# 204（该设备 access 立即失效 + 删该 device TokenFamily + Redis device:revoked，下次请求 401 device_revoked）
+```
+
+### SRP K 通信加密（对标 1Password SRP+GCM）
+- K = SRP 握手 H(S)，**session 级**（login 到 logout，TTL 30 天 = refresh 同期，refresh 续）
+- 认证 POST body + 响应用 K AES-256-GCM 加密，header `X-Safebox-Encrypted: 1`
+- K 不存（session 过期/Redis 故障）-> **401 `session expired`**（强制重 SRP login，防 downgrade）
+- curl 单独无法完成（需算 K + AES-GCM），用 Python httpx + `tests/_srp.py` 模拟，见 `server/tests/test_auth.py`
+
+### Phase 2 测试用例（需 Python + K，curl 无法直接验）
+
+| 用例 | 测 | 预期 |
+|------|------|------|
+| TC-P2-01 | register 响应 | 含 `device_id` |
+| TC-P2-02 | SRP challenge 传 `device_id`（同设备） | verify 响应 device_id 一致 + devices[] is_current:true |
+| TC-P2-03 | SRP challenge 传 `device_name`（新设备） | verify 响应新 device_id + devices[] 多一条 |
+| TC-P2-04 | deauthorize 后该 device access 调 /sync/pull | 401 `device_revoked` |
+| TC-P2-05 | 对已 revoked device 再 DELETE | 204（幂等） |
+| TC-P2-06 | DELETE 他人 device_id | 404 `device_not_found` |
+| TC-P2-07 | challenge 传已 revoked 的 device_id | 401 `device_revoked` |
+| TC-P2-08 | 登录后 POST /auth/change-password 缺 `X-Safebox-Encrypted` header | **400** `encrypted body required`（非 401） |
+| TC-P2-09 | 带 `X-Safebox-Encrypted:1` 但 body 非合法 AES-GCM | 400 `decrypt failed` |
+| TC-P2-10 | GET /auth/devices 响应 | `Content-Type: application/octet-stream` + `X-Safebox-Encrypted:1`，body 密文（需 K 解） |
+| TC-P2-11 | POST /auth/logout 缺 `X-Safebox-Encrypted` | 400（POST 属强制加密，即便 body={}） |
+| TC-P2-12 | K 不存（删 Redis session_key）后认证 | 401 `session expired` |
+| TC-P2-13 | 设备信息填充 | challenge/verify 后 device 有 client_name/os_name/last_auth_ip（从 User-Agent + IP） |
 
 ---
 

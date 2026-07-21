@@ -18,11 +18,8 @@ import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { saveSession } from "../../db/sessionStore";
 import { useAuth } from "../../context/AuthContext";
-import {
-  generatePrivateEphemeral, computeClientPublic, computeU, computeClientS,
-  computeK, computeM1, verifyM2, deriveX,
-  bigIntToHex, hexToBigInt, hexToBytes, bytesToHex,
-} from "../../crypto/srp";
+import { bytesToHex } from "../../crypto/srp";
+import { performSrpLogin } from "../../services/srpAuth";
 
 export function RecoveryPage() {
   const { t } = useTranslation();
@@ -53,24 +50,8 @@ export function RecoveryPage() {
       // 1. 取 salt
       const salt = await apiClient.getSalt(email);
 
-      // 2. SRP 两步登录（用输入的助记词 + 主密码派生 x）
-      const a = generatePrivateEphemeral();
-      const A = computeClientPublic(a);
-      const chal = await apiClient.loginSrpChallenge({
-        target_type: "email", target: email, A: bigIntToHex(A),
-      });
-      const B = hexToBigInt(chal.B);
-      const x = await deriveX(masterPassword, mnemonic, hexToBytes(salt.srp_salt), email);
-      const u = await computeU(A, B);
-      const S = await computeClientS(B, a, u, x);
-      const K = await computeK(S);
-      const M1 = await computeM1(A, B, K);
-      const resp = await apiClient.loginSrpVerify({
-        session_id: chal.session_id, M1: bytesToHex(M1),
-      });
-      if (!await verifyM2(A, M1, K, resp.M2)) {
-        throw new Error(t("auth.recovery.recoverFailed"));
-      }
+      // 2. SRP 两步登录（用输入的助记词 + 主密码派生 x；新设备无 device_id -> 建 UserDevice）
+      const { resp, K } = await performSrpLogin("email", email, masterPassword, mnemonic, salt);
 
       // 3. 助记词 + 主密码派生 K -> 解 UserKey + 建本地缓存（换设备无 cached_K/mnemonic_encrypted）
       const rec = await keyChain.recoverAndRewrap(
@@ -80,7 +61,7 @@ export function RecoveryPage() {
         throw new Error(t("auth.recovery.recoverFailed"));
       }
 
-      // 4. 落库 + 登录
+      // 4. 落库 + 登录（device_id + session_K 建，cached_K + mnemonic_encrypted 重建）
       await saveSession({
         email,
         accessToken: resp.access_token,
@@ -91,6 +72,8 @@ export function RecoveryPage() {
         mnemonic_salt: resp.mnemonic_salt,
         cached_K: rec.newCachedK,
         mnemonic_encrypted: rec.mnemonicEncrypted,
+        device_id: resp.device_id,
+        session_K: bytesToHex(K),
       });
       login(resp.access_token, resp.refresh_token, resp.user_id);
       navigate("/");

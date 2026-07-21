@@ -37,7 +37,7 @@
 ```
 > 助记词不上传（客户端本地持有 + 加密缓存）。`device_*` 为占位值。
 
-响应 201：`{"user_id": "uuid", "access_token": "jwt", "refresh_token": "jwt"}`
+响应 201：`{"user_id": "uuid", "access_token": "jwt", "refresh_token": "jwt", "device_id": "uuid"}`
 
 ### POST /auth/register/phone
 同上，`email` 换 `phone`。
@@ -63,7 +63,7 @@
 ### POST /auth/login/srp/challenge
 SRP 第一步：客户端发 A，服务端返回 B + session_id（存 Redis TTL 5min）。
 
-请求：`{"target_type": "email|phone", "target": "...", "A": "hex"}`
+请求：`{"target_type": "email|phone", "target": "...", "A": "hex", "device_id?": "同设备", "device_name?": "新设备"}`
 响应 200：`{"session_id": "...", "B": "hex"}`
 429：登录限流（`login_rate_limited`，含 `seconds`）
 
@@ -76,13 +76,13 @@ SRP 第二步：客户端发 M1，服务端验证后返回 M2 + token。
 {
   "access_token": "...", "refresh_token": "...",
   "local_salt": "...", "encrypted_user_key": "...", "mnemonic_salt": "...",
-  "M2": "hex(服务端证据)", "devices": [...]
+  "M2": "hex(服务端证据)", "device_id": "uuid(token 绑定)", "devices": [...]
 }
 ```
 401：M1 不匹配（错密码/错助记词/用户不存在，统一错误防枚举）
 
 ### POST /auth/login/google
-请求：`{"google_id_token": "..."}`，响应同 SRP verify（无 M2，Google 不走 SRP）。
+请求：`{"google_id_token": "...", "device_id?": "同设备", "device_name?": "新设备"}`，响应同 SRP verify（无 M2，Google 不走 SRP）。
 
 ### POST /auth/change-password
 改主密码（需 Bearer + 验证码）。旧主密码由前置 SRP 登录验（fresh token），此端点只写新材料。
@@ -106,17 +106,30 @@ SRP 第二步：客户端发 M1，服务端验证后返回 M2 + token。
 ### POST /auth/logout
 需 Bearer。204 No Content。
 
-### POST /auth/register-device
-需 Bearer。请求：`{"device_name": "...", "device_public_key": "...", "device_wrapped": "..."}`
-响应 200：`{"device_id": "..."}`
-> 保留端点，`device_*` 为占位值。
-
 ### DELETE /auth/account
 需 Bearer。旧主密码由前置 SRP 登录验（fresh token）。
 请求：`{"verification_code": "123456"}`
 204 No Content（FK 级联删全数据，不可恢复）。
 
 **已删除端点**：`/auth/login/email`、`/auth/login/phone`、`/auth/recovery/initiate`、所有 `/auth/recovery/*`。
+
+---
+
+## 设备管理 + SRP K 通信加密（Phase 2）
+
+### GET /auth/devices
+需 Bearer。响应：`[{id, device_name, device_wrapped, client_name, os_name, last_auth_ip, last_active_at, created_at, is_revoked, is_current}]`
+
+### DELETE /auth/devices/{device_id}
+需 Bearer。标记设备 revoked + 删该 device 的 TokenFamily + Redis `device:revoked:{id}`（access 立即失效）。204
+
+### SRP K 通信加密（对标 1Password SRP+GCM）
+- 登录后认证 API：POST body + 响应用 SRP K（AES-256-GCM）加密，header `X-Safebox-Encrypted: 1`（强制，防 downgrade）
+- K 生命周期 = session 级（login 到 logout，TTL 30 天 = refresh token 同期，refresh 续）；K 不存（session 过期/Redis 故障）-> 401 `session expired`（强制重 SRP login 重建 K，防 downgrade）
+- 登录前 API（/salt/register/login/refresh）不加密
+- SRP challenge 请求加 `device_id?`（同设备）/`device_name?`（新设备）；verify 响应加 `device_id`（token 绑定）
+- refresh 续 K TTL（`session_key:{device_id}` Redis）
+- 设备信息：challenge/verify 从 `User-Agent` + `X-Real-IP` 解析填充 device 的 `client_name`（浏览器名+版本）/`os_name`/`last_auth_ip`
 
 ---
 

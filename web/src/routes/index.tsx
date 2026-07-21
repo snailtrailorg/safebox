@@ -12,6 +12,7 @@ import { ItemEditPage } from "../pages/vault/ItemEditPage";
 import { ChangePasswordPage } from "../pages/settings/ChangePasswordPage";
 import { ExportBackupPage } from "../pages/settings/ExportBackupPage";
 import { ImportBackupPage } from "../pages/settings/ImportBackupPage";
+import { DevicesPage } from "../pages/settings/DevicesPage";
 
 export function AppRoutes() {
   return (
@@ -93,6 +94,14 @@ export function AppRoutes() {
         element={
           <AuthGuard>
             <ImportBackupPage />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path="/settings/devices"
+        element={
+          <AuthGuard>
+            <DevicesPage />
           </AuthGuard>
         }
       />

@@ -8,9 +8,11 @@ import { SendCodeButton } from "../../components/ui/SendCodeButton";
 import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
-import { saveSession } from "../../db/sessionStore";
+import { saveSession, getSession } from "../../db/sessionStore";
 import { GOOGLE_CLIENT_ID, checkPasswordStrength } from "../../config/constants";
 import { generateMnemonic } from "../../crypto/bip39";
+import { bytesToHex } from "../../crypto/srp";
+import { performSrpLogin } from "../../services/srpAuth";
 
 type RegisterTab = "email" | "phone" | "google";
 
@@ -48,7 +50,7 @@ export function RegisterPage() {
   const [googleTimeout, setGoogleTimeout] = useState(false);
   const [mnemonic, setMnemonic] = useState("");
   const [showMnemonic, setShowMnemonic] = useState(false);
-  const [pendingTokens, setPendingTokens] = useState<{ access_token: string; refresh_token: string; user_id: string } | null>(null);
+  const [pendingTokens, setPendingTokens] = useState<{ access_token: string; refresh_token: string; user_id: string; device_id: string } | null>(null);
 
   // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
   useEffect(() => {
@@ -112,7 +114,7 @@ export function RegisterPage() {
       const mnemonic = generateMnemonic();
       const identifier = tab === "email" ? email : tab === "phone" ? phone : "google";
       const keys = await keyChain.generateKeys(mnemonic, password, identifier);
-      let tokens: { access_token: string; refresh_token: string; user_id: string } | null = null;
+      let tokens: { access_token: string; refresh_token: string; user_id: string; device_id: string } | null = null;
       if (tab === "email") {
         const response = await apiClient.registerEmail({
           email, verification_code: code,
@@ -168,6 +170,42 @@ export function RegisterPage() {
       setMnemonic(mnemonic);
       setPendingTokens(tokens);
       setShowMnemonic(true);
+    } catch (e) {
+      setToast({ message: e instanceof Error ? e.message : t("auth.register.registerFailed"), type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 助记词确认后走 SRP 登录建 K（注册不 SRP 握手无 K；用刚生成的 mnemonic + 主密码 + 同 device_id 避免重复建 device）
+  const handleMnemonicConfirmed = async () => {
+    setShowMnemonic(false);
+    setLoading(true);
+    try {
+      if (tab === "google" || !pendingTokens) {
+        // Google 不走 SRP（无 K）-> TODO Google K 方案；临时 login（无 session_K，认证将 401）
+        if (pendingTokens) login(pendingTokens.access_token, pendingTokens.refresh_token, pendingTokens.user_id);
+        navigate("/");
+        return;
+      }
+      const targetType = tab as "email" | "phone";
+      const target = tab === "email" ? email : phone;
+      const salt = targetType === "email"
+        ? await apiClient.getSalt(target)
+        : await apiClient.getSalt(undefined, target);
+      const { resp, K } = await performSrpLogin(targetType, target, password, mnemonic, salt, pendingTokens.device_id);
+      await saveSession({
+        device_id: resp.device_id,
+        session_K: bytesToHex(K),
+        localSalt: resp.local_salt,
+        encrypted_user_key: resp.encrypted_user_key,
+        mnemonic_salt: resp.mnemonic_salt,
+      });
+      // unlock UserKey（cached_K 注册时存，generateKeys 已设 userKey 但保险重解）
+      const session = await getSession();
+      await keyChain.unlockWithPassword(password, resp.local_salt, resp.encrypted_user_key, session.cached_K || "");
+      await login(resp.access_token, resp.refresh_token, resp.user_id || "");
+      navigate("/");
     } catch (e) {
       setToast({ message: e instanceof Error ? e.message : t("auth.register.registerFailed"), type: "error" });
     } finally {
@@ -291,15 +329,9 @@ export function RegisterPage() {
             <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
               ⚠️ 忘主密码且无助记词 = 数据永久丢失（主密码参与加密，无法重置）
             </p>
-            <button onClick={() => {
-              if (pendingTokens) {
-                login(pendingTokens.access_token, pendingTokens.refresh_token, pendingTokens.user_id);
-              }
-              setShowMnemonic(false);
-              navigate("/");
-            }}
-              style={{ width: "100%", padding: "0.75rem", background: "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: "pointer" }}>
-              我已保存，进入密码库
+            <button onClick={handleMnemonicConfirmed} disabled={loading}
+              style={{ width: "100%", padding: "0.75rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
+              {loading ? t("common.loggingIn") : "我已保存，进入密码库"}
             </button>
           </div>
         </div>

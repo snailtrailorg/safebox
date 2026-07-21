@@ -87,6 +87,9 @@ class FakeRedis:
         self.store[key] = str(v)
         return v
 
+    async def exists(self, key):
+        return 1 if key in self.store else 0
+
     async def expire(self, key, ttl):
         return True
 

@@ -194,6 +194,14 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
                   {t("settings.changePassword")}
                 </button>
 
+                {/* 设备管理 */}
+                <button
+                  onClick={() => navigateAndClose("/settings/devices")}
+                  style={menuBtnStyle("设备管理")}
+                >
+                  设备管理
+                </button>
+
                 {/* 分割线 */}
                 <div style={{ height: 1, background: "#eee" }} />
 

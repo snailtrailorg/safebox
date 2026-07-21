@@ -119,6 +119,23 @@
 
 ---
 
+## 十、设备 deauthorize + SRP K 通信（Phase 2）
+
+### 登录建 device + K
+- 注册/登录建 `UserDevice`（`device_id` 绑 access/refresh token）
+- SRP verify 后 `K=H(S)` 存 Redis `session_key:{device_id}` TTL 30min（refresh 续）+ client IndexedDB
+
+### deauthorize
+- `GET /auth/devices` 设备列表（含 `is_current`/`is_revoked`/`last_active_at`）
+- `DELETE /auth/devices/{id}` 撤销（标记 is_revoked + 删该 device TokenFamily + Redis `device:revoked:{id}`，access 立即失效）
+- 中间件 `get_current_user_id` 查 Redis revoked -> 401
+
+### K 通信加密（对标 1Password SRP+GCM 传输层）
+- 认证 POST body + 响应用 K AES-256-GCM 加密（`X-Safebox-Encrypted: 1`，强制防 downgrade）
+- 登录前 API（/salt/register/login/refresh）不加密
+
+---
+
 ## 九、核心原则
 
 | 原则 | 说明 |

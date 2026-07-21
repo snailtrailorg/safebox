@@ -14,6 +14,8 @@
   "user_not_found": "User not found.",
   "refresh_token_invalid": "Invalid or expired refresh token.",
   "invalid_token": "Invalid token.",
+  "device_revoked": "Device has been revoked. Please sign in again.",
+  "device_not_found": "Device not found.",
   "email_subject": "SafeBox Verification Code",
   "email_heading": "SafeBox Verification Code",
   "email_body_code": "Your verification code is:",

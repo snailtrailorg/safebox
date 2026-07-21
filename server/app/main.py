@@ -10,6 +10,7 @@ from app.api import api_router
 from app.config import settings
 from app.database import get_db
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.transport_crypto import TransportCryptoMiddleware
 
 
 @asynccontextmanager
@@ -40,6 +41,8 @@ app.add_middleware(
 )
 # 速率限制（最后添加 = 最外层，请求最先经过）
 app.add_middleware(RateLimitMiddleware)
+# SRP K 通信加密（最内层，路由前解密 / 响应加密）
+app.add_middleware(TransportCryptoMiddleware)
 
 app.include_router(api_router)
 

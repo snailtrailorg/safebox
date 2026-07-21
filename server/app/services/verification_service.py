@@ -113,13 +113,15 @@ def _srp_session_key(session_id: str) -> str:
 async def create_srp_session(
     b_hex: str, v_hex: str, A_hex: str,
     user_id: Optional[str], target_type: str, target: str,
+    device_id: Optional[str] = None, device_name: Optional[str] = None,
 ) -> str:
-    """存 SRP 握手中间态（b/v/A/user_id/target），返回 session_id。"""
+    """存 SRP 握手中间态（b/v/A/user_id/target/device），返回 session_id。"""
     r = await _get_redis()
     session_id = secrets.token_urlsafe(32)
     payload = json.dumps({
         "b": b_hex, "v": v_hex, "A": A_hex,
         "user_id": user_id, "target_type": target_type, "target": target,
+        "device_id": device_id, "device_name": device_name,
     })
     await r.setex(_srp_session_key(session_id), timedelta(seconds=SRP_SESSION_TTL), payload)
     return session_id
@@ -168,3 +170,61 @@ async def check_rate_key(key: str, window: int = IP_RATE_WINDOW, max_count: int 
     await r.zadd(key, {str(uuid.uuid4()): now})
     await r.expire(key, window)
     return False
+
+
+# ── Device deauthorize（access token 撤销标记，TTL = access 有效期）──
+
+from uuid import UUID as _UUID
+from datetime import timedelta as _timedelta
+
+DEVICE_REVOKED_TTL = 1800  # 30 分钟（access token 有效期，过期后自动清）
+
+
+def _device_revoked_key(device_id: _UUID) -> str:
+    return f"device:revoked:{device_id}"
+
+
+async def mark_device_revoked(device_id: _UUID) -> None:
+    """标记设备已撤销（access token 立即失效，TTL = access 有效期后自动清）。"""
+    r = await _get_redis()
+    await r.setex(_device_revoked_key(device_id), _timedelta(seconds=DEVICE_REVOKED_TTL), "1")
+
+
+async def is_device_revoked(device_id: _UUID) -> bool:
+    """检查设备是否已撤销。"""
+    r = await _get_redis()
+    return bool(await r.exists(_device_revoked_key(device_id)))
+
+
+# ── SRP 会话密钥 K（通信加密，TTL = session 级 = refresh token 同期 30 天）──
+# K 在 login（SRP verify）建立，login 到 logout 持久（对齐 cached_K），refresh 续 TTL。
+# logout/deauthorize 清 K。K 不存时 middleware 拒 401（session expired，防 downgrade）。
+
+SESSION_KEY_TTL = 30 * 24 * 3600  # 30 天（refresh token 同期，session 级）
+
+
+def _session_key_key(device_id: _UUID) -> str:
+    return f"session_key:{device_id}"
+
+
+async def store_session_key(device_id: _UUID, K_hex: str) -> None:
+    """SRP verify 后存 K（login 建立，TTL = session 级；refresh 时续）。"""
+    r = await _get_redis()
+    await r.setex(_session_key_key(device_id), _timedelta(seconds=SESSION_KEY_TTL), K_hex)
+
+
+async def get_session_key(device_id: _UUID) -> Optional[str]:
+    r = await _get_redis()
+    return await r.get(_session_key_key(device_id))
+
+
+async def renew_session_key(device_id: _UUID) -> None:
+    """refresh 时续 K TTL（保持 session 连续；K 已过期则 no-op，client 须重 SRP login）。"""
+    r = await _get_redis()
+    await r.expire(_session_key_key(device_id), _timedelta(seconds=SESSION_KEY_TTL))
+
+
+async def delete_session_key(device_id: _UUID) -> None:
+    """logout/deauthorize 时清 K（session 终点，client 须重 SRP login 重建 K）。"""
+    r = await _get_redis()
+    await r.delete(_session_key_key(device_id))

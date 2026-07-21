@@ -9,11 +9,8 @@ import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
 import { saveSession, getSession } from "../../db/sessionStore";
-import {
-  generatePrivateEphemeral, computeClientPublic, computeU, computeClientS,
-  computeK, computeM1, verifyM2, deriveX,
-  bigIntToHex, hexToBigInt, hexToBytes, bytesToHex,
-} from "../../crypto/srp";
+import { bytesToHex } from "../../crypto/srp";
+import { performSrpLogin } from "../../services/srpAuth";
 import { GOOGLE_CLIENT_ID } from "../../config/constants";
 import type { LoginResponse } from "../../types/api";
 
@@ -109,12 +106,12 @@ export function LoginPage() {
   };
 
   // ── SRP 两步登录（email/phone 共用）─────────────────
-  const srpLogin = async (targetType: "email" | "phone", target: string, pw: string) => {
+  const srpLogin = async (targetType: "email" | "phone", target: string, pw: string): Promise<{ resp: LoginResponse; K: Uint8Array }> => {
     // 1. 拿 srp_salt/local_salt
     const salt = targetType === "email"
       ? await apiClient.getSalt(target)
       : await apiClient.getSalt(undefined, target);
-    // 2. 从本地缓存解出 mnemonic（同设备登录算 SRP x 用）
+    // 2. 从本地缓存解出 mnemonic（同设备登录算 SRP x 用）；无缓存（logout 后/换设备）-> 引导 RecoveryPage
     const session = await getSession();
     if (!session.mnemonic_encrypted || !session.cached_K) {
       throw new Error(t("auth.login.needRecovery"));
@@ -123,26 +120,8 @@ export function LoginPage() {
     if (!mnemonic) {
       throw new Error(t("auth.login.unlockFailed"));
     }
-    // 3. challenge: A -> B
-    const a = generatePrivateEphemeral();
-    const A = computeClientPublic(a);
-    const chal = await apiClient.loginSrpChallenge({
-      target_type: targetType, target, A: bigIntToHex(A),
-    });
-    const B = hexToBigInt(chal.B);
-    // 4. 算 x/S/K/M1
-    const x = await deriveX(pw, mnemonic, hexToBytes(salt.srp_salt), target);
-    const u = await computeU(A, B);
-    const S = await computeClientS(B, a, u, x);
-    const K = await computeK(S);
-    const M1 = await computeM1(A, B, K);
-    // 5. verify: M1 -> M2 + token
-    const resp = await apiClient.loginSrpVerify({ session_id: chal.session_id, M1: bytesToHex(M1) });
-    // 6. 验证服务端 M2
-    if (!await verifyM2(A, M1, K, resp.M2)) {
-      throw new Error(t("auth.login.loginFailed"));
-    }
-    return resp;
+    // 3. SRP challenge + verify + 派生 K（同设备传 device_id，新设备传 device_name 建 UserDevice）
+    return performSrpLogin(targetType, target, pw, mnemonic, salt, session.device_id);
   };
 
   const handleEmailLogin = async () => {
@@ -152,13 +131,15 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const response = await srpLogin("email", email, password);
+      const { resp: response, K } = await srpLogin("email", email, password);
       await saveSession({
         email,
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
-        // cached_K / mnemonic_encrypted 保留（merge）
+        device_id: response.device_id,
+        session_K: bytesToHex(K),
+        // cached_K / mnemonic_encrypted 保留（merge，同设备登录用）
       });
       await handleLoginResponse(response, password);
     } catch (e) {
@@ -181,12 +162,14 @@ export function LoginPage() {
     }
     setLoading(true);
     try {
-      const response = await srpLogin("phone", phone, phonePassword);
+      const { resp: response, K } = await srpLogin("phone", phone, phonePassword);
       await saveSession({
         email: phone,
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
+        device_id: response.device_id,
+        session_K: bytesToHex(K),
       });
       await handleLoginResponse(response, phonePassword);
     } catch (e) {

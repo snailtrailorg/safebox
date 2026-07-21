@@ -152,19 +152,6 @@ async def test_unauthorized_access(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_register_device(client: AsyncClient):
-    resp = await client.post("/api/v1/auth/register/email", json=register_payload("device@safebox.example.com"))
-    token = resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    resp = await client.post("/api/v1/auth/register-device", json={
-        "device_name": "Tablet", "device_public_key": "dpk2", "device_wrapped": "dw2",
-    }, headers=headers)
-    assert resp.status_code == 200
-    assert "device_id" in resp.json()
-
-
-@pytest.mark.asyncio
 async def test_get_salt(client: AsyncClient):
     """GET /salt 返回 SRP 参数 + salt，不返回密钥材料。"""
     resp = await client.post("/api/v1/auth/register/email", json=register_payload("salt@safebox.example.com"))

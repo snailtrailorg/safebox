@@ -49,6 +49,8 @@ export interface SessionData {
   encrypted_user_key: string;   // AES(K, User Key)，从服务器获取
   mnemonic_salt: string;        // K 派生用盐
   mnemonic_encrypted?: string;  // AES(localDerivedKey, mnemonic)，同设备登录算 SRP x 用（换设备后写入）
+  device_id?: string;            // 当前设备 id（token 绑定，deauthorize 用）
+  session_K?: string;            // SRP 会话密钥 K 的 hex（通信加密用，TTL=session 级 30 天，login 存 logout 清）
   lastSyncTime: string;
   lastSyncId: string | null;     // 上次同步最后一条 server_id，与 lastSyncTime 组成复合游标
 }

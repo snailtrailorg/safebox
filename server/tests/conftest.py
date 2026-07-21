@@ -53,6 +53,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = override_get_db
 
     # Mock Redis 依赖的验证/限流函数；SRP session 走 FakeRedis（无真 Redis）
+    # K 通信：mock 固定 K + identity 加解密 + 测试请求带 X-Safebox-Encrypted header，
+    # 让 middleware 透传明文（测试关注业务逻辑，不验传输层加密；K 通信正确性靠前端 transport.ts 测试）
     fake_redis = FakeRedis()
     with (
         patch("app.api.auth.verify_and_consume", new_callable=AsyncMock) as mock_verify,
@@ -65,15 +67,19 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         patch("app.api.auth.send_sms", new_callable=AsyncMock),
         patch("app.middleware.rate_limit.check_rate_key", new_callable=AsyncMock) as mock_rate,
         patch("app.services.verification_service._get_redis", new_callable=AsyncMock) as mock_redis,
+        patch("app.middleware.transport_crypto.get_session_key", new_callable=AsyncMock) as mock_session_key,
+        patch("app.services.transport_crypto.encrypt", side_effect=lambda K, data: data),
+        patch("app.services.transport_crypto.decrypt", side_effect=lambda K, data: data),
     ):
         mock_verify.return_value = True
         mock_rl.return_value = True
         mock_wait.return_value = 0
         mock_rate.return_value = False  # 不限流
         mock_redis.return_value = fake_redis
+        mock_session_key.return_value = "00" * 32  # 固定测试 K（middleware identity 加解密透传）
 
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        async with AsyncClient(transport=transport, base_url="http://test", headers={"X-Safebox-Encrypted": "1"}) as ac:
             yield ac
 
     app.dependency_overrides.clear()

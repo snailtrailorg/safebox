@@ -1,4 +1,4 @@
-/** API 请求/响应类型（SRP-6a 模型）。 */
+/** API 请求/响应类型（SRP-6a + device 模型）。 */
 
 // ── 验证码 ──────────────────────────────────────────
 
@@ -11,24 +11,24 @@ export interface SendCodeResponse { expires_in: number }
 // ── /salt 响应 ─────────────────────────────────────
 
 export interface SaltResponse {
-  srp_salt: string;        // hex，2SKD x 派生用
-  local_salt: string;      // base64，cached_K / mnemonic 缓存派生用
-  mnemonic_salt: string;   // base64，K 派生用
+  srp_salt: string;
+  local_salt: string;
+  mnemonic_salt: string;
   kdf_settings: { algorithm: string; iterations: number };
-  N: string;               // hex，RFC 3526 4096-bit（前端也硬编码，此处用于一致性校验）
-  g: string;               // "2"
+  N: string;
+  g: string;
 }
 
-// ── 注册 ──────────────────────────────────────────
+// ── 注册 ──
 
 export interface RegisterEmailRequest {
   email: string;
   verification_code: string;
-  srp_verifier: string;          // hex，客户端 deriveX + computeVerifier 本地派生
-  srp_salt: string;               // hex，客户端生成
+  srp_verifier: string;
+  srp_salt: string;
   local_salt: string;
-  encrypted_user_key: string;     // AES(K, User Key), K=PBKDF2(助记词+主密码,mnemonic_salt)
-  mnemonic_salt: string;          // K 派生用盐
+  encrypted_user_key: string;
+  mnemonic_salt: string;
   kdf_settings?: Record<string, unknown>;
   device_name?: string;
   device_public_key?: string;
@@ -39,7 +39,7 @@ export interface RegisterPhoneRequest extends Omit<RegisterEmailRequest, "email"
 }
 export interface RegisterGoogleRequest {
   google_id_token: string;
-  srp_verifier: string;           // Google 用户也存 verifier，供改密/删号 SRP 验旧密码
+  srp_verifier: string;
   srp_salt: string;
   local_salt: string;
   encrypted_user_key: string;
@@ -53,24 +53,31 @@ export interface RegisterResponse {
   user_id: string;
   access_token: string;
   refresh_token: string;
+  device_id: string;            // 当前设备 id（token 绑定）
 }
 
-// ── 登录（SRP-6a 两步：challenge A->B，verify M1->M2+token）──
+// ── 登录（SRP-6a 两步 + device 绑定）──
 
 export interface SRPChallengeRequest {
   target_type: "phone" | "email";
   target: string;
-  A: string;                      // hex，客户端公开值
+  A: string;
+  device_id?: string;           // 同设备登录（已有 device）
+  device_name?: string;         // 新设备登录（建 UserDevice）
 }
 export interface SRPChallengeResponse {
   session_id: string;
-  B: string;                      // hex，服务端公开值
+  B: string;
 }
 export interface SRPVerifyRequest {
   session_id: string;
-  M1: string;                     // hex，客户端证据
+  M1: string;
 }
-export interface LoginGoogleRequest { google_id_token: string }
+export interface LoginGoogleRequest {
+  google_id_token: string;
+  device_id?: string;
+  device_name?: string;
+}
 export interface LoginResponse {
   user_id: string;
   access_token: string;
@@ -78,12 +85,24 @@ export interface LoginResponse {
   local_salt: string;
   encrypted_user_key: string;
   mnemonic_salt: string;
-  M2: string;                     // hex，服务端证据（SRP 登录有，Google 登录空）
+  M2: string;
+  device_id: string;            // 当前设备 id（token 绑定）
   devices?: DeviceInfo[];
 }
-export interface DeviceInfo { id: string; device_name?: string | null; device_wrapped: string }
+export interface DeviceInfo {
+  id: string;
+  device_name?: string | null;
+  device_wrapped: string;
+  client_name?: string | null;
+  os_name?: string | null;
+  last_auth_ip?: string | null;
+  last_active_at?: string | null;
+  created_at?: string | null;
+  is_revoked: boolean;
+  is_current: boolean;
+}
 
-// ── 改密（旧密码由前置 SRP 登录验，此端点只传新材料）──
+// ── 改密 ──
 
 export interface ChangePasswordRequest {
   target: "phone" | "email";
@@ -92,7 +111,7 @@ export interface ChangePasswordRequest {
   new_srp_verifier: string;
   new_srp_salt: string;
   new_local_salt: string;
-  new_encrypted_user_key: string;   // AES(新K, UserKey)，主密码参与 K 派生，改密重包裹
+  new_encrypted_user_key: string;
 }
 export interface ChangePasswordResponse {
   success: boolean;
@@ -105,12 +124,7 @@ export interface ChangePasswordResponse {
 export interface RefreshTokenRequest { refresh_token: string }
 export interface RefreshTokenResponse { access_token: string; refresh_token: string }
 
-// ── 设备 ──────────────────────────────────────────
-
-export interface RegisterDeviceRequest { device_name?: string; device_public_key: string; device_wrapped: string }
-export interface RegisterDeviceResponse { device_id: string }
-
-// ── 删号（旧密码由前置 SRP 登录验，只需验证码）──
+// ── 删号 ──
 
 export interface DeleteAccountRequest { verification_code: string }
 

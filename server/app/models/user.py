@@ -78,11 +78,19 @@ class UserDevice(Base):
     device_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     device_public_key: Mapped[str] = mapped_column(Text)
     device_wrapped: Mapped[str] = mapped_column(Text)
+    client_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # 浏览器名（User-Agent 解析，如 "Chrome 120"）
+    os_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # OS（如 "Fedora"）
+    last_auth_ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # 最后认证 IP
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_active_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=utcnow
     )
 
     user: Mapped["User"] = relationship(back_populates="devices")
@@ -101,6 +109,9 @@ class TokenFamily(Base):
     )
     family: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     active_token_hash: Mapped[str] = mapped_column(String(128))
+    device_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("user_devices.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     used_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -70,14 +70,14 @@ function UnlockScreen() {
       const session = await getSession();
       const ok = await keyChain.unlockWithPassword(password, session.localSalt, session.encrypted_user_key, session.cached_K || "");
       if (!ok) {
-        setError(t("auth.login.unlockFailed"));
+        setError("密码错误，或主密码已在他设备更改。若刚改过密码，请点下方「退出登录」后用助记词 + 新密码恢复。");
         setUnlocking(false);
         return;
       }
       // 模型 D：无 RSA，直接解锁
       unlock();
     } catch {
-      setError(t("auth.login.unlockFailed"));
+      setError("密码错误，或主密码已在他设备更改。若刚改过密码，请点下方「退出登录」后用助记词 + 新密码恢复。");
       setUnlocking(false);
     }
   };

@@ -195,7 +195,28 @@ EncryptedField = { encrypted_key, ciphertext }
 
 ---
 
-## 八、文档索引
+## 九、设备 deauthorize + SRP K 通信（Phase 2）
+
+### 设备绑定 + deauthorize
+- 登录/注册建 `UserDevice`，`device_id` 绑 access/refresh token（claim）
+- 中间件 `get_current_user_id` 查 Redis `device:revoked:{id}`（TTL 30min），revoked -> 401（access 立即失效，解决 30min 重用）
+- `TokenFamily` 加 `device_id` 列，`revoke_device_tokens` 按 device 撤销
+- `GET /auth/devices` 设备列表（含 `is_current`/`is_revoked`/`last_active_at`），`DELETE /auth/devices/{id}` deauthorize
+
+### SRP K 通信加密（对标 1Password SRP+GCM 传输层）
+- SRP verify 后 `K=H(S)` 存 Redis `session_key:{device_id}` TTL 30min（refresh 续）+ client IndexedDB
+- 认证 POST body + 响应用 K AES-256-GCM 加密（`nonce(12)+ciphertext+tag`）
+- `services/transport_crypto.py`（AES-GCM service，cryptography 库）+ `middleware/transport_crypto.py`（BaseHTTPMiddleware，解密认证 body + 加密响应）
+- 强制 `X-Safebox-Encrypted` header（防 downgrade）；K 不存透传（兼容旧 token/测试）
+
+### 不做（基于白皮书分析）
+- 分享（RSA 密钥对）：白皮书 L412 vault sharing 专用，SafeBox 单用户
+- device_key 并行 UserKey：白皮书 L1163 device key 是 SSO 专用（无主密码），SafeBox 都有主密码，独立解会违背忘主密码=数据丢失
+- 每请求 Ed25519 签名：1Password 无此设计
+
+---
+
+## 十、文档索引
 
 | 文档 | 内容 |
 |---|---|

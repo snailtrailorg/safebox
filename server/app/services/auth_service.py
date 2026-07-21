@@ -62,6 +62,9 @@ async def create_user_with_keys(
     device_name: Optional[str] = None,
     device_public_key: str = "web",
     device_wrapped: str = "web",
+    client_name: Optional[str] = None,
+    os_name: Optional[str] = None,
+    last_auth_ip: Optional[str] = None,
 ) -> User:
     """注册：创建 user + user_keys + device。
 
@@ -92,9 +95,12 @@ async def create_user_with_keys(
         device_name=device_name,
         device_public_key=device_public_key,
         device_wrapped=device_wrapped,
+        client_name=client_name,
+        os_name=os_name,
+        last_auth_ip=last_auth_ip,
     )
     db.add(device)
 
     await db.commit()
     await db.refresh(user)
-    return user
+    return user, device.id

@@ -1,19 +1,20 @@
-"""认证 API：注册、登录（SRP-6a 两步）、验证码、改密、设备注册、注销。"""
+"""认证 API：注册、登录（SRP-6a 两步 + device 绑定）、验证码、改密、设备管理、注销。"""
 
-from typing import Optional
+from typing import Optional, List
 import json
 import hmac
 import hashlib
+from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import delete as sa_delete
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.i18n import get_lang, get_text
-from app.middleware import get_current_user_id
+from app.middleware import get_current_user_id, get_current_device_id
 from app.models import User, UserDevice
 from app.schemas.auth import (
     ChangePasswordRequest,
@@ -22,11 +23,8 @@ from app.schemas.auth import (
     DeviceInfo,
     LoginGoogleRequest,
     LoginResponse,
-    LogoutRequest,
     RefreshTokenRequest,
     RefreshTokenResponse,
-    RegisterDeviceRequest,
-    RegisterDeviceResponse,
     RegisterEmailRequest,
     RegisterGoogleRequest,
     RegisterPhoneRequest,
@@ -65,16 +63,21 @@ from app.services.srp_service import (
     is_valid_public,
     verify_M1,
 )
+from app.services.token_service import revoke_device_tokens
 from app.services.verification_service import (
     check_rate_limit,
     clear_login_failures,
     create_srp_session,
+    delete_session_key,
     delete_srp_session,
     generate_code,
     get_login_wait,
     get_srp_session,
+    mark_device_revoked,
     record_login_failure,
+    renew_session_key,
     store_code,
+    store_session_key,
     verify_and_consume,
 )
 
@@ -89,6 +92,104 @@ def _t(request: Request, key: str, **kw: object) -> str:
 
 def _login_err_key(target_type: str) -> str:
     return "email_or_password_wrong" if target_type == "email" else "phone_or_password_wrong"
+
+
+def _parse_user_agent(ua: str) -> tuple[str, str]:
+    """从 User-Agent 解析 (client_name, os_name)。简单解析，不依赖库。"""
+    import re
+    # 浏览器（顺序重要：Edge 含 Chrome 字样，Chrome 含 Safari 字样）
+    client = "Unknown"
+    if "Edg/" in ua:
+        client = "Edge"
+    elif "Chrome/" in ua and "Chromium" not in ua:
+        client = "Chrome"
+    elif "Firefox/" in ua:
+        client = "Firefox"
+    elif "Safari/" in ua and "Chrome" not in ua:
+        client = "Safari"
+    m = re.search(r"(?:Chrome|Firefox|Version|Edg)/(\d+)", ua)
+    ver = m.group(1) if m else ""
+    client_name = f"{client} {ver}" if ver else client
+    # OS
+    os_name = "Unknown"
+    if "Windows" in ua:
+        os_name = "Windows"
+    elif "Android" in ua:
+        os_name = "Android"
+    elif "iPhone" in ua or "iPad" in ua:
+        os_name = "iOS"
+    elif "Mac OS" in ua or "Macintosh" in ua:
+        os_name = "macOS"
+    elif "Linux" in ua:
+        os_name = "Linux"
+    return client_name, os_name
+
+
+def _client_ip(request: Request) -> str:
+    """最后认证 IP（X-Forwarded-For / X-Real-IP / client.host）。"""
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    xri = request.headers.get("X-Real-IP", "")
+    if xri:
+        return xri
+    return request.client.host if request.client else ""
+
+
+def _device_info(d: UserDevice, current_device_id: Optional[UUID] = None) -> DeviceInfo:
+    return DeviceInfo(
+        id=str(d.id),
+        device_name=d.device_name,
+        device_wrapped=d.device_wrapped,
+        client_name=d.client_name,
+        os_name=d.os_name,
+        last_auth_ip=d.last_auth_ip,
+        last_active_at=d.last_active_at.isoformat() if d.last_active_at else None,
+        created_at=d.created_at.isoformat() if d.created_at else None,
+        is_revoked=d.is_revoked,
+        is_current=(current_device_id == d.id),
+    )
+
+
+async def _resolve_device(
+    db: AsyncSession, user_id: UUID,
+    device_id_str: Optional[str], device_name: Optional[str],
+    request: Request,
+) -> UUID:
+    """登录后建/关联 device。同设备（device_id 有）验未 revoked + 更新 last_active_at + client_info；
+    新设备建 UserDevice（client_name/os_name/last_auth_ip 从 User-Agent + IP 解析）。"""
+    client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
+    ip = _client_ip(request)
+    if device_id_str:
+        try:
+            device_id = UUID(device_id_str)
+        except (ValueError, TypeError):
+            device_id = None
+        if device_id:
+            result = await db.execute(
+                select(UserDevice).where(UserDevice.id == device_id, UserDevice.user_id == user_id)
+            )
+            device = result.scalar_one_or_none()
+            if device and not device.is_revoked:
+                device.last_active_at = datetime.now(timezone.utc)
+                device.client_name = client_name
+                device.os_name = os_name
+                device.last_auth_ip = ip
+                await db.flush()
+                return device.id
+    # 新设备：建 UserDevice（device_public_key/device_wrapped 占位，deauthorize 用 device_id）
+    device = UserDevice(
+        user_id=user_id,
+        device_name=device_name,
+        device_public_key="web",
+        device_wrapped="web",
+        client_name=client_name,
+        os_name=os_name,
+        last_auth_ip=ip,
+    )
+    db.add(device)
+    await db.flush()
+    return device.id
 
 
 # ── 预登录 ──────────────────────────────────────────
@@ -128,13 +229,7 @@ async def get_salt(email: Optional[str] = None, phone: Optional[str] = None, db:
 
 
 def _derive_fake_salt(target: str) -> str:
-    """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。
-
-    - 稳定：同一 target 每次相同（与真实用户一致）。
-    - 格式一致：HMAC-SHA256 输出 32 字节 -> base64，与真实 salt 不可区分。
-    - 不可预测：依赖 jwt_secret_key，攻击者无法自行计算比对。
-    - SRP verify 时客户端用此 fake srp_salt 派生 x，与服务端 fake verifier 不匹配，必失败。
-    """
+    """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。"""
     import base64
     digest = hmac.new(settings.jwt_secret_key.encode(), target.encode(), hashlib.sha256).digest()
     return base64.b64encode(digest).decode()
@@ -171,17 +266,18 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "email_already_registered"))
 
-    # 清除该邮箱的历史登录失败计数（防止他人攻击导致的锁影响真正注册用户）
     await clear_login_failures("email", req.email)
 
-    user = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
+    client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
+    user, device_id = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
         srp_verifier=req.srp_verifier, srp_salt=req.srp_salt, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
         kdf_settings=req.kdf_settings,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
-    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
+        client_name=client_name, os_name=os_name, last_auth_ip=_client_ip(request))
+    access_token = create_access_token(user.id, device_id)
+    refresh_token = await create_refresh_token(db, user.id, device_id)
+    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))
 
 
 @router.post("/register/phone", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -194,14 +290,16 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
 
     await clear_login_failures("phone", req.phone)
 
-    user = await create_user_with_keys(db=db, email=None, phone=req.phone, google_id=None,
+    client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
+    user, device_id = await create_user_with_keys(db=db, email=None, phone=req.phone, google_id=None,
         srp_verifier=req.srp_verifier, srp_salt=req.srp_salt, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
         kdf_settings=req.kdf_settings,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
-    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
+        client_name=client_name, os_name=os_name, last_auth_ip=_client_ip(request))
+    access_token = create_access_token(user.id, device_id)
+    refresh_token = await create_refresh_token(db, user.id, device_id)
+    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))
 
 
 @router.post("/register/google", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -213,22 +311,24 @@ async def register_google(req: RegisterGoogleRequest, request: Request, db: Asyn
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "google_already_registered"))
 
-    user = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
+    client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
+    user, device_id = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
         srp_verifier=req.srp_verifier, srp_salt=req.srp_salt, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
         kdf_settings=req.kdf_settings,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
-    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token)
+        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
+        client_name=client_name, os_name=os_name, last_auth_ip=_client_ip(request))
+    access_token = create_access_token(user.id, device_id)
+    refresh_token = await create_refresh_token(db, user.id, device_id)
+    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))
 
 
-# ── 登录（SRP-6a 两步：challenge A->B，verify M1->M2+token）──────────
+# ── 登录（SRP-6a 两步 + device 绑定）──────────
 
-async def _build_login_response(db: AsyncSession, user, M2: str = "") -> LoginResponse:
-    """构建登录响应。SRP 登录传 M2（服务端证据），Google 登录无 M2。"""
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
+async def _build_login_response(db: AsyncSession, user, M2: str = "", device_id: Optional[UUID] = None) -> LoginResponse:
+    """构建登录响应。token 绑 device_id；SRP 登录传 M2，Google 登录无 M2。"""
+    access_token = create_access_token(user.id, device_id)
+    refresh_token = await create_refresh_token(db, user.id, device_id)
     keys = await get_user_keys(db, user.id)
     devices = await get_user_devices(db, user.id)
     return LoginResponse(
@@ -238,13 +338,14 @@ async def _build_login_response(db: AsyncSession, user, M2: str = "") -> LoginRe
         encrypted_user_key=keys.encrypted_user_key if keys else "",
         mnemonic_salt=keys.mnemonic_salt if keys else "",
         M2=M2,
-        devices=[DeviceInfo(id=str(d.id), device_name=d.device_name, device_wrapped=d.device_wrapped) for d in devices],
+        device_id=str(device_id) if device_id else "",
+        devices=[_device_info(d, device_id) for d in devices],
     )
 
 
 @router.post("/login/srp/challenge", response_model=SRPChallengeResponse)
 async def login_srp_challenge(req: SRPChallengeRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """SRP 第一步：客户端发 A，服务端返回 B + session_id（存 b/v/A 到 Redis）。"""
+    """SRP 第一步：客户端发 A，服务端返回 B + session_id（存 b/v/A/device 到 Redis）。"""
     wait = await get_login_wait(req.target_type, req.target)
     if wait > 0:
         await record_login_failure(req.target_type, req.target)
@@ -254,6 +355,19 @@ async def login_srp_challenge(req: SRPChallengeRequest, request: Request, db: As
         user = await find_user_by_email(db, req.target)
     else:
         user = await find_user_by_phone(db, req.target)
+
+    # 同设备登录：device_id 有则验 UserDevice 未 revoked
+    if user and req.device_id:
+        try:
+            did = UUID(req.device_id)
+            result = await db.execute(
+                select(UserDevice).where(UserDevice.id == did, UserDevice.user_id == user.id)
+            )
+            device = result.scalar_one_or_none()
+            if device and device.is_revoked:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "device_revoked"))
+        except (ValueError, TypeError):
+            pass
 
     try:
         A = int(req.A, 16)
@@ -275,13 +389,14 @@ async def login_srp_challenge(req: SRPChallengeRequest, request: Request, db: As
     session_id = await create_srp_session(
         b_hex=hex(b)[2:], v_hex=hex(v)[2:], A_hex=hex(A)[2:],
         user_id=user_id, target_type=req.target_type, target=req.target,
+        device_id=req.device_id, device_name=req.device_name,
     )
     return SRPChallengeResponse(session_id=session_id, B=hex(B)[2:])
 
 
 @router.post("/login/srp/verify", response_model=LoginResponse)
 async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """SRP 第二步：客户端发 M1，服务端验证后返回 M2 + token。"""
+    """SRP 第二步：客户端发 M1，服务端验证后返回 M2 + token（绑 device_id）。"""
     session = await get_srp_session(req.session_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SRP session expired")
@@ -293,6 +408,8 @@ async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSes
     v = int(session["v"], 16)
     A = int(session["A"], 16)
     user_id = session.get("user_id")
+    device_id_str = session.get("device_id")
+    device_name = session.get("device_name")
 
     try:
         client_M1 = bytes.fromhex(req.M1)
@@ -318,8 +435,11 @@ async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSes
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, _login_err_key(target_type)))
 
     await clear_login_failures(target_type, target)
+    device_id = await _resolve_device(db, UUID(user_id), device_id_str, device_name, request)
+    await db.commit()
+    await store_session_key(device_id, K.hex())  # 存 SRP 会话密钥 K（通信加密，TTL=session 级 30 天，login 存 logout 清）
     M2 = compute_M2(A, client_M1, K).hex()
-    return await _build_login_response(db, user, M2=M2)
+    return await _build_login_response(db, user, M2=M2, device_id=device_id)
 
 
 @router.post("/login/google", response_model=LoginResponse)
@@ -336,26 +456,28 @@ async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSessi
         await record_login_failure("google", google_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "google_not_registered"))
     await clear_login_failures("google", google_id)
-    return await _build_login_response(db, user)
+    device_id = await _resolve_device(db, user.id, req.device_id, req.device_name, request)
+    await db.commit()
+    return await _build_login_response(db, user, device_id=device_id)
 
 
 # ── 改主密码 ───────────────────────────────────────
-# 旧主密码由前置 SRP 登录验证（客户端先走 challenge+verify 拿 fresh token），此端点只验 fresh token + 验证码。
+# 旧主密码由前置 SRP 登录验证（fresh token），此端点只验 fresh token + 验证码。
 
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     req: ChangePasswordRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """改主密码：主密码参与 K 派生，更新 encrypted_user_key + srp_verifier/srp_salt/local_salt。
-    前端用助记词+新主密码派生新 K 重新包裹 UserKey，重新派生 SRP x 算新 verifier。旧密码由前置 SRP 登录验证。"""
+    新 token 继承当前 device_id。"""
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
 
-    # 验证码必须发到用户注册的邮箱/手机，不接受客户端自带的 target/value
     code_ok = (user.email and await verify_and_consume("email", user.email, req.verification_code)) or \
               (user.phone and await verify_and_consume("phone", user.phone, req.verification_code))
     if not code_ok:
@@ -368,12 +490,22 @@ async def change_password(
     if keys:
         keys.encrypted_user_key = req.new_encrypted_user_key
     await revoke_all_user_tokens(db, user.id)  # 同一事务吊销旧 token（单次 commit，原子）
+    # 清其他设备 session_key（让 B 等 K 不存 -> 401 -> 重登 RecoveryPage；当前 device 保留继续用）
+    device_id = await get_current_device_id(request)
+    if device_id:
+        result = await db.execute(
+            select(UserDevice.id).where(UserDevice.user_id == user.id, UserDevice.id != device_id)
+        )
+    else:
+        result = await db.execute(select(UserDevice.id).where(UserDevice.user_id == user.id))
+    for (did,) in result.fetchall():
+        await delete_session_key(did)
     await db.commit()
 
-    await send_recovery_alert(user, "password_changed")
+    background_tasks.add_task(send_recovery_alert, user, "password_changed")  # 异步发通知，不阻塞响应（SMTP 慢）
 
-    access_token = create_access_token(user.id)
-    refresh_token = await create_refresh_token(db, user.id)
+    access_token = create_access_token(user.id, device_id)
+    refresh_token = await create_refresh_token(db, user.id, device_id)
     return ChangePasswordResponse(success=True, access_token=access_token, refresh_token=refresh_token)
 
 
@@ -384,7 +516,9 @@ async def refresh_token(req: RefreshTokenRequest, request: Request, db: AsyncSes
     result = await verify_and_rotate_refresh_token(db, req.refresh_token)
     if result is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "refresh_token_invalid"))
-    new_access, new_refresh, _ = result
+    new_access, new_refresh, _, device_id = result
+    if device_id:
+        await renew_session_key(device_id)  # 续 K TTL（保持 session 连续）
     return RefreshTokenResponse(access_token=new_access, refresh_token=new_refresh)
 
 
@@ -393,18 +527,48 @@ async def refresh_token(req: RefreshTokenRequest, request: Request, db: AsyncSes
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(user_id: UUID = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     await revoke_all_user_tokens(db, user_id)
+    # 清该用户所有 device 的 session_key（session 终点，对称撤销 token；重登须重 SRP login 重建 K）
+    result = await db.execute(select(UserDevice.id).where(UserDevice.user_id == user_id))
+    for (device_id,) in result.fetchall():
+        await delete_session_key(device_id)
     await db.commit()
 
 
-# ── 设备注册 ─────────────────────────────────────
+# ── 设备管理 ─────────────────────────────────────
 
-@router.post("/register-device", response_model=RegisterDeviceResponse)
-async def register_device(req: RegisterDeviceRequest, user_id: UUID = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
-    device = UserDevice(user_id=user_id, device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped)
-    db.add(device)
+@router.get("/devices", response_model=List[DeviceInfo])
+async def list_devices(
+    request: Request,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """当前用户的所有设备列表（含 is_revoked / is_current）。"""
+    current = await get_current_device_id(request)
+    devices = await get_user_devices(db, user_id)
+    return [_device_info(d, current) for d in devices]
+
+
+@router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deauthorize_device(
+    device_id: UUID,
+    request: Request,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """撤销某设备：标记 is_revoked + 删该 device TokenFamily + Redis 标记（access 立即失效）。"""
+    result = await db.execute(
+        select(UserDevice).where(UserDevice.id == device_id, UserDevice.user_id == user_id)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "device_not_found"))
+    if device.is_revoked:
+        return  # 幂等
+    device.is_revoked = True
+    device.revoked_at = datetime.now(timezone.utc)
+    await revoke_device_tokens(db, device.id)
     await db.commit()
-    await db.refresh(device)
-    return RegisterDeviceResponse(device_id=str(device.id))
+    await mark_device_revoked(device.id)  # Redis 标记（access 立即失效，TTL = access 有效期）
 
 
 # ── 注销账号 ────────────────────────────────────────

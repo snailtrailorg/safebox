@@ -94,6 +94,14 @@
 - 前端（单个文件）：`cd web && npx vitest run src/__tests__/kdf-keychain.test.ts`
 - 测试数据库是 SQLite，不需要 PostgreSQL/Redis（conftest.py mock 了 Redis 依赖）
 
+### 设备 deauthorize + SRP K 通信加密（Phase 2）
+- **device_id 绑 token**：access/refresh token 加 `device_id` claim；`UserDevice` 加 `is_revoked`/`revoked_at`/`updated_at` + `client_name`/`os_name`/`last_auth_ip`（challenge/verify 从 User-Agent + X-Real-IP 解析填充）；`TokenFamily` 加 `device_id` 列（按 device 撤销）
+- **deauthorize**：`DELETE /auth/devices/{id}` 标记 is_revoked + 删该 device TokenFamily + Redis `device:revoked:{id}` TTL 30min（中间件 `get_current_user_id` 查，access 立即失效）；`GET /auth/devices` 设备列表。解决 access 30min 重用
+- **SRP K 通信加密**（对标 1Password SRP+GCM 传输层，白皮书 L1706/L1948）：SRP verify 后 `K=H(S)` 存 Redis `session_key:{device_id}` **TTL session 级 30 天**（refresh 续，login 存/logout 清）+ client IndexedDB。认证 POST body + 响应用 K AES-256-GCM 加密（`services/transport_crypto.py` service + `middleware/transport_crypto.py` **纯 ASGI middleware**，BaseHTTPMiddleware 的 call_next 不传 receive body 故用纯 ASGI）。强制 `X-Safebox-Encrypted` header；**K 不存拒 401 `session expired`**（不透传，防 downgrade）。logout/change-password 清 session_key（change-password 清其他 device 保留当前）
+- `middleware/__init__.py`：`get_current_user_id` 解 device_id + 查 `is_device_revoked` + 存 `request.state.device_id`；新增 `get_current_device_id`
+- 迁移 `g8b9c0d1e2f3_device_auth.py`（device 绑 token）+ `h9c0d1e2f3a4_device_info.py`（device info 字段）；i18n 加 `device_revoked`/`device_not_found`；`register-device` 端点已删（冗余，register/verify 的 _resolve_device 已建 device）
+- **不做**：分享（RSA，白皮书 L412 vault sharing 专用，SafeBox 单用户）、device_key 并行 UserKey（白皮书 L1163 SSO 专用，SafeBox 都有主密码，独立解会违背忘主密码=丢失）、每请求 Ed25519 签名
+
 ### 条目类型
 - 5 种：login / card / identity / note / file
 - 类型配置在 `config/itemTypes.ts`，使用 `buildItemTypeConfigs(t)` 构建

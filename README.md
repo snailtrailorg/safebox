@@ -166,6 +166,10 @@ npx vitest run     # 84 tests
 
 详见 `docs/`。
 
+## 设备 deauthorize + SRP K 通信（Phase 2）
+- **device_id 绑 token** + Redis `device:revoked`（access 立即失效，解决 30min 重用）+ `GET/DELETE /auth/devices`
+- **SRP K 通信加密**（对标 1Password SRP+GCM）：登录后认证 API body + 响应用 SRP 握手派生的 K（AES-256-GCM）加密，TLS 之上第二层，防路径泄密（Nginx/反代/中间人）
+
 ## 部署
 
 详见 `DEPLOY.md`。
