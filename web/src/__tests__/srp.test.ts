@@ -73,4 +73,22 @@ describe("SRP-6a 前后端一致性", () => {
     const x2 = await deriveX(PASSWORD, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", hexToBytes(SALT_HEX), EMAIL);
     expect(bigIntToHex(x1)).not.toBe(bigIntToHex(x2));
   });
+
+  it("verifyM2 错 M2 返 false（常量时间）", async () => {
+    const A = computeClientPublic(12345n);
+    const B = hexToBigInt(B_HEX);
+    const u = await computeU(A, B);
+    const x = await deriveX(PASSWORD, MNEMONIC, hexToBytes(SALT_HEX), EMAIL);
+    const S = await computeClientS(B, 12345n, u, x);
+    const K = await computeK(S);
+    const M1 = await computeM1(A, B, K);
+    expect(await verifyM2(A, M1, K, "00".repeat(32))).toBe(false);
+  });
+
+  it("isValidPublic B%N=0 返 false（SRP 规范 client 校验，防恶意服务端）", async () => {
+    const { isValidPublic, N } = await import("../crypto/srp");
+    expect(isValidPublic(0n)).toBe(false);
+    expect(isValidPublic(N)).toBe(false);
+    expect(isValidPublic(12345n)).toBe(true);
+  });
 });
