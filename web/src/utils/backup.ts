@@ -4,6 +4,7 @@
  * 格式：JSON → AES-256-GCM(PBKDF2(backupPassword, salt)) → .safebox 文件
  */
 import { deriveKey, generateSalt } from "../crypto/kdf";
+import i18n from "../i18n";
 import { aesEncrypt, aesDecrypt } from "../crypto/aes";
 import { getDb } from "../db/database";
 import { getUserItems, upsertItem } from "../db/itemsStore";
@@ -70,17 +71,17 @@ export async function importBackup(password: string, file: File): Promise<number
   const raw = new Uint8Array(await file.arrayBuffer());
 
   // 解析: 前 32 字节是 salt，剩余是 base64(nonce+ciphertext)
-  if (raw.length < 33) throw new Error("无效的备份文件");
+  if (raw.length < 33) throw new Error(i18n.t("backup.invalidFile"));
   const salt = raw.slice(0, 32);
   const encoded = new TextDecoder().decode(raw.slice(32));
 
   const key = await deriveKey(password, salt);
   // aesDecrypt 自动从 base64 中提取 nonce
   const plainBytes = await aesDecrypt(key, encoded);
-  if (!plainBytes) throw new Error("密码错误或文件损坏");
+  if (!plainBytes) throw new Error(i18n.t("backup.wrongPassword"));
 
   const payload: BackupPayload = JSON.parse(new TextDecoder().decode(plainBytes));
-  if (payload.version !== 1) throw new Error(`不支持的备份版本: ${payload.version}`);
+  if (payload.version !== 1) throw new Error(i18n.t("backup.unsupportedVersion", { version: payload.version }));
 
   const uid = await getCurrentUserId();
   const db = await getDb();

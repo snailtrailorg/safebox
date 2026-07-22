@@ -315,9 +315,9 @@ export function RegisterPage() {
       {showMnemonic && mnemonic && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#fff", borderRadius: 12, padding: "2rem", maxWidth: 480, width: "90%", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
-            <h2 style={{ color: "#0f3460", marginBottom: "0.5rem" }}>🔐 助记词</h2>
+            <h2 style={{ color: "#0f3460", marginBottom: "0.5rem" }}>{t("auth.register.mnemonicTitle")}</h2>
             <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: "1rem" }}>
-              请妥善保存以下 12 个词。主密码与助记词共同参与加密密钥派生，换设备时需凭助记词恢复数据。此助记词仅显示一次，无法再次查看。
+              {t("auth.register.mnemonicHint")}
             </p>
             <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "1rem", fontFamily: "monospace", fontSize: "1rem", lineHeight: 1.8, wordBreak: "break-all", marginBottom: "1rem" }}>
               {mnemonic}
@@ -327,11 +327,11 @@ export function RegisterPage() {
               {t("auth.register.copyMnemonic")}
             </button>
             <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginBottom: "1rem" }}>
-              ⚠️ 忘主密码且无助记词 = 数据永久丢失（主密码参与加密，无法重置）
+              {t("auth.register.warning")}
             </p>
             <button onClick={handleMnemonicConfirmed} disabled={loading}
               style={{ width: "100%", padding: "0.75rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-              {loading ? t("common.loggingIn") : "我已保存，进入密码库"}
+              {loading ? t("common.loggingIn") : t("auth.register.savedAndEnter")}
             </button>
           </div>
         </div>

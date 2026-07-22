@@ -1,47 +1,30 @@
 {
   "app": {
-    "name": "SafeBox",
     "tagline": "端到端加密密码管理器",
     "unlockTitle": "重新输入密码",
     "unlockHint": "本系统采用零知识架构设计，密钥仅在登录期间保存在内存中，由于页面刷新或长时间未操作，内存中的密钥已被清除，需要重新输入密码以恢复密钥。",
-    "recoverAccount": "输入 12 词助记词",
     "indexeddbWarning": "⚠️ 此浏览器不支持本地存储（可能处于无痕模式），无法使用 SafeBox。",
     "dbErrorTitle": "数据库错误",
     "dbErrorDetail": "发生了意外的数据库错误，请强制刷新页面修复（Ctrl+F5）。",
     "createAccount": "创建账号"
   },
-
   "common": {
-    "save": "保存",
-    "cancel": "取消",
     "delete": "删除",
-    "edit": "编辑",
-    "back": "返回",
     "loading": "加载中…",
     "saving": "保存中…",
-    "deleting": "删除中…",
     "syncing": "同步中…",
     "sending": "发送中…",
-    "sent": "已发送",
     "sendCode": "发送验证码",
     "resendIn": "{{s}}秒后可重发",
     "exporting": "导出中…",
     "importing": "导入中…",
     "loggingIn": "登录中…",
     "registering": "注册中…",
-    "recovering": "恢复中…",
-    "changing": "修改中…",
     "unlocking": "解锁中…",
     "continue": "继续使用",
-    "error": "出错了",
-    "success": "成功",
-    "confirm": "确认",
-    "close": "关闭",
-    "backToLogin": "返回登录",
     "optional": "可选",
     "reload": "重新加载"
   },
-
   "auth": {
     "login": {
       "title": "登录",
@@ -55,7 +38,6 @@
       "submitBtn": "登录",
       "phoneLabel": "手机号",
       "phonePlaceholder": "+8613800138000",
-      "sendCode": "发送验证码",
       "codeLabel": "验证码",
       "codePlaceholder": "6位数字",
       "googleDesc": "使用 Google 账号登录，密码用于解密密钥材料",
@@ -68,14 +50,13 @@
       "recoveryLink": "助记词登录",
       "googleSuccess": "Google 验证成功，请输入密码",
       "unlockFailed": "密钥解锁失败，请检查密码",
-      "rsaFailed": "RSA 密钥加载失败",
       "fillEmailAndPassword": "请输入邮箱和密码",
       "fillAll": "请填写完整",
       "codeSent": "验证码已发送",
-      "sendFailed": "发送失败",
       "loginFailed": "登录失败",
       "enterPassword": "请输入密码",
-      "needRecovery": "此设备未缓存助记词，请使用恢复入口换设备登录"
+      "needRecovery": "此设备未缓存助记词，请使用恢复入口换设备登录",
+      "unlockChangedHint": "密码错误，或主密码已在他设备更改。若刚改过密码，请点下方「退出登录」后用助记词 + 新密码恢复。"
     },
     "register": {
       "title": "注册",
@@ -88,7 +69,6 @@
       "passwordPlaceholder": "至少12位",
       "phoneLabel": "手机号",
       "phonePlaceholder": "+8613800138000",
-      "sendCode": "发送验证码",
       "codeLabel": "验证码",
       "codePlaceholder": "6位数字",
       "googleDesc": "使用 Google 账号注册，仍需设置密码用于加密",
@@ -101,19 +81,14 @@
       "fillAllFields": "请输入邮箱、验证码和密码",
       "fillAll": "请填写完整",
       "fillGoogleAndPassword": "请先完成 Google 验证并设置密码",
-      "codeSent": "验证码已发送",
-      "sendFailed": "发送失败",
       "registerFailed": "注册失败",
-      "successTitle": "注册成功",
-      "successSubtitle": "请保存你的助记词",
-      "recoveryWarning": "⚠️ 助记词仅在此时显示一次，关闭页面后无法再次查看！",
-      "recoveryWarningDetail": "请立即复制并保存在安全的地方（建议打印或手写）。丢失密码和助记词将导致数据永久无法恢复。",
       "copyMnemonic": "📋 复制助记词",
       "copied": "已复制到剪贴板",
       "savedAndEnter": "我已保存，进入 SafeBox",
-      "noMnemonic": "没有待保存的助记词，请先完成注册。",
-      "goToRegister": "前往注册",
-      "passwordTooWeak": "密码太弱，请使用更复杂的密码"
+      "passwordTooWeak": "密码太弱，请使用更复杂的密码",
+      "mnemonicTitle": "🔐 助记词",
+      "mnemonicHint": "请妥善保存以下 12 个词。主密码与助记词共同参与加密密钥派生，换设备时需凭助记词恢复数据。此助记词仅显示一次，无法再次查看。",
+      "warning": "⚠️ 忘主密码且无助记词 = 数据永久丢失（主密码参与加密，无法重置）"
     },
     "recovery": {
       "title": "换设备登录",
@@ -128,12 +103,10 @@
       "recoverBtn": "换设备登录",
       "enterEmail": "请输入邮箱",
       "enterPassword": "请输入主密码",
-      "enterMnemonic": "请输入助记词",
       "mnemonicWordCount": "助记词应为 12 个英文单词，用空格分隔",
       "recoverFailed": "恢复失败，请检查助记词或主密码"
     }
   },
-
   "vault": {
     "list": {
       "title": "密码库",
@@ -142,10 +115,7 @@
       "deleteSwipe": "🗑️ 删除",
       "confirmDelete": "确定删除「{{name}}」？",
       "deleted": "已删除",
-      "deleteFailed": "删除失败",
-      "typeAndroid": "Android 应用",
-      "typeAccount": "通用账户",
-      "typeFile": "文件"
+      "deleteFailed": "删除失败"
     },
     "conflict": {
       "title": "⚠️ 同步冲突",
@@ -170,10 +140,6 @@
       "decryptFailed": "文件解密失败",
       "downloadFailed": "下载失败",
       "confirmDelete": "确定删除？",
-      "typeLogin": "登录",
-      "typeCard": "银行卡",
-      "typeIdentity": "身份信息",
-      "typeNote": "安全笔记",
       "typeFile": "文件"
     },
     "edit": {
@@ -228,27 +194,15 @@
       "identityEmailPlaceholder": "邮箱",
       "noteContent": "内容",
       "noteContentPlaceholder": "在此输入加密文本…",
-      "packageName": "包名",
-      "packagePlaceholder": "com.example.app",
-      "username": "用户名",
-      "usernamePlaceholder": "用户名",
-      "usernameEmail": "用户名/邮箱",
-      "usernameEmailPlaceholder": "user@email.com",
-      "password": "密码",
-      "passwordPlaceholder": "密码",
       "generate": "🎲 生成",
-      "url": "网址",
-      "urlPlaceholder": "https://example.com",
-      "filePath": "文件路径",
-      "filePathPlaceholder": "/path/to/file",
       "chooseFile": "选择文件…",
       "fileSelected": "已选择: {{name}} ({{size}})",
       "noFile": "请选择文件"
-    }
+    },
+    "loadFailed": "加载失败",
+    "syncFailed": "同步失败"
   },
-
   "settings": {
-    "title": "设置",
     "changePassword": "🔒 修改密码",
     "exportBackup": "📤 导出备份",
     "importBackup": "📥 导入备份",
@@ -257,19 +211,13 @@
     "currentPasswordPlaceholder": "输入当前密码",
     "newPassword": "新密码",
     "newPasswordPlaceholder": "至少 12 位",
-    "emailCodePlaceholder": "邮箱验证码",
-    "confirmChange": "确认修改",
     "logoutConfirm": "确定退出登录？密钥将从内存中清除。",
     "deleteAccount": "🗑️ 注销账号",
     "deleteAccountEnterCode": "请输入发送到您邮箱/手机的验证码：",
     "deleteAccountConfirm1": "请在下框中输入 DELETE 以确认注销：",
     "deleteAccountConfirmAnswer": "DELETE",
     "deleteAccountConfirm2": "所有数据将被永久删除，此操作不可撤销。确认注销？",
-    "enterCurrentPassword": "请先输入当前密码",
-    "wrongPassword": "当前密码错误",
-    "noEmail": "无法获取邮箱",
     "codeSent": "验证码已发送到邮箱",
-    "sendFailed": "发送失败",
     "enterNewPwAndCode": "请输入新密码和验证码",
     "passwordMinLength": "密码至少 12 位",
     "passwordChanged": "密码已修改",
@@ -285,9 +233,9 @@
     "verifyCodePlaceholder": "邮箱验证码",
     "mnemonicLabel": "助记词",
     "mnemonicPlaceholder": "改主密码需助记词重新派生加密密钥",
-    "currentPasswordWrong": "当前密码错误"
+    "currentPasswordWrong": "当前密码错误",
+    "devicesMenu": "设备管理"
   },
-
   "appLayout": {
     "offline": "⚠️ 网络已断开 — 数据将在恢复连接后自动同步",
     "sync": "🔄 同步",
@@ -297,8 +245,32 @@
     "autoLockTitle": "长时间无操作，即将自动锁定",
     "autoLockContinue": "继续操作"
   },
-
-  "toast": {
-    "close": "关闭"
+  "toast": {},
+  "devices": {
+    "noDevices": "无设备",
+    "currentDevice": "当前设备",
+    "revoked": "已撤销",
+    "revoke": "撤销",
+    "lastActive": "最后活跃",
+    "created": "创建",
+    "unnamed": "未命名设备",
+    "revokeConfirm": "撤销该设备？该设备的登录将立即失效。",
+    "loadFailed": "加载失败",
+    "revokeFailed": "撤销失败",
+    "revokedToast": "已撤销",
+    "ip": "IP"
+  },
+  "password": {
+    "minLength": "最少 12 个字符",
+    "needUpper": "需要大写字母",
+    "needLower": "需要小写字母",
+    "needDigit": "需要数字",
+    "needSpecial": "需要特殊字符",
+    "sequential": "包含连续序列，换个密码"
+  },
+  "backup": {
+    "invalidFile": "无效的备份文件",
+    "wrongPassword": "密码错误或文件损坏",
+    "unsupportedVersion": "不支持的备份版本: {{version}}"
   }
 }

@@ -197,9 +197,9 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
                 {/* 设备管理 */}
                 <button
                   onClick={() => navigateAndClose("/settings/devices")}
-                  style={menuBtnStyle("设备管理")}
+                  style={menuBtnStyle(t("settings.devicesMenu"))}
                 >
-                  设备管理
+                  {t("settings.devicesMenu")}
                 </button>
 
                 {/* 分割线 */}

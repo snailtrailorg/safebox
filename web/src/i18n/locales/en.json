@@ -1,47 +1,30 @@
 {
   "app": {
-    "name": "SafeBox",
     "tagline": "End-to-End Encrypted Password Manager",
     "unlockTitle": "Re-enter Password",
     "unlockHint": "This system uses a zero-knowledge architecture. The encryption key is kept in memory only during the active session. A page refresh or prolonged inactivity clears the key from memory. Please re-enter your password to restore the key.",
-    "recoverAccount": "Enter 12-Word Recovery Phrase",
     "indexeddbWarning": "⚠️ This browser does not support local storage (possibly in incognito mode). SafeBox cannot be used.",
     "dbErrorTitle": "Database Error",
     "dbErrorDetail": "An unexpected database error occurred. Please force-refresh the page to recover (Ctrl+F5).",
     "createAccount": "Create Account"
   },
-
   "common": {
-    "save": "Save",
-    "cancel": "Cancel",
     "delete": "Delete",
-    "edit": "Edit",
-    "back": "Back",
     "loading": "Loading…",
     "saving": "Saving…",
-    "deleting": "Deleting…",
     "syncing": "Syncing…",
     "sending": "Sending…",
-    "sent": "Sent",
     "sendCode": "Send Code",
     "resendIn": "Resend in {{s}}s",
     "exporting": "Exporting…",
     "importing": "Importing…",
     "loggingIn": "Signing in…",
     "registering": "Signing up…",
-    "recovering": "Recovering…",
-    "changing": "Changing…",
     "unlocking": "Unlocking…",
     "continue": "Continue",
-    "error": "Error",
-    "success": "Success",
-    "confirm": "Confirm",
-    "close": "Close",
-    "backToLogin": "Back to Sign In",
     "optional": "Optional",
     "reload": "Reload"
   },
-
   "auth": {
     "login": {
       "title": "Sign In",
@@ -55,7 +38,6 @@
       "submitBtn": "Sign In",
       "phoneLabel": "Phone",
       "phonePlaceholder": "+8613800138000",
-      "sendCode": "Send Code",
       "codeLabel": "Verification Code",
       "codePlaceholder": "6 digits",
       "googleDesc": "Sign in with Google. Password is used to decrypt your keys.",
@@ -68,14 +50,13 @@
       "recoveryLink": "Recovery Code",
       "googleSuccess": "Google verified. Please enter your password.",
       "unlockFailed": "Key unlock failed. Please check your password.",
-      "rsaFailed": "RSA key loading failed.",
       "fillEmailAndPassword": "Please enter email and password.",
       "fillAll": "Please complete all fields.",
       "codeSent": "Code sent.",
-      "sendFailed": "Failed to send code.",
       "loginFailed": "Sign in failed.",
       "enterPassword": "Please enter password.",
-      "needRecovery": "No mnemonic cached on this device. Use recovery to sign in on a new device."
+      "needRecovery": "No mnemonic cached on this device. Use recovery to sign in on a new device.",
+      "unlockChangedHint": "Wrong password, or master password changed on another device. If recently changed, click \"Logout\" below and recover with mnemonic + new password."
     },
     "register": {
       "title": "Sign Up",
@@ -88,7 +69,6 @@
       "passwordPlaceholder": "At least 12 characters",
       "phoneLabel": "Phone",
       "phonePlaceholder": "+8613800138000",
-      "sendCode": "Send Code",
       "codeLabel": "Verification Code",
       "codePlaceholder": "6 digits",
       "googleDesc": "Sign up with Google. You still need a password for encryption.",
@@ -101,19 +81,14 @@
       "fillAllFields": "Please enter email, verification code and password.",
       "fillAll": "Please complete all fields.",
       "fillGoogleAndPassword": "Please complete Google verification and set a password.",
-      "codeSent": "Code sent.",
-      "sendFailed": "Failed to send code.",
       "registerFailed": "Sign up failed.",
-      "successTitle": "Sign Up Successful",
-      "successSubtitle": "Save Your Recovery Phrase",
-      "recoveryWarning": "⚠️ The recovery phrase is shown only once and cannot be viewed again!",
-      "recoveryWarningDetail": "Copy and save it in a secure place now (print or write it down). Losing both your password and recovery phrase will make your data permanently unrecoverable.",
       "copyMnemonic": "📋 Copy Recovery Phrase",
       "copied": "Copied to clipboard.",
       "savedAndEnter": "I've Saved It — Enter SafeBox",
-      "noMnemonic": "No recovery phrase to save. Please complete registration first.",
-      "goToRegister": "Go to Registration",
-      "passwordTooWeak": "Password is too weak; please use a stronger password"
+      "passwordTooWeak": "Password is too weak; please use a stronger password",
+      "mnemonicTitle": "🔐 Mnemonic",
+      "mnemonicHint": "Keep these 12 words safe. Master password and mnemonic together derive the encryption key; you need the mnemonic to recover on a new device. Shown only once.",
+      "warning": "⚠️ Forgetting master password without mnemonic = permanent data loss (master password derives encryption, cannot reset)"
     },
     "recovery": {
       "title": "Sign In on New Device",
@@ -128,12 +103,10 @@
       "recoverBtn": "Sign In on New Device",
       "enterEmail": "Please enter your email.",
       "enterPassword": "Please enter master password.",
-      "enterMnemonic": "Please enter recovery phrase.",
       "mnemonicWordCount": "Recovery phrase must be 12 English words separated by spaces",
       "recoverFailed": "Recovery failed. Check your recovery phrase or master password."
     }
   },
-
   "vault": {
     "list": {
       "title": "Vault",
@@ -142,10 +115,7 @@
       "deleteSwipe": "🗑️ Delete",
       "confirmDelete": "Delete \"{{name}}\"?",
       "deleted": "Deleted.",
-      "deleteFailed": "Delete failed.",
-      "typeAndroid": "Android App",
-      "typeAccount": "Account",
-      "typeFile": "File"
+      "deleteFailed": "Delete failed."
     },
     "conflict": {
       "title": "⚠️ Sync Conflict",
@@ -170,10 +140,6 @@
       "decryptFailed": "File decryption failed",
       "downloadFailed": "Download failed",
       "confirmDelete": "Confirm delete?",
-      "typeLogin": "Login",
-      "typeCard": "Card",
-      "typeIdentity": "Identity",
-      "typeNote": "Secure Note",
       "typeFile": "File"
     },
     "edit": {
@@ -228,27 +194,15 @@
       "identityEmailPlaceholder": "Email address",
       "noteContent": "Content",
       "noteContentPlaceholder": "Enter your encrypted text here...",
-      "packageName": "Package",
-      "packagePlaceholder": "com.example.app",
-      "username": "Username",
-      "usernamePlaceholder": "Username",
-      "usernameEmail": "Username/Email",
-      "usernameEmailPlaceholder": "user@email.com",
-      "password": "Password",
-      "passwordPlaceholder": "Password",
       "generate": "🎲 Generate",
-      "url": "Website",
-      "urlPlaceholder": "https://example.com",
-      "filePath": "File Path",
-      "filePathPlaceholder": "/path/to/file",
       "chooseFile": "Choose File…",
       "fileSelected": "Selected: {{name}} ({{size}})",
       "noFile": "Please select a file"
-    }
+    },
+    "loadFailed": "Load failed",
+    "syncFailed": "Sync failed"
   },
-
   "settings": {
-    "title": "Settings",
     "changePassword": "🔒 Change Password",
     "exportBackup": "📤 Export Backup",
     "importBackup": "📥 Import Backup",
@@ -257,19 +211,13 @@
     "currentPasswordPlaceholder": "Enter current password",
     "newPassword": "New Password",
     "newPasswordPlaceholder": "At least 12 characters",
-    "emailCodePlaceholder": "Email verification code",
-    "confirmChange": "Confirm Change",
     "logoutConfirm": "Sign out? Your keys will be cleared from memory.",
     "deleteAccount": "🗑️ Delete Account",
     "deleteAccountEnterCode": "Enter the verification code sent to your email/phone:",
     "deleteAccountConfirm1": "To confirm, type DELETE below:",
     "deleteAccountConfirmAnswer": "DELETE",
     "deleteAccountConfirm2": "All your data will be permanently deleted. This action cannot be undone. Continue?",
-    "enterCurrentPassword": "Please enter your current password first.",
-    "wrongPassword": "Incorrect current password.",
-    "noEmail": "Cannot retrieve email.",
     "codeSent": "Verification code sent to your email.",
-    "sendFailed": "Failed to send code.",
     "enterNewPwAndCode": "Please enter new password and verification code.",
     "passwordMinLength": "Password must be at least 12 characters.",
     "passwordChanged": "Password changed.",
@@ -285,9 +233,9 @@
     "verifyCodePlaceholder": "Email verification code",
     "mnemonicLabel": "Recovery Phrase",
     "mnemonicPlaceholder": "Required to re-derive the encryption key when changing master password",
-    "currentPasswordWrong": "Incorrect current password."
+    "currentPasswordWrong": "Incorrect current password.",
+    "devicesMenu": "Devices"
   },
-
   "appLayout": {
     "offline": "⚠️ Offline — data will sync automatically when reconnected",
     "sync": "🔄 Sync",
@@ -297,8 +245,32 @@
     "autoLockTitle": "Auto-lock due to inactivity",
     "autoLockContinue": "Continue"
   },
-
-  "toast": {
-    "close": "Close"
+  "toast": {},
+  "devices": {
+    "noDevices": "No devices",
+    "currentDevice": "Current device",
+    "revoked": "Revoked",
+    "revoke": "Revoke",
+    "lastActive": "Last active",
+    "created": "Created",
+    "unnamed": "Unnamed device",
+    "revokeConfirm": "Revoke this device? Its session will be terminated immediately.",
+    "loadFailed": "Load failed",
+    "revokeFailed": "Revoke failed",
+    "revokedToast": "Revoked",
+    "ip": "IP"
+  },
+  "password": {
+    "minLength": "At least 12 characters",
+    "needUpper": "Requires uppercase letter",
+    "needLower": "Requires lowercase letter",
+    "needDigit": "Requires digit",
+    "needSpecial": "Requires special character",
+    "sequential": "Contains sequential characters, change password"
+  },
+  "backup": {
+    "invalidFile": "Invalid backup file",
+    "wrongPassword": "Wrong password or corrupted file",
+    "unsupportedVersion": "Unsupported backup version: {{version}}"
   }
 }

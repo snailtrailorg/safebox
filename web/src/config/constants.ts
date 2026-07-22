@@ -1,3 +1,4 @@
+import i18n from "../i18n";
 /** 加密常量 — 与 Android CryptoManager.kt 完全一致 */
 
 export const PBKDF2_ITERATIONS = 600_000;
@@ -24,15 +25,15 @@ export const GOOGLE_CLIENT_ID =
 // ── 密码强度校验 ──────────────────────────────────
 
 export function checkPasswordStrength(password: string): { ok: boolean; reason?: string } {
-  if (password.length < 12) return { ok: false, reason: "最少 12 个字符" };
-  if (!/[A-Z]/.test(password)) return { ok: false, reason: "需要大写字母" };
-  if (!/[a-z]/.test(password)) return { ok: false, reason: "需要小写字母" };
-  if (!/[0-9]/.test(password)) return { ok: false, reason: "需要数字" };
+  if (password.length < 12) return { ok: false, reason: i18n.t("password.minLength") };
+  if (!/[A-Z]/.test(password)) return { ok: false, reason: i18n.t("password.needUpper") };
+  if (!/[a-z]/.test(password)) return { ok: false, reason: i18n.t("password.needLower") };
+  if (!/[0-9]/.test(password)) return { ok: false, reason: i18n.t("password.needDigit") };
   const SPECIAL_CHARS = `~!@#$%^&*()_+{}[]:;<>,./?'"`;
   if (!password.split('').some(c => SPECIAL_CHARS.includes(c)))
-    return { ok: false, reason: "需要特殊字符" };
+    return { ok: false, reason: i18n.t("password.needSpecial") };
   if (hasSequentialPattern(password))
-    return { ok: false, reason: "包含连续序列，换个密码" };
+    return { ok: false, reason: i18n.t("password.sequential") };
   return { ok: true };
 }
 

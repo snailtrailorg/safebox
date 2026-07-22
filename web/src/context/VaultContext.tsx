@@ -2,6 +2,7 @@
  * VaultContext — 密码库状态管理
  */
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
+import i18n from "../i18n";
 import type { Item, ItemType, ConflictInfo } from "../types/domain";
 import { getUserItems, upsertItem, softDeleteItem, getItem, markSynced, markForRepush, upsertFromServer, softDeleteByServerId } from "../db/itemsStore";
 import { getCurrentUserId } from "../db/sessionStore";
@@ -61,7 +62,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         isLoading: false,
-        error: e instanceof Error ? e.message : "加载失败",
+        error: e instanceof Error ? e.message : i18n.t("vault.loadFailed"),
       }));
     }
   }, [decryptNames]);
@@ -102,7 +103,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         isSyncing: false,
-        error: e instanceof Error ? e.message : "同步失败",
+        error: e instanceof Error ? e.message : i18n.t("vault.syncFailed"),
       }));
     } finally {
       syncingRef.current = false;
