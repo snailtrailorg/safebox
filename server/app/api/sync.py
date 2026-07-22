@@ -136,8 +136,14 @@ async def sync_push(
             existing = existing_map_by_did.get(item_req.client_did)
 
         if existing:
-            # 乐观并发：客户端基线 version 必须等于服务端当前 version
-            if item_req.version == existing.version:
+            if existing.is_deleted:
+                # 已软删条目被 push 视为冲突（防陈旧 push 复活墓碑），返回服务端版本让客户端应用删除
+                results.append(SyncPushResult(
+                    client_did=item_req.client_did, server_id=str(existing.id),
+                    status="conflict", version=existing.version,
+                ))
+            elif item_req.version == existing.version:
+                # 乐观并发：客户端基线 version 等于服务端当前 version
                 existing.type = item_req.type
                 existing.icon = item_req.icon
                 existing.name = item_req.name

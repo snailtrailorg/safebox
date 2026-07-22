@@ -62,10 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-    const isNewSession = !sessionStorage.getItem("sb_auth");
-    if (isNewSession && has && tokenValid) {
-      sessionStorage.setItem("sb_auth", "1");
-    }
     const status: AuthStatus = has && tokenValid
       ? (keyChain.isUnlocked ? "ready" : "locked")
       : "guest";

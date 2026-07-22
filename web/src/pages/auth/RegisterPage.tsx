@@ -322,7 +322,7 @@ export function RegisterPage() {
             <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "1rem", fontFamily: "monospace", fontSize: "1rem", lineHeight: 1.8, wordBreak: "break-all", marginBottom: "1rem" }}>
               {mnemonic}
             </div>
-            <button onClick={() => { navigator.clipboard.writeText(mnemonic); setToast({ message: t("auth.register.copied"), type: "success" }); }}
+            <button onClick={async () => { await navigator.clipboard.writeText(mnemonic); setToast({ message: t("auth.register.copied"), type: "success" }); setTimeout(() => navigator.clipboard.writeText("").catch(() => {}), 30000); }}
               style={{ width: "100%", padding: "0.5rem", marginBottom: "1rem", background: "#0f3460", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.85rem" }}>
               {t("auth.register.copyMnemonic")}
             </button>

@@ -127,10 +127,7 @@ def _parse_user_agent(ua: str) -> tuple[str, str]:
 
 
 def _client_ip(request: Request) -> str:
-    """最后认证 IP（X-Forwarded-For / X-Real-IP / client.host）。"""
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
+    """最后认证 IP。优先 X-Real-IP（反代设，可信），不取 X-Forwarded-For（client 可伪造）。"""
     xri = request.headers.get("X-Real-IP", "")
     if xri:
         return xri
@@ -264,7 +261,7 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
     await clear_login_failures("email", req.email)
 
     client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
-    user, device_id = await create_user_with_keys(db=db, email=req.email, phone=None, google_id=None,
+    user, device_id = await create_user_with_keys(db=db, email=req.email.lower(), phone=None, google_id=None,
         srp_verifier=req.srp_verifier, srp_salt=req.srp_salt, local_salt=req.local_salt,
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
         kdf_settings=req.kdf_settings,
@@ -418,8 +415,7 @@ async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSes
 
     if not verify_M1(A, B, K, client_M1):
         # 真用户密码错 / 用户不存在（fake verifier）/ 客户端算错：统一 401
-        if user_id:
-            await record_login_failure(target_type, target)
+        await record_login_failure(target_type, target)  # 无论 user_id 是否存在都记（防枚举侧信道：不存在用户不锁可区分）
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, _login_err_key(target_type)))
 
     # fake verifier 不会过 verify_M1，到此一定是真用户且密码正确

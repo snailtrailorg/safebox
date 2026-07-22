@@ -8,12 +8,13 @@ import { useTranslation } from "react-i18next";
 
 interface SendCodeButtonProps {
   onClick: () => Promise<void>;
+  onError?: (e: any) => void;
   disabled?: boolean;
   /** 倒计时秒数，默认 60 */
   countdown?: number;
 }
 
-export function SendCodeButton({ onClick, disabled, countdown = 60 }: SendCodeButtonProps) {
+export function SendCodeButton({ onClick, onError, disabled, countdown = 60 }: SendCodeButtonProps) {
   const { t } = useTranslation();
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState(0);
@@ -34,9 +35,10 @@ export function SendCodeButton({ onClick, disabled, countdown = 60 }: SendCodeBu
     }, 1000);
     try {
       await onClick();
-    } catch {
+    } catch (e) {
       if (timerRef.current) clearInterval(timerRef.current);
       setRemaining(0);
+      onError?.(e);
     } finally {
       setSending(false);
     }

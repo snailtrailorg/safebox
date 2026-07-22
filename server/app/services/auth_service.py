@@ -22,7 +22,7 @@ DEFAULT_KDF_SETTINGS = {"algorithm": "pbkdf2", "iterations": 600_000}
 # ── 用户查询 ────────────────────────────────────────
 
 async def find_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(select(User).where(User.email == email.lower()))
     return result.scalar_one_or_none()
 
 

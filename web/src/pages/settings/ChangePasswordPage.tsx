@@ -152,7 +152,7 @@ export function ChangePasswordPage() {
               maxLength={6}
               style={{ flex: 1, padding: "0.6rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem" }}
             />
-            <SendCodeButton onClick={handleSendVerifyCode} />
+            <SendCodeButton onClick={handleSendVerifyCode} onError={(e: any) => setToast({ message: e instanceof Error ? e.message : t("settings.sendFailed"), type: "error" })} />
           </div>
           <button
             onClick={handleChangePassword}

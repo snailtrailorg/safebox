@@ -39,10 +39,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# 速率限制（最后添加 = 最外层，请求最先经过）
-app.add_middleware(RateLimitMiddleware)
-# SRP K 通信加密（最内层，路由前解密 / 响应加密）
+# SRP K 通信加密（内层，路由前解密 / 响应加密）
 app.add_middleware(TransportCryptoMiddleware)
+# 速率限制（最后添加 = 最外层，请求最先经过，抗 DoS + 429 经 CORS）
+app.add_middleware(RateLimitMiddleware)
 
 app.include_router(api_router)
 

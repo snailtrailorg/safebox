@@ -6,7 +6,7 @@
 import { apiClient } from "./api";
 import {
   generatePrivateEphemeral, computeClientPublic, computeU, computeClientS,
-  computeK, computeM1, verifyM2, deriveX,
+  computeK, computeM1, verifyM2, deriveX, isValidPublic,
   bigIntToHex, hexToBigInt, hexToBytes, bytesToHex,
 } from "../crypto/srp";
 import type { LoginResponse, SaltResponse } from "../types/api";
@@ -27,8 +27,10 @@ export async function performSrpLogin(
     ...(deviceId ? { device_id: deviceId } : { device_name: "Web Browser" }),
   });
   const B = hexToBigInt(chal.B);
+  if (!isValidPublic(B)) throw new Error("Invalid server public B");  // SRP 规范：B%N=0 则 abort
   const x = await deriveX(password, mnemonic, hexToBytes(salt.srp_salt), target);
   const u = await computeU(A, B);
+  if (u === 0n) throw new Error("Invalid u");  // SRP 规范：u=0 则 abort（防恶意服务端削弱 PAKE）
   const S = await computeClientS(B, a, u, x);
   const K = await computeK(S);
   const M1 = await computeM1(A, B, K);
