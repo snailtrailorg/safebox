@@ -64,7 +64,7 @@ from app.services.srp_service import (
     is_valid_public,
     verify_M1,
 )
-from app.services.token_service import revoke_device_tokens
+from app.services.token_service import revoke_device_tokens, is_fresh_token
 from app.services.verification_service import (
     check_rate_limit,
     clear_login_failures,
@@ -465,6 +465,9 @@ async def change_password(
 ):
     """改主密码：主密码参与 K 派生，更新 encrypted_user_key + srp_verifier/srp_salt/local_salt。
     新 token 继承当前 device_id。"""
+    # M6: 改密要求 fresh token（5min 内），防 XSS 盗旧 access 改密
+    if not is_fresh_token(getattr(request.state, "token_iat", None)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "invalid_token"))
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))
@@ -573,6 +576,9 @@ async def delete_account(
     db: AsyncSession = Depends(get_db),
 ):
     """注销账号。需 fresh token（前置 SRP 登录）+ 验证码（绑定注册联系方式）确认。"""
+    # M6: 注销要求 fresh token（5min 内），防 XSS 盗旧 access 删号
+    if not is_fresh_token(getattr(request.state, "token_iat", None)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "invalid_token"))
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_t(request, "user_not_found"))

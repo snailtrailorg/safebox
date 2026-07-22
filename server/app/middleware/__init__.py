@@ -43,6 +43,7 @@ async def get_current_user_id(
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("device_revoked", lang))
             if request:
                 request.state.device_id = device_id
+                request.state.token_iat = payload.get("iat")  # 供 change-password/delete 校验 fresh
         return UUID(user_id)
     except (InvalidTokenError, ValueError, TypeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("invalid_token", lang))

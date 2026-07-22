@@ -21,12 +21,23 @@ from app.config import settings
 from app.models import TokenFamily
 
 
+FRESH_TOKEN_WINDOW = timedelta(minutes=5)  # fresh token 新鲜窗口（改密/删号须 5min 内，防盗用旧 access）
+
+
 def create_access_token(user_id: UUID, device_id: Optional[UUID] = None) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload: dict = {"sub": str(user_id), "exp": expire, "type": "access"}
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=settings.access_token_expire_minutes)
+    payload: dict = {"sub": str(user_id), "exp": expire, "type": "access", "iat": now}
     if device_id:
         payload["device_id"] = str(device_id)
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def is_fresh_token(iat) -> bool:
+    """校验 token iat 是否在 fresh 窗口内（改密/删号要求 fresh token，防 XSS 盗旧 access 改密）。"""
+    if not iat:
+        return False  # 旧 token 无 iat -> 非新鲜
+    return datetime.now(timezone.utc) - datetime.fromtimestamp(iat, timezone.utc) < FRESH_TOKEN_WINDOW
 
 
 # ── Refresh Token Family ──────────────────────────
