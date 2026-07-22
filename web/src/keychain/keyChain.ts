@@ -50,6 +50,8 @@ class KeyChain {
     // User Key（随机，不变）
     this.userKey = await generateAesKey();
     const userKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
+    // 导出后重新 import 为 non-extractable（日常不可导出，防 XSS exportKey 泄露 UserKey）
+    this.userKey = await crypto.subtle.importKey("raw", userKeyRaw, "AES-GCM", false, ["encrypt", "decrypt"]);
 
     // encrypted_user_key = AES(K, User Key) - 存服务器
     const encrypted_user_key = await aesEncrypt(K, userKeyRaw);
@@ -96,7 +98,7 @@ class KeyChain {
       const ukRaw = await aesDecrypt(await importAesKey(this.bytesToBase64(kRaw)), encryptedUserKey);
       if (!ukRaw) return false;
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
-      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
+      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", false, ["encrypt", "decrypt"]);
       return true;
     } catch { return false; }
   }
@@ -129,7 +131,7 @@ class KeyChain {
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return false;
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
-      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
+      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", false, ["encrypt", "decrypt"]);
       return true;
     } catch { return false; }
   }
@@ -151,7 +153,7 @@ class KeyChain {
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return { ok: false };
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
-      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", true, ["encrypt", "decrypt"]);
+      this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", false, ["encrypt", "decrypt"]);
       // 建本地缓存：cached_K + mnemonic_encrypted（均用 localDerivedKey 包裹）
       const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
       const localSalt = this.base64ToBytes(localSaltBase64);

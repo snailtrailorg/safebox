@@ -9,8 +9,10 @@ import jwt as jwt_lib
 from jwt import InvalidTokenError
 
 from app.config import settings
+from app.database import get_db
 from app.i18n import get_lang, get_text
 from app.services.verification_service import is_device_revoked
+from sqlalchemy.ext.asyncio import AsyncSession
 
 security = HTTPBearer()
 
@@ -18,6 +20,7 @@ security = HTTPBearer()
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     request: Request = None,
+    db: AsyncSession = Depends(get_db),
 ) -> UUID:
     """从 Authorization: Bearer <token> 中解析当前用户 ID。仅接受 type="access" 的 token。
 
@@ -36,7 +39,7 @@ async def get_current_user_id(
         device_id_str: Optional[str] = payload.get("device_id")
         device_id = UUID(device_id_str) if device_id_str else None
         if device_id:
-            if await is_device_revoked(device_id):
+            if await is_device_revoked(device_id, db):
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=get_text("device_revoked", lang))
             if request:
                 request.state.device_id = device_id

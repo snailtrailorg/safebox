@@ -85,6 +85,11 @@ class ApiClient {
             reqBody = (await encryptBody(K2, new TextEncoder().encode(JSON.stringify(body)))) as BodyInit;
           }
           response = await fetch(url, { method, headers, body: reqBody });
+          if (response.status === 401) {
+            // refresh 成功但重试仍 401（如改密清了 session_key -> K 不存）-> 强制 logout 走 RecoveryPage
+            this.onAuthFailure?.();
+            throw new ApiError(401, "session expired");
+          }
         }
       } else {
         this.onAuthFailure?.();

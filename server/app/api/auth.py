@@ -1,6 +1,7 @@
 """认证 API：注册、登录（SRP-6a 两步 + device 绑定）、验证码、改密、设备管理、注销。"""
 
 from typing import Optional, List
+import base64
 import json
 import hmac
 import hashlib
@@ -218,21 +219,15 @@ async def get_salt(email: Optional[str] = None, phone: Optional[str] = None, db:
             "g": str(SRP_G),
         }
     target = email or phone or ""
+    digest = hmac.new(settings.jwt_secret_key.encode(), target.encode(), hashlib.sha256).digest()
     return {
-        "srp_salt": _derive_fake_salt(target),
-        "local_salt": _derive_fake_salt(target),
+        "srp_salt": digest[:16].hex(),                          # hex(16字节)=32 字符，与真实 srp_salt 格式一致（防枚举）
+        "local_salt": base64.b64encode(digest).decode(),        # base64(32字节)=44 字符，与真实一致
         "kdf_settings": DEFAULT_KDF_SETTINGS,
-        "mnemonic_salt": _derive_fake_salt(target),
+        "mnemonic_salt": base64.b64encode(digest).decode(),
         "N": hex(SRP_N)[2:],
         "g": str(SRP_G),
     }
-
-
-def _derive_fake_salt(target: str) -> str:
-    """为不存在用户派生确定性 salt：base64(HMAC-SHA256(jwt_secret, target))。"""
-    import base64
-    digest = hmac.new(settings.jwt_secret_key.encode(), target.encode(), hashlib.sha256).digest()
-    return base64.b64encode(digest).decode()
 
 
 # ── 验证码 ──────────────────────────────────────────

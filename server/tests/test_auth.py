@@ -184,30 +184,21 @@ async def test_register_persists_kdf_settings(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_salt_nonexistent_user_not_enumerable(client: AsyncClient):
-    """不存在用户的 salt 稳定且格式与真实用户一致（防枚举）。"""
-    import base64
-
-    # 两次查询同一不存在邮箱
+    """不存在用户的 srp_salt 稳定且格式与真实用户一致（防枚举）。"""
+    # 两次查询同一不存在邮箱 -> 稳定
     r1 = await client.get("/api/v1/auth/salt?email=nonexist-m4@safebox.example.com")
     r2 = await client.get("/api/v1/auth/salt?email=nonexist-m4@safebox.example.com")
     assert r1.status_code == 200 and r2.status_code == 200
-    s1, s2 = r1.json()["srp_salt"], r2.json()["srp_salt"]
-    # 稳定：同一 target 每次相同
-    assert s1 == s2
-    # 格式与真实用户一致：base64(32 字节) = 44 字符
-    assert len(base64.b64decode(s1)) == 32
-
-    # 不同不存在邮箱 -> 不同 salt
+    assert r1.json()["srp_salt"] == r2.json()["srp_salt"]
+    # 不同不存在邮箱 -> 不同 srp_salt
     r3 = await client.get("/api/v1/auth/salt?email=other-m4@safebox.example.com")
-    assert r3.json()["srp_salt"] != s1
-
-    # 真实用户与不存在用户的 salt 格式无法区分
-    real_salt_b64 = base64.b64encode(__import__("secrets").token_bytes(32)).decode()
-    await client.post("/api/v1/auth/register/email", json=register_payload("real-m4@safebox.example.com", local_salt=real_salt_b64))
-    real = (await client.get("/api/v1/auth/salt?email=real-m4@safebox.example.com")).json()["local_salt"]
-    fake = s1
-    assert len(base64.b64decode(real)) == 32
-    assert len(real) == len(fake)
+    assert r3.json()["srp_salt"] != r1.json()["srp_salt"]
+    # 真实用户与不存在用户的 srp_salt 格式一致（hex(16字节)=32 字符，防长度枚举）
+    await client.post("/api/v1/auth/register/email", json=register_payload("real-m4@safebox.example.com"))
+    real_srp = (await client.get("/api/v1/auth/salt?email=real-m4@safebox.example.com")).json()["srp_salt"]
+    fake_srp = r1.json()["srp_salt"]
+    assert len(real_srp) == len(fake_srp) == 32
+    bytes.fromhex(real_srp); bytes.fromhex(fake_srp)
 
 
 @pytest.mark.asyncio

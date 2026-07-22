@@ -41,6 +41,13 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     conflicts: [],
   });
 
+  // lock/logout 清已解密内存（条目名明文不残留）
+  useEffect(() => {
+    if (status === "locked" || status === "guest") {
+      setState({ items: [], itemNames: {}, isLoading: false, isSyncing: false, error: null, conflicts: [] });
+    }
+  }, [status]);
+
   const decryptNames = useCallback(async (items: Item[]): Promise<Record<number, string>> => {
     const names: Record<number, string> = {};
     await Promise.all(items.map(async (item) => {

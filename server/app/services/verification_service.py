@@ -8,8 +8,11 @@ import json
 from datetime import timedelta
 
 import redis.asyncio as aioredis
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.models import UserDevice
 
 # Redis 连接（懒初始化）
 _redis: Optional[aioredis.Redis] = None
@@ -190,10 +193,17 @@ async def mark_device_revoked(device_id: _UUID) -> None:
     await r.setex(_device_revoked_key(device_id), _timedelta(seconds=DEVICE_REVOKED_TTL), "1")
 
 
-async def is_device_revoked(device_id: _UUID) -> bool:
-    """检查设备是否已撤销。"""
+async def is_device_revoked(device_id: _UUID, db: AsyncSession = None) -> bool:
+    """检查设备是否已撤销。Redis 未命中回退查 DB（防 Redis 丢数据绕过撤销）。"""
     r = await _get_redis()
-    return bool(await r.exists(_device_revoked_key(device_id)))
+    if await r.exists(_device_revoked_key(device_id)):
+        return True
+    if db is not None:
+        result = await db.execute(select(UserDevice.is_revoked).where(UserDevice.id == device_id))
+        if result.scalar_one_or_none():
+            await r.setex(_device_revoked_key(device_id), _timedelta(seconds=DEVICE_REVOKED_TTL), "1")
+            return True
+    return False
 
 
 # ── SRP 会话密钥 K（通信加密，TTL = session 级 = refresh token 同期 30 天）──
