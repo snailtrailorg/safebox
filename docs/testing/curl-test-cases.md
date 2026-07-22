@@ -16,7 +16,6 @@ MNEMONIC="abandon ability able about above absent absorb abstract accuse achieve
 SRP_SALT="00112233445566778899aabbccddeeff"   # 16 字节 hex，客户端生成
 LOCAL_SALT="aabbccdd11223344..."               # base64(32 字节)
 MNEMONIC_SALT="eeff001122334455..."            # base64(32 字节)
-# GOOGLE_ID_TOKEN="<真实 Google ID Token>"  # Google 注册/登录需，dev 通常跳过
 
 # SRP verifier 由客户端派生（Python 示例）：
 # cd server && PYTHONPATH=. venv/bin/python -c "
@@ -84,15 +83,6 @@ curl -s -X POST $BASE/api/v1/auth/register/email \
 ## TC-05 手机号注册
 同 TC-04，`email` 换 `phone`，verifier 的 identifier 用 phone。
 
-## TC-06 Google 注册
-```bash
-VERIFIER=$(... deriveX 用 identifier="google" ...)
-curl -s -X POST $BASE/api/v1/auth/register/google \
-  -H "Content-Type: application/json" \
-  -d "{\"google_id_token\":\"$GOOGLE_ID_TOKEN\",\"srp_verifier\":\"$VERIFIER\",...}"
-# 201（不验验证码；Google 用户也存 verifier 供改密/删号 SRP 验旧密码）
-```
-
 ## TC-07 SRP 登录（challenge + verify）
 SRP 两步，需客户端算 A/M1。完整脚本（Python 算 + curl 发）：
 
@@ -119,14 +109,6 @@ asyncio.run(main())
 "
 # 输出 access_token + device_id；错密码/错助记词/用户不存在 -> 401（统一错误防枚举）
 # verify 后 K_comm 存 Redis session_key:{device_id} TTL 30 天
-```
-
-## TC-08 Google 登录
-```bash
-curl -s -X POST $BASE/api/v1/auth/login/google \
-  -H "Content-Type: application/json" \
-  -d "{\"google_id_token\":\"$GOOGLE_ID_TOKEN\",\"device_id\":\"<同设备>\",\"device_name\":\"<新设备>\"}"
-# 200 响应同 SRP verify（无 M2，Google 不走 SRP，无 K_comm）
 ```
 
 ## TC-11 改密

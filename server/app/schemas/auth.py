@@ -47,20 +47,6 @@ class RegisterPhoneRequest(BaseModel):
     device_wrapped: str = "web"
 
 
-class RegisterGoogleRequest(BaseModel):
-    model_config = {"populate_by_name": True}
-    google_id_token: str
-    srp_verifier: str
-    srp_salt: str
-    local_salt: str
-    kdf_settings: Optional[dict] = None
-    encrypted_user_key: str
-    mnemonic_salt: str
-    device_name: Optional[str] = None
-    device_public_key: str = "web"
-    device_wrapped: str = "web"
-
-
 class RegisterResponse(BaseModel):
     user_id: str
     access_token: str
@@ -87,12 +73,6 @@ class SRPChallengeResponse(BaseModel):
 class SRPVerifyRequest(BaseModel):
     session_id: str
     M1: str
-
-
-class LoginGoogleRequest(BaseModel):
-    google_id_token: str
-    device_id: Optional[str] = None
-    device_name: Optional[str] = None
 
 
 class LoginResponse(BaseModel):

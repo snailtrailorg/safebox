@@ -216,11 +216,6 @@ UserKey 不变，条目无需重加密
 ### 忘主密码
 数据永久丢失（主密码参与 K + x 派生，无服务端重置）。
 
-### Google 登录
-- Google 只验证身份（ID Token），用户仍需设主密码+助记词
-- 注册: Google ID Token + srp_verifier + encrypted_user_key（identifier="google"）
-- 登录: `/auth/login/google`（不走 SRP，**无 K_comm** -> Google 用户认证会 401，待 Google K 方案）
-
 ---
 
 ## 九、字段级加密（v2 EncryptedField）

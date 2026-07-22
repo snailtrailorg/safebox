@@ -2,7 +2,6 @@
  * ChangePasswordPage - 修改密码（fresh SRP token + 验证码 + 新 SRP 材料）
  *
  * email/phone 用户：先用旧密码走 SRP 登录拿 fresh token，再改密。
- * Google 用户：用当前 token（OAuth 登录无 SRP 路径）。
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -34,7 +33,7 @@ export function ChangePasswordPage() {
     const ok = await keyChain.unlockWithPassword(currentPassword, session.localSalt, session.encrypted_user_key, session.cached_K);
     if (!ok) throw new Error("wrong password");
     const contact = session.email || "";
-    if (!contact || contact === "google") throw new Error("no contact");
+    if (!contact) throw new Error("no contact");
     await apiClient.sendCode({ target: contact.includes("@") ? "email" : "phone", value: contact });
   };
 
@@ -52,7 +51,6 @@ export function ChangePasswordPage() {
     try {
       const session = await getSession();
       const contact = session.email || "";
-      const isGoogle = contact === "google";
       const targetType = contact.includes("@") ? "email" : "phone";
       const identifier = contact;
 
@@ -65,15 +63,13 @@ export function ChangePasswordPage() {
         return;
       }
 
-      // 2. fresh token（email/phone: SRP 登录验旧密码；Google: 用当前 token）
-      if (!isGoogle) {
-        const salt = targetType === "email"
-          ? await apiClient.getSalt(contact)
-          : await apiClient.getSalt(undefined, contact);
-        // 同设备传 device_id（验未 revoked）；fresh SRP 建 K 续用（改密不重握手，session_K 保留直到重登）
-        const { resp, K } = await performSrpLogin(targetType, contact, currentPassword, mnemonic, salt, session.device_id);
-        await saveSession({ accessToken: resp.access_token, refreshToken: resp.refresh_token, session_K: bytesToHex(K) });
-      }
+      // 2. fresh token（SRP 登录验旧密码）
+      const salt = targetType === "email"
+        ? await apiClient.getSalt(contact)
+        : await apiClient.getSalt(undefined, contact);
+      // 同设备传 device_id（验未 revoked）；fresh SRP 建 K 续用（改密不重握手，session_K 保留直到重登）
+      const { resp: srpResp, K } = await performSrpLogin(targetType, contact, currentPassword, mnemonic, salt, session.device_id);
+      await saveSession({ accessToken: srpResp.access_token, refreshToken: srpResp.refresh_token, session_K: bytesToHex(K) });
 
       // 3. 新盐 + 助记词+新主密码重派生 K + 重包裹 encrypted_user_key + 新 SRP verifier
       const newSalt = new Uint8Array(32);

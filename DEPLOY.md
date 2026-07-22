@@ -124,9 +124,6 @@ SAFEBOX_SMTP_PORT=587
 SAFEBOX_SMTP_USERNAME=
 SAFEBOX_SMTP_PASSWORD=
 SAFEBOX_SMTP_FROM=noreply@your-domain.com
-
-# Google OAuth（生产必须配置，否则 RuntimeError）
-SAFEBOX_GOOGLE_CLIENT_ID=
 ```
 
 > `.env` 含密码/JWT 密钥，已在 `.gitignore`，不提交。

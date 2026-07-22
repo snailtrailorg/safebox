@@ -22,12 +22,10 @@ from app.schemas.auth import (
     ChangePasswordResponse,
     DeleteAccountRequest,
     DeviceInfo,
-    LoginGoogleRequest,
     LoginResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
     RegisterEmailRequest,
-    RegisterGoogleRequest,
     RegisterPhoneRequest,
     RegisterResponse,
     SRPChallengeRequest,
@@ -42,7 +40,6 @@ from app.services.auth_service import (
     create_refresh_token,
     create_user_with_keys,
     find_user_by_email,
-    find_user_by_google_id,
     find_user_by_phone,
     get_user_devices,
     get_user_keys,
@@ -50,7 +47,6 @@ from app.services.auth_service import (
     verify_and_rotate_refresh_token,
 )
 from app.services.email_service import send_recovery_alert, send_verification_email
-from app.services.google_auth_service import verify_google_id_token
 from app.services.sms_service import send_sms
 from app.services.srp_service import (
     G as SRP_G,
@@ -294,31 +290,10 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))
 
 
-@router.post("/register/google", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-async def register_google(req: RegisterGoogleRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    google_id = await verify_google_id_token(req.google_id_token)
-    if not google_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "google_token_invalid"))
-    existing = await find_user_by_google_id(db, google_id)
-    if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_t(request, "google_already_registered"))
-
-    client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
-    user, device_id = await create_user_with_keys(db=db, email=None, phone=None, google_id=google_id,
-        srp_verifier=req.srp_verifier, srp_salt=req.srp_salt, local_salt=req.local_salt,
-        encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
-        kdf_settings=req.kdf_settings,
-        device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
-        client_name=client_name, os_name=os_name, last_auth_ip=_client_ip(request))
-    access_token = create_access_token(user.id, device_id)
-    refresh_token = await create_refresh_token(db, user.id, device_id)
-    return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))
-
-
 # ── 登录（SRP-6a 两步 + device 绑定）──────────
 
 async def _build_login_response(db: AsyncSession, user, M2: str = "", device_id: Optional[UUID] = None) -> LoginResponse:
-    """构建登录响应。token 绑 device_id；SRP 登录传 M2，Google 登录无 M2。"""
+    """构建登录响应。token 绑 device_id；SRP 登录传 M2。"""
     access_token = create_access_token(user.id, device_id)
     refresh_token = await create_refresh_token(db, user.id, device_id)
     keys = await get_user_keys(db, user.id)
@@ -431,25 +406,6 @@ async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSes
     await store_session_key(device_id, K.hex())  # 存 SRP 会话密钥 K（通信加密，TTL=session 级 30 天，login 存 logout 清）
     M2 = compute_M2(A, client_M1, K).hex()
     return await _build_login_response(db, user, M2=M2, device_id=device_id)
-
-
-@router.post("/login/google", response_model=LoginResponse)
-async def login_google(req: LoginGoogleRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    google_id = await verify_google_id_token(req.google_id_token)
-    if not google_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "google_token_invalid"))
-    wait = await get_login_wait("google", google_id)
-    if wait > 0:
-        await record_login_failure("google", google_id)
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=_t(request, "login_rate_limited", seconds=wait))
-    user = await find_user_by_google_id(db, google_id)
-    if not user:
-        await record_login_failure("google", google_id)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "google_not_registered"))
-    await clear_login_failures("google", google_id)
-    device_id = await _resolve_device(db, user.id, req.device_id, req.device_name, request)
-    await db.commit()
-    return await _build_login_response(db, user, device_id=device_id)
 
 
 # ── 改主密码 ───────────────────────────────────────

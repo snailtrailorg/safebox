@@ -8,10 +8,8 @@
 |------|------|------|
 | 邮箱注册 | 验证码 + 客户端派生 SRP verifier + encrypted_user_key + 建设备 | `POST /auth/register/email` |
 | 手机号注册 | 短信验证码 + 同上 | `POST /auth/register/phone` |
-| Google 注册 | Google ID Token 验证 + 同上（也存 verifier） | `POST /auth/register/google` |
 | SRP 登录第一步 | 客户端发 A + device_id?/device_name?，服务端返 B + session_id（Redis 5min） | `POST /auth/login/srp/challenge` |
 | SRP 登录第二步 | 客户端发 M1，服务端验后返 M2 + token + device_id + 密钥材料，存 K_comm | `POST /auth/login/srp/verify` |
-| Google 登录 | Google ID Token（不走 SRP，无 K_comm，待 K 方案） | `POST /auth/login/google` |
 | 改密 | fresh token（前置 SRP）+ 验证码 + 新 SRP 材料 + 清其他 device K | `POST /auth/change-password` |
 | GET salt | 返回 srp_salt/local_salt/mnemonic_salt/kdf_settings/N/g（防枚举） | `GET /auth/salt` |
 | 登出 | 撤销所有 token family + 清所有 device session_key（client 清缓存，决策 A） | `POST /auth/logout` |
@@ -107,14 +105,13 @@
 | K 通信 session 级 | K_comm 30 天，不存拒 401（防 downgrade），纯 ASGI middleware |
 | device deauthorize | device_id 绑 token + Redis revoked（access 立即失效） |
 | CORS | 通配符源时 disable credentials |
-| Google OAuth | 未配置 client_id 抛 RuntimeError |
 
 ## 八、前端功能
 
 | 功能 | 描述 |
 |------|------|
-| 登录页 | email/phone（SRP 两步，同设备 device_id/新设备 device_name）+ Google | `/login` |
-| 注册页 | 三 Tab + 助记词模态 + 确认后 SRP 建 K | `/register` |
+| 登录页 | email/phone（SRP 两步，同设备 device_id/新设备 device_name） | `/login` |
+| 注册页 | email/phone 两 Tab + 助记词模态 + 确认后 SRP 建 K | `/register` |
 | 恢复页 | 换设备/logout 后重登：助记词+主密码 SRP + recoverAndRewrap | `/recovery` |
 | 密码库列表 | 条目列表 + FAB 新建 + 左滑删除 | `/` |
 | 条目详情 | 5 种类型查看 | `/item/:did` |
@@ -169,11 +166,7 @@
 | RSA 工具死代码 | `crypto/rsa.ts` 保留但全项目无引用 |
 | 文件 blob 不同步 | 多设备间文件内容不同步，仅元数据同步 |
 | logout 清本地密钥 | 决策 A：退出清 cached_K/mnemonic_encrypted/session_K，重登需助记词+主密码（走 RecoveryPage） |
-| Google 用户 K 通信 | Google 登录不 SRP 无 K_comm，认证 API 会 401（待 Google K 方案） |
-| Google 用户改密/删号 | 用当前 token（无 email/phone 走 SRP 登录），验证码可能失败 |
-| Google 用户 SRP identifier | 固定 "google"（注册/改密一致） |
 | sync_batch_limit | config.py 声明=100，代码未引用（pull limit 用 Query 默认，max 500 硬编码） |
-| Google Client ID | 前端 constants.ts 有调试 fallback 写死在 bundle 内 |
 | 登录限流无 8 秒档 | 实际序列 0,0,1,2,4 -> 锁 1h |
 | 助记词永久有效 | 不过期/不重置/不重生成；无作废机制 |
 | K 通信 replay | per-message replay 未做（GCM tag 防篡改不防重放，与白皮书一致待改进） |

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthLayout } from "../../components/layout/AuthLayout";
@@ -11,24 +11,9 @@ import { useAuth } from "../../context/AuthContext";
 import { saveSession, getSession } from "../../db/sessionStore";
 import { bytesToHex } from "../../crypto/srp";
 import { performSrpLogin } from "../../services/srpAuth";
-import { GOOGLE_CLIENT_ID } from "../../config/constants";
 import type { LoginResponse } from "../../types/api";
 
-type LoginTab = "email" | "phone" | "google";
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: Record<string, unknown>) => void;
-          renderButton: (el: HTMLElement, config: Record<string, unknown>) => void;
-          prompt: (callback?: (n: { isNotDisplayed: () => boolean }) => void) => void;
-        };
-      };
-    };
-  }
-}
+type LoginTab = "email" | "phone";
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -43,53 +28,9 @@ export function LoginPage() {
   const [phonePassword, setPhonePassword] = useState("");
   const [code, setCode] = useState("");
 
-  const [googlePassword, setGooglePassword] = useState("");
-  const [googleIdToken, setGoogleIdToken] = useState("");
-  const [googleAuthed, setGoogleAuthed] = useState(false);
-  const googleInitRef = useRef(false);
-  const [googleReady, setGoogleReady] = useState(false);
-  const [googleTimeout, setGoogleTimeout] = useState(false);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-
   const [loading, setLoading] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
-
-  // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
-  useEffect(() => {
-    if (googleInitRef.current || !GOOGLE_CLIENT_ID) return;
-    const timer = setInterval(() => {
-      if (window.google?.accounts?.id) {
-        clearInterval(timer);
-        googleInitRef.current = true;
-        setGoogleReady(true);
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (resp: { credential: string }) => {
-            setGoogleIdToken(resp.credential);
-            setGoogleAuthed(true);
-            setToast({ message: t("auth.login.googleSuccess"), type: "success" });
-          },
-        });
-      }
-    }, 200);
-    const timeout = setTimeout(() => setGoogleTimeout(true), 15000);
-    return () => { clearInterval(timer); clearTimeout(timeout); };
-  }, []);
-
-  // SDK 就绪 + 面板可见时渲染按钮
-  useEffect(() => {
-    if (googleBtnRef.current && googleReady) {
-      window.google?.accounts.id.renderButton(googleBtnRef.current, {
-        type: "standard",
-        theme: "outline",
-        size: "large",
-        text: "signin_with",
-        shape: "rectangular",
-        width: 300,
-      });
-    }
-  }, [googleReady]);
 
   // ── 通用登录响应处理 ─────────────────────────────
   const handleLoginResponse = async (response: LoginResponse, pw: string) => {
@@ -179,32 +120,9 @@ export function LoginPage() {
     }
   };
 
-  const handleGooglePasswordLogin = async () => {
-    if (!googlePassword) {
-      setToast({ message: t("auth.login.enterPassword"), type: "error" });
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await apiClient.loginGoogle({ google_id_token: googleIdToken });
-      await saveSession({
-        email: "google",
-        localSalt: response.local_salt,
-        encrypted_user_key: response.encrypted_user_key,
-        mnemonic_salt: response.mnemonic_salt,
-      });
-      await handleLoginResponse(response, googlePassword);
-    } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : t("auth.login.loginFailed"), type: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const tabs: { key: LoginTab; label: string }[] = [
     { key: "email", label: t("auth.login.emailTab") },
     { key: "phone", label: t("auth.login.phoneTab") },
-    { key: "google", label: t("auth.login.googleTab") },
   ];
 
   return (
@@ -258,40 +176,6 @@ export function LoginPage() {
         <button onClick={handlePhoneLogin} disabled={loading} style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
           {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
         </button>
-      </div>
-
-      {/* Google tab - 始终在 DOM 中，只隐藏不销毁 */}
-      <div style={{ display: tab === "google" ? "block" : "none" }}>
-        {!googleAuthed ? (
-          <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "1rem" }}>
-              {t("auth.login.googleDesc")}
-            </p>
-            {!googleReady ? (
-              <div style={{ padding: "0.75rem", color: "#999", fontSize: "0.85rem" }}>
-                {googleTimeout ? t("auth.login.googleTimeout") : t("auth.login.googleLoading")}
-              </div>
-            ) : (
-              <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
-            )}
-            {!GOOGLE_CLIENT_ID && (
-              <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginTop: "0.75rem" }}>
-                {t("auth.login.googleNotConfigured")}
-              </p>
-            )}
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
-              {t("auth.login.googleVerified")}
-            </div>
-            <PasswordInput label={t("auth.login.passwordLabel")} value={googlePassword} onChange={(e) => setGooglePassword(e.target.value)} placeholder={t("auth.login.googlePasswordPlaceholder")} />
-            <button onClick={handleGooglePasswordLogin} disabled={loading}
-              style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem", background: loading ? "#95a5a6" : "#0f3460", color: "#fff", border: "none", borderRadius: 8, fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
-              {loading ? t("common.loggingIn") : t("auth.login.submitBtn")}
-            </button>
-          </>
-        )}
       </div>
 
       <div style={{ marginTop: "1.5rem", textAlign: "center", fontSize: "0.85rem", color: "#666" }}>

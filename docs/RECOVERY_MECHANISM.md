@@ -144,7 +144,6 @@
 | GET | /auth/salt | SRP 参数 + salt（防枚举） |
 | POST | /auth/login/srp/challenge | SRP 第一步：A -> session_id + B（device_id?/device_name?） |
 | POST | /auth/login/srp/verify | SRP 第二步：M1 -> M2 + token + K_comm 存 |
-| POST | /auth/login/google | Google 登录（不 SRP，无 K_comm） |
 | POST | /auth/change-password | 改密（fresh token + 验证码 + 清其他 device K） |
 | POST /auth/logout | 撤销 token + 清 session_key（client 清缓存，决策 A） |
 | DELETE | /auth/account | 注销（fresh token + 验证码） |

@@ -13,7 +13,7 @@
   └─ 三态 session：login（SRP）/ lock-unlock（autoLock 本地）/ logout（清缓存）
 
 服务端 (FastAPI + PostgreSQL + Redis)
-  ├─ 认证：SRP-6a challenge/verify + Google OAuth
+  ├─ 认证：SRP-6a challenge/verify
   ├─ device 绑 token + deauthorize（access 立即失效）+ device info（浏览器/OS/IP）
   ├─ 只存 SRP verifier（不存密码/助记词明文）
   ├─ SRP K 通信加密 middleware（纯 ASGI，K 不存拒 401）

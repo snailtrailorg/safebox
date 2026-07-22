@@ -25,7 +25,7 @@
 - 服务端不存密码哈希，只存 SRP verifier（`users.srp_verifier`，hex）+ `srp_salt`
 - SRP-6a：RFC 3526 4096-bit MODP + SHA-256，自实现 `srp_service.py`（无外部 SRP 库，N 硬编码 1024 hex）
 - 2SKD x 派生：`x = PBKDF2(主密码, HKDF拉伸(srp_salt,邮箱), 600k) XOR HKDF(助记词, salt=邮箱, info="safebox-srp-auth")`，助记词=Secret Key（双秘密，缺一不可）
-- 登录两步：`/auth/login/srp/challenge`（A->B+session_id，Redis TTL 5min，传 device_id?/device_name?）+ `/auth/login/srp/verify`（M1->M2+token+K_comm 存）；Google 登录 `/auth/login/google` 不走 SRP（无 K_comm，待 K 方案）
+- 登录两步：`/auth/login/srp/challenge`（A->B+session_id，Redis TTL 5min，传 device_id?/device_name?）+ `/auth/login/srp/verify`（M1->M2+token+K_comm 存）
 - 改密/删号验旧密码：客户端先走 SRP 登录拿 fresh token，再调端点
 - `bcrypt`/`passlib`/`hash_auth_key`/`verify_auth_key`/`deriveAuthKey` 已移除
 - 前端 `crypto/srp.ts`（BigInt + Web Crypto，与后端逐字节一致，固定向量见 `tests/srp.test.ts`）
@@ -83,7 +83,6 @@
 - 迁移链：`f7a8b9c0d1e2_srp_auth`（SRP 改造）-> `g8b9c0d1e2f3_device_auth`（device 绑 token）-> `h9c0d1e2f3a4_device_info`（client_name/os_name/last_auth_ip）
 
 ### 安全
-- Google OAuth：生产必须配置 `SAFEBOX_GOOGLE_CLIENT_ID`，否则 RuntimeError
 - 登录限流：退避 0,0,1,2,4 秒 -> 第 5 次锁 1h（按目标，第 1 次不限制）
 - JWT secret：生产必须覆盖默认；JWT type 校验 `type="access"` 防 refresh 冒充
 - CORS：通配符源时 disable credentials

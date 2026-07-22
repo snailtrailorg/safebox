@@ -37,18 +37,6 @@ export interface RegisterEmailRequest {
 export interface RegisterPhoneRequest extends Omit<RegisterEmailRequest, "email"> {
   phone: string;
 }
-export interface RegisterGoogleRequest {
-  google_id_token: string;
-  srp_verifier: string;
-  srp_salt: string;
-  local_salt: string;
-  encrypted_user_key: string;
-  mnemonic_salt: string;
-  kdf_settings?: Record<string, unknown>;
-  device_name?: string;
-  device_public_key?: string;
-  device_wrapped?: string;
-}
 export interface RegisterResponse {
   user_id: string;
   access_token: string;
@@ -72,11 +60,6 @@ export interface SRPChallengeResponse {
 export interface SRPVerifyRequest {
   session_id: string;
   M1: string;
-}
-export interface LoginGoogleRequest {
-  google_id_token: string;
-  device_id?: string;
-  device_name?: string;
 }
 export interface LoginResponse {
   user_id: string;

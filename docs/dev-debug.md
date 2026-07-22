@@ -40,7 +40,7 @@ SQL
 ```bash
 cd server/
 cp .env.example .env
-# 编辑 .env，本地开发用默认值即可（SMTP/Google 可选，未配置时 dev 模式打印验证码）
+# 编辑 .env，本地开发用默认值即可（SMTP 可选，未配置时 dev 模式打印验证码）
 ```
 
 ## 4. 安装依赖 + 数据库迁移

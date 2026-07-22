@@ -31,11 +31,6 @@ async def find_user_by_phone(db: AsyncSession, phone: str) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
-async def find_user_by_google_id(db: AsyncSession, google_id: str) -> Optional[User]:
-    result = await db.execute(select(User).where(User.google_id == google_id))
-    return result.scalar_one_or_none()
-
-
 async def get_user_keys(db: AsyncSession, user_id: UUID) -> Optional[UserKeys]:
     result = await db.execute(select(UserKeys).where(UserKeys.user_id == user_id))
     return result.scalar_one_or_none()

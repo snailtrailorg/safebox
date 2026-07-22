@@ -16,12 +16,6 @@ export const RSA_DECRYPT_CHUNK = 512;
 
 export const DEVICE_KEY_ALIAS = "safebox_device_key";
 
-// Google OAuth — 从环境变量读取，退回调试用固定值
-// https://console.cloud.google.com/apis/credentials
-export const GOOGLE_CLIENT_ID =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) ||
-  "1081355276099-7vt4a4rbvshbf48ga4nj9vpitc6ap2tp.apps.googleusercontent.com";
-
 // ── 密码强度校验 ──────────────────────────────────
 
 export function checkPasswordStrength(password: string): { ok: boolean; reason?: string } {

@@ -33,9 +33,6 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "noreply@safebox.example.com"
 
-    # Google OAuth
-    google_client_id: str = ""
-
     # 助记词
     mnemonic_hmac_key: str = ""  # 32 字节 base64 编码，服务端 HMAC 密钥
     cors_origins: str = "*"

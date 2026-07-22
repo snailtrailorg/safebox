@@ -68,8 +68,7 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
     setDropdownOpen(false);
     const session = await getSession();
     const contact = session.email || "";
-    // Google 用户无 email/phone，无法收验证码（OAuth 登录限制）
-    if (contact && contact !== "google") {
+    if (contact) {
       try {
         await apiClient.sendCode({ target: contact.includes("@") ? "email" : "phone", value: contact });
         alert(t("settings.codeSent"));

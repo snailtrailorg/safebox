@@ -4,10 +4,10 @@
  */
 import type {
   SendCodeRequest, SendCodeResponse,
-  RegisterEmailRequest, RegisterPhoneRequest, RegisterGoogleRequest, RegisterResponse,
+  RegisterEmailRequest, RegisterPhoneRequest, RegisterResponse,
   SaltResponse,
   SRPChallengeRequest, SRPChallengeResponse, SRPVerifyRequest,
-  LoginGoogleRequest, LoginResponse,
+  LoginResponse,
   ChangePasswordRequest, ChangePasswordResponse,
   RefreshTokenRequest, RefreshTokenResponse,
   DeleteAccountRequest,
@@ -146,7 +146,6 @@ class ApiClient {
   async sendCode(req: SendCodeRequest): Promise<SendCodeResponse> { return this.request("POST", "/auth/send-code", req, true); }
   async registerEmail(req: RegisterEmailRequest): Promise<RegisterResponse> { return this.request("POST", "/auth/register/email", req, true); }
   async registerPhone(req: RegisterPhoneRequest): Promise<RegisterResponse> { return this.request("POST", "/auth/register/phone", req, true); }
-  async registerGoogle(req: RegisterGoogleRequest): Promise<RegisterResponse> { return this.request("POST", "/auth/register/google", req, true); }
   async getSalt(email?: string, phone?: string): Promise<SaltResponse> {
     const params = new URLSearchParams();
     if (email) params.set("email", email);
@@ -155,7 +154,6 @@ class ApiClient {
   }
   async loginSrpChallenge(req: SRPChallengeRequest): Promise<SRPChallengeResponse> { return this.request("POST", "/auth/login/srp/challenge", req, true); }
   async loginSrpVerify(req: SRPVerifyRequest): Promise<LoginResponse> { return this.request("POST", "/auth/login/srp/verify", req, true); }
-  async loginGoogle(req: LoginGoogleRequest): Promise<LoginResponse> { return this.request("POST", "/auth/login/google", req, true); }
   async changePassword(req: ChangePasswordRequest): Promise<ChangePasswordResponse> { return this.request("POST", "/auth/change-password", req); }
 
   // ── 设备管理 ──

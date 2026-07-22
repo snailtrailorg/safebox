@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthLayout } from "../../components/layout/AuthLayout";
@@ -9,26 +9,12 @@ import { apiClient } from "../../services/api";
 import { keyChain } from "../../keychain/keyChain";
 import { useAuth } from "../../context/AuthContext";
 import { saveSession, getSession } from "../../db/sessionStore";
-import { GOOGLE_CLIENT_ID, checkPasswordStrength } from "../../config/constants";
+import { checkPasswordStrength } from "../../config/constants";
 import { generateMnemonic } from "../../crypto/bip39";
 import { bytesToHex } from "../../crypto/srp";
 import { performSrpLogin } from "../../services/srpAuth";
 
-type RegisterTab = "email" | "phone" | "google";
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: Record<string, unknown>) => void;
-          renderButton: (el: HTMLElement, config: Record<string, unknown>) => void;
-          prompt: (callback?: (n: { isNotDisplayed: () => boolean }) => void) => void;
-        };
-      };
-    };
-  }
-}
+type RegisterTab = "email" | "phone";
 
 export function RegisterPage() {
   const { t } = useTranslation();
@@ -40,53 +26,10 @@ export function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
-
-  const [googleIdToken, setGoogleIdToken] = useState("");
-  const [googleAuthed, setGoogleAuthed] = useState(false);
-  const googleInitRef = useRef(false);
-  const [googleReady, setGoogleReady] = useState(false);
-  const [googleTimeout, setGoogleTimeout] = useState(false);
   const [mnemonic, setMnemonic] = useState("");
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [pendingTokens, setPendingTokens] = useState<{ access_token: string; refresh_token: string; user_id: string; device_id: string } | null>(null);
-
-  // ── Google SDK 初始化（只执行一次，面板始终在 DOM 中）──
-  useEffect(() => {
-    if (googleInitRef.current || !GOOGLE_CLIENT_ID) return;
-    const timer = setInterval(() => {
-      if (window.google?.accounts?.id) {
-        clearInterval(timer);
-        googleInitRef.current = true;
-        setGoogleReady(true);
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (resp: { credential: string }) => {
-            setGoogleIdToken(resp.credential);
-            setGoogleAuthed(true);
-            setToast({ message: t("auth.register.googleSuccess"), type: "success" });
-          },
-        });
-      }
-    }, 200);
-    const timeout = setTimeout(() => setGoogleTimeout(true), 15000);
-    return () => { clearInterval(timer); clearTimeout(timeout); };
-  }, []);
-
-  // SDK 就绪时渲染按钮（面板始终在 DOM 中）
-  useEffect(() => {
-    if (googleBtnRef.current && googleReady) {
-      window.google?.accounts.id.renderButton(googleBtnRef.current, {
-        type: "standard",
-        theme: "outline",
-        size: "large",
-        text: "signup_with",
-        shape: "rectangular",
-        width: 300,
-      });
-    }
-  }, [googleReady]);
 
   const handleRegister = async () => {
     if (tab === "email" && (!email || !code || !password)) {
@@ -95,10 +38,6 @@ export function RegisterPage() {
     }
     if (tab === "phone" && (!phone || !code || !password)) {
       setToast({ message: t("auth.register.fillAll"), type: "error" });
-      return;
-    }
-    if (tab === "google" && (!googleIdToken || !password)) {
-      setToast({ message: t("auth.register.fillGoogleAndPassword"), type: "error" });
       return;
     }
 
@@ -112,7 +51,7 @@ export function RegisterPage() {
     try {
       // 生成助记词（BIP39 12 词），用于派生 K + SRP x（助记词 = Secret Key，仅本地）
       const mnemonic = generateMnemonic();
-      const identifier = tab === "email" ? email : tab === "phone" ? phone : "google";
+      const identifier = tab === "email" ? email : phone;
       const keys = await keyChain.generateKeys(mnemonic, password, identifier);
       let tokens: { access_token: string; refresh_token: string; user_id: string; device_id: string } | null = null;
       if (tab === "email") {
@@ -131,7 +70,7 @@ export function RegisterPage() {
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
           mnemonic_encrypted: keys.mnemonic_encrypted,
         });
-      } else if (tab === "phone") {
+      } else {
         const response = await apiClient.registerPhone({
           phone, verification_code: code,
           srp_verifier: keys.srp_verifier, srp_salt: keys.srp_salt,
@@ -144,22 +83,6 @@ export function RegisterPage() {
         tokens = response;
         await saveSession({
           email: phone, localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
-          mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
-          mnemonic_encrypted: keys.mnemonic_encrypted,
-        });
-      } else {
-        const response = await apiClient.registerGoogle({
-          google_id_token: googleIdToken,
-          srp_verifier: keys.srp_verifier, srp_salt: keys.srp_salt,
-          local_salt: keys.localSalt,
-          encrypted_user_key: keys.encrypted_user_key,
-          kdf_settings: keys.kdfSettings,
-          mnemonic_salt: keys.mnemonic_salt,
-          device_name: "Web Browser", device_public_key: "web", device_wrapped: "web",
-        });
-        tokens = response;
-        await saveSession({
-          email: "google", localSalt: keys.localSalt, encrypted_user_key: keys.encrypted_user_key,
           mnemonic_salt: keys.mnemonic_salt, cached_K: keys.cached_K,
           mnemonic_encrypted: keys.mnemonic_encrypted,
         });
@@ -182,13 +105,11 @@ export function RegisterPage() {
     setShowMnemonic(false);
     setLoading(true);
     try {
-      if (tab === "google" || !pendingTokens) {
-        // Google 不走 SRP（无 K）-> TODO Google K 方案；临时 login（无 session_K，认证将 401）
-        if (pendingTokens) login(pendingTokens.access_token, pendingTokens.refresh_token, pendingTokens.user_id);
+      if (!pendingTokens) {
         navigate("/");
         return;
       }
-      const targetType = tab as "email" | "phone";
+      const targetType = tab;
       const target = tab === "email" ? email : phone;
       const salt = targetType === "email"
         ? await apiClient.getSalt(target)
@@ -222,7 +143,6 @@ export function RegisterPage() {
   const tabs: { key: RegisterTab; label: string }[] = [
     { key: "email", label: t("auth.register.emailTab") },
     { key: "phone", label: t("auth.register.phoneTab") },
-    { key: "google", label: t("auth.register.googleTab") },
   ];
 
   return (
@@ -270,36 +190,6 @@ export function RegisterPage() {
             style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
         </div>
         <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
-      </div>
-
-      {/* Google tab - 始终在 DOM 中，只隐藏不销毁 */}
-      <div style={{ display: tab === "google" ? "block" : "none" }}>
-        {!googleAuthed ? (
-          <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "1rem" }}>
-              {t("auth.register.googleDesc")}
-            </p>
-            {!googleReady ? (
-              <div style={{ padding: "0.75rem", color: "#999", fontSize: "0.85rem" }}>
-                {googleTimeout ? t("auth.login.googleTimeout") : t("auth.login.googleLoading")}
-              </div>
-            ) : (
-              <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
-            )}
-            {!GOOGLE_CLIENT_ID && (
-              <p style={{ fontSize: "0.8rem", color: "#e74c3c", marginTop: "0.75rem" }}>
-                {t("auth.register.googleNotConfigured")}
-              </p>
-            )}
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: "1rem", padding: "0.5rem 0.75rem", background: "#f0fff0", borderRadius: 8, border: "1px solid #27ae60", fontSize: "0.85rem", color: "#27ae60", textAlign: "center" }}>
-              {t("auth.register.googleVerified")}
-            </div>
-            <PasswordInput label={t("auth.register.passwordLabel")} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.register.passwordPlaceholder")} />
-          </>
-        )}
       </div>
 
       <button onClick={handleRegister} disabled={loading}
