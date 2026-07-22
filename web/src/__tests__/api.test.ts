@@ -25,8 +25,8 @@ const mockResp = (status: number, body: unknown) => ({
 describe("apiClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getAccessToken.mockResolvedValue("access-token");
-    getRefreshToken.mockResolvedValue("refresh-token");
+    vi.mocked(getAccessToken).mockResolvedValue("access-token");
+    vi.mocked(getRefreshToken).mockResolvedValue("refresh-token");
   });
 
   it("200 正常请求（封装正确）", async () => {

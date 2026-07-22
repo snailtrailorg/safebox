@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # 同步
     sync_batch_limit: int = 100
 
-    model_config = {"env_prefix": "SAFEBOX_", "env_file": ".env"}
+    model_config = {"env_prefix": "SAFEBOX_", "env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

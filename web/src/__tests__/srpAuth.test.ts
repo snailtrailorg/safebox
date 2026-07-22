@@ -22,33 +22,40 @@ vi.mock("../services/api", () => ({
 // mock generatePrivateEphemeral 固定 a=12345（与 srp.test.ts 向量一致，使 K 可预测）
 vi.mock("../crypto/srp", async (importOriginal) => {
   const orig = await importOriginal();
-  return { ...orig, generatePrivateEphemeral: () => 12345n };
+  return { ...(orig as any), generatePrivateEphemeral: () => 12345n };
 });
 
 import { performSrpLogin } from "../services/srpAuth";
 import { apiClient } from "../services/api";
 import { bytesToHex } from "../crypto/srp";
+import type { SaltResponse } from "../types/api";
 
-const SALT = { srp_salt: SALT_HEX, local_salt: "", mnemonic_salt: "" };
+const SALT: SaltResponse = {
+  srp_salt: SALT_HEX, local_salt: "", mnemonic_salt: "",
+  kdf_settings: { algorithm: "pbkdf2", iterations: 600000 }, N: "0", g: "2",
+};
+
+const mockChallenge = vi.mocked(apiClient.loginSrpChallenge);
+const mockVerify = vi.mocked(apiClient.loginSrpVerify);
 
 describe("performSrpLogin", () => {
   it("challenge + verify + K 派生（封装正确）", async () => {
-    apiClient.loginSrpChallenge.mockResolvedValue({ session_id: "s1", B: B_HEX });
-    apiClient.loginSrpVerify.mockResolvedValue({ access_token: "tok", refresh_token: "ref", M2: M2_HEX, device_id: "d1", devices: [] });
+    mockChallenge.mockResolvedValue({ session_id: "s1", B: B_HEX });
+    mockVerify.mockResolvedValue({ access_token: "tok", refresh_token: "ref", M2: M2_HEX, device_id: "d1", devices: [] } as any);
     const { resp, K } = await performSrpLogin("email", EMAIL, PASSWORD, MNEMONIC, SALT);
     expect(bytesToHex(K)).toBe(K_HEX);
     expect(resp.access_token).toBe("tok");
-    expect(apiClient.loginSrpChallenge).toHaveBeenCalledWith(expect.objectContaining({ target_type: "email", target: EMAIL }));
+    expect(mockChallenge).toHaveBeenCalledWith(expect.objectContaining({ target_type: "email", target: EMAIL }));
   });
 
   it("错 M2 -> throw（边界）", async () => {
-    apiClient.loginSrpChallenge.mockResolvedValue({ session_id: "s1", B: B_HEX });
-    apiClient.loginSrpVerify.mockResolvedValue({ M2: "00".repeat(32) });
+    mockChallenge.mockResolvedValue({ session_id: "s1", B: B_HEX });
+    mockVerify.mockResolvedValue({ M2: "00".repeat(32) } as any);
     await expect(performSrpLogin("email", EMAIL, PASSWORD, MNEMONIC, SALT)).rejects.toThrow("M2");
   });
 
   it("B%N=0 -> throw（边界，SRP 规范防恶意服务端）", async () => {
-    apiClient.loginSrpChallenge.mockResolvedValue({ session_id: "s1", B: "0" });
+    mockChallenge.mockResolvedValue({ session_id: "s1", B: "0" });
     await expect(performSrpLogin("email", EMAIL, PASSWORD, MNEMONIC, SALT)).rejects.toThrow("Invalid server public B");
   });
 });
