@@ -30,15 +30,31 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
 from tests._srp import FakeRedis
 
-# 测试用 SQLite 数据库
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+# 测试用 SQLite 数据库 —— **内存库，非文件库**
+#
+# 早期用 `sqlite+aiosqlite:///./test.db`（文件），有两个真实危害：
+# 1. **并发冲突**：两个 pytest 进程共用同一个 test.db，一个 drop_all 撞上另一个
+#    的写入 → `OperationalError: database is locked`。实测发生过（一次全量跑
+#    与另一次单跑重叠，13 分钟后以 OperationalError 失败）。
+# 2. **残留污染**：进程非正常退出时 drop_all 跑不到，test.db 留在磁盘上，
+#    下次跑测试从脏库开始。
+# 内存库（`sqlite+aiosqlite://`）天然隔离每次进程、退出即销毁，两者一并解决。
+# 注：SQLite 内存库对每个连接是独立实例，故用 StaticPool 让同一进程内复用
+# 单一连接，避免建表与查询走到不同连接上。
+TEST_DATABASE_URL = "sqlite+aiosqlite://"
 
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+test_engine = create_async_engine(
+    TEST_DATABASE_URL,
+    echo=False,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestAsyncSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
