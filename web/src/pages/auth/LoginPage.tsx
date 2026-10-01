@@ -75,6 +75,7 @@ export function LoginPage() {
       const { resp: response, K } = await srpLogin("email", email, password);
       await saveSession({
         email,
+        identifier_type: "email",
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,
@@ -106,6 +107,7 @@ export function LoginPage() {
       const { resp: response, K } = await srpLogin("phone", phone, phonePassword);
       await saveSession({
         email: phone,
+        identifier_type: "phone",
         localSalt: response.local_salt,
         encrypted_user_key: response.encrypted_user_key,
         mnemonic_salt: response.mnemonic_salt,

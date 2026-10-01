@@ -55,7 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = await getAccessToken();
       if (token) {
         try {
-          const payload = JSON.parse(atob(token.split(".")[1]));
+          // JWT payload 段是 base64url（用 - / _ 替代 + / /），浏览器 atob 只接受标准 base64，
+          // 直接 atob 遇到 - / _ 会抛 InvalidCharacterError -> 正常 token 被误判为未登录。
+          // 故先转回标准 base64 再解码。
+          const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+          const payload = JSON.parse(atob(b64));
           tokenValid = payload.exp * 1000 > Date.now();
         } catch {
           tokenValid = false;

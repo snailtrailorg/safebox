@@ -70,7 +70,8 @@ export function AppLayout({ title, children, actions }: AppLayoutProps) {
     const contact = session.email || "";
     if (contact) {
       try {
-        await apiClient.sendCode({ target: contact.includes("@") ? "email" : "phone", value: contact });
+        const targetType = session.identifier_type ?? (contact.includes("@") ? "email" : "phone");
+        await apiClient.sendCode({ target: targetType, value: contact });
         alert(t("settings.codeSent"));
       } catch (e: any) {
         alert(e.message || "Failed to send code");

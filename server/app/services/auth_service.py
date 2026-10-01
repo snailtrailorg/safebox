@@ -18,6 +18,29 @@ from app.services.token_service import (
 # 服务端默认 KDF（与前端 DEFAULT_KDF 一致）；注册未指定时落库此值
 DEFAULT_KDF_SETTINGS = {"algorithm": "pbkdf2", "iterations": 600_000}
 
+# 允许的 KDF 算法白名单。argon2id 未实现（前端 kdf.ts 会抛错），
+# 若落库则账户永久无法解锁 —— 故在入口拦截，只放行 pbkdf2。
+ALLOWED_KDF_ALGORITHMS = ("pbkdf2",)
+MIN_PBKDF2_ITERATIONS = 100_000  # 防止客户端上传过低迭代数削弱 KDF
+
+
+def validate_kdf_settings(raw: Optional[dict]) -> dict:
+    """校验客户端上传的 kdf_settings；非法则回退默认值（不抛错，避免注册被卡）。
+
+    背景：kdf_settings 由客户端注册时上传并原样落库，是未校验的外部输入。
+    若允许 argon2id 落库，前端 deriveKey 会抛 "argon2id KDF not yet supported"，
+    该账户之后永久无法派生 K -> 数据不可达。故只放行 pbkdf2。
+    """
+    if not raw or not isinstance(raw, dict):
+        return dict(DEFAULT_KDF_SETTINGS)
+    algo = raw.get("algorithm")
+    if algo not in ALLOWED_KDF_ALGORITHMS:
+        return dict(DEFAULT_KDF_SETTINGS)
+    iterations = raw.get("iterations", DEFAULT_KDF_SETTINGS["iterations"])
+    if not isinstance(iterations, int) or iterations < MIN_PBKDF2_ITERATIONS:
+        return dict(DEFAULT_KDF_SETTINGS)
+    return {"algorithm": "pbkdf2", "iterations": iterations}
+
 
 # ── 用户查询 ────────────────────────────────────────
 
@@ -73,7 +96,7 @@ async def create_user_with_keys(
         srp_verifier=srp_verifier,
         srp_salt=srp_salt,
         local_salt=local_salt,
-        kdf_settings=json.dumps(kdf_settings or DEFAULT_KDF_SETTINGS),
+        kdf_settings=json.dumps(validate_kdf_settings(kdf_settings)),
     )
     db.add(user)
     await db.flush()

@@ -23,6 +23,16 @@ import type { ItemKey, EncryptedField } from "./types";
 
 class KeyChain {
   private userKey: CryptoKey | null = null;
+  /**
+   * UserKey 的 raw 副本，仅用于"重新包裹"（改密/重包裹场景）。
+   *
+   * 为什么需要它：WebCrypto 的 exportKey / wrapKey 都要求源密钥 extractable=true，
+   * 而 this.userKey 被刻意 import 为 extractable=false（防 XSS 导出）。
+   * 实测：wrapKey("raw", nonExtractableKey, ...) 同样抛 InvalidAccessError。
+   * 故只能在解锁时（raw 明文还在栈上）留存一份，供后续重新包裹使用。
+   * 与 userKey 同生命周期：lock() 时一并清空。
+   */
+  private userKeyRaw: Uint8Array | null = null;
 
   get isUnlocked(): boolean { return this.userKey !== null; }
 
@@ -44,12 +54,14 @@ class KeyChain {
     crypto.getRandomValues(mnemonicSalt);
     const srpSalt = generateSrpSalt(); // 16 字节
 
-    // K = PBKDF2(助记词 + 主密码, mnemonic_salt) - 主密码参与派生
-    const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
+    // K = PBKDF2(助记词 ‖ 主密码, mnemonic_salt) - 主密码参与派生
+    const K = await this.derivePermanentK(mnemonic, masterPassword, mnemonicSalt);
 
     // User Key（随机，不变）
     this.userKey = await generateAesKey();
     const userKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
+    // 留存 raw 副本供"重新包裹"（改密）使用 —— 见 userKeyRaw 字段注释
+    this.userKeyRaw = userKeyRaw.slice();
     // 导出后重新 import 为 non-extractable（日常不可导出，防 XSS exportKey 泄露 UserKey）
     this.userKey = await crypto.subtle.importKey("raw", userKeyRaw, "AES-GCM", false, ["encrypt", "decrypt"]);
 
@@ -99,6 +111,7 @@ class KeyChain {
       if (!ukRaw) return false;
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
       this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", false, ["encrypt", "decrypt"]);
+      this.userKeyRaw = ukRaw.slice(); // 留存 raw 供改密重包裹
       return true;
     } catch { return false; }
   }
@@ -127,11 +140,12 @@ class KeyChain {
   ): Promise<boolean> {
     try {
       const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
-      const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
+      const K = await this.derivePermanentK(mnemonic, masterPassword, mnemonicSalt);
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return false;
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
       this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", false, ["encrypt", "decrypt"]);
+      this.userKeyRaw = ukRaw.slice(); // 留存 raw 供改密重包裹
       return true;
     } catch { return false; }
   }
@@ -149,11 +163,12 @@ class KeyChain {
   ): Promise<{ ok: boolean; newCachedK?: string; mnemonicEncrypted?: string }> {
     try {
       const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
-      const K = await deriveKey(mnemonic + masterPassword, mnemonicSalt);
+      const K = await this.derivePermanentK(mnemonic, masterPassword, mnemonicSalt);
       const ukRaw = await aesDecrypt(K, encryptedUserKey);
       if (!ukRaw) return { ok: false };
       const buf = ukRaw.buffer.slice(ukRaw.byteOffset, ukRaw.byteOffset + ukRaw.byteLength) as ArrayBuffer;
       this.userKey = await crypto.subtle.importKey("raw", buf, "AES-GCM", false, ["encrypt", "decrypt"]);
+      this.userKeyRaw = ukRaw.slice(); // 留存 raw 供改密重包裹
       // 建本地缓存：cached_K + mnemonic_encrypted（均用 localDerivedKey 包裹）
       const kRaw = new Uint8Array(await crypto.subtle.exportKey("raw", K));
       const localSalt = this.base64ToBytes(localSaltBase64);
@@ -183,11 +198,12 @@ class KeyChain {
     new_srp_salt: string;
     new_mnemonic_encrypted: string;
   }> {
-    if (!this.userKey) throw new Error("not_unlocked");
+    if (!this.userKey || !this.userKeyRaw) throw new Error("not_unlocked");
     const mnemonicSalt = this.base64ToBytes(mnemonicSaltBase64);
-    // 新 K = PBKDF2(助记词 + 新主密码, mnemonic_salt)
-    const newK = await deriveKey(mnemonic + newMasterPassword, mnemonicSalt);
-    const userKeyRaw = new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
+    // 新 K = PBKDF2(助记词 ‖ 新主密码, mnemonic_salt)
+    const newK = await this.derivePermanentK(mnemonic, newMasterPassword, mnemonicSalt);
+    // 用留存副本而非 exportKey —— userKey 是 non-extractable，exportKey 必抛 InvalidAccessError
+    const userKeyRaw = this.userKeyRaw;
     // 重新包裹 User Key（User Key 不变，K 变）
     const new_encrypted_user_key = await aesEncrypt(newK, userKeyRaw);
     // 新本地缓存：cached_K + mnemonic_encrypted（新 localDerivedKey 包裹）
@@ -209,10 +225,10 @@ class KeyChain {
     };
   }
 
-  /** 导出 User Key 的 raw bytes */
+  /** 导出 User Key 的 raw bytes（从留存副本读取；userKey 本身不可导出） */
   async exportUserKeyRaw(): Promise<Uint8Array | null> {
-    if (!this.userKey) return null;
-    return new Uint8Array(await crypto.subtle.exportKey("raw", this.userKey));
+    if (!this.userKeyRaw) return null;
+    return this.userKeyRaw.slice();
   }
 
   // ── Item Key（不变）──────────────────────────────
@@ -268,7 +284,7 @@ class KeyChain {
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   }
 
-  lock(): void { this.userKey = null; }
+  lock(): void { this.userKey = null; this.userKeyRaw = null; }
 
   private bytesToBase64(bytes: Uint8Array): string {
     let b = ""; for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
@@ -278,6 +294,20 @@ class KeyChain {
     const b = atob(b64); const r = new Uint8Array(b.length);
     for (let i = 0; i < b.length; i++) r[i] = b.charCodeAt(i);
     return r;
+  }
+
+  /**
+   * 派生永久 K：K = PBKDF2(助记词 ‖ 主密码, mnemonic_salt)
+   *
+   * 用 U+0000 作分隔符而非裸拼接 `mnemonic + masterPassword`：
+   * 裸拼接存在跨边界歧义（助记词尾部 + 主密码头部可被另一组组合复现）。
+   * U+0000 无法通过 HTML 表单输入，可安全充当边界标记。
+   *
+   * ⚠️ 这是密码学契约：修改拼接方式会导致所有既有 encrypted_user_key 无法解开。
+   * 本函数是 K 派生的唯一入口，4 个调用点（注册/助记词解锁/恢复/改密）必须全部走这里。
+   */
+  private async derivePermanentK(mnemonic: string, masterPassword: string, mnemonicSalt: Uint8Array): Promise<CryptoKey> {
+    return deriveKey(`${mnemonic}\u0000${masterPassword}`, mnemonicSalt);
   }
 }
 

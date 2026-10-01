@@ -25,15 +25,24 @@ export function RecoveryPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [tab, setTab] = useState<"email" | "phone">("email");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [masterPassword, setMasterPassword] = useState("");
   const [mnemonic, setMnemonic] = useState("");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "error" | "success" } | null>(null);
 
+  const tabs: { key: "email" | "phone"; label: string }[] = [
+    { key: "email", label: t("auth.recovery.emailTab") },
+    { key: "phone", label: t("auth.recovery.phoneTab") },
+  ];
+
   const handleRecover = async () => {
-    if (!email.trim()) {
-      setToast({ message: t("auth.recovery.enterEmail"), type: "error" });
+    // 按当前 tab 决定登录标识符与 target_type（与 LoginPage 的 email/phone 双通道对齐）
+    const contact = (tab === "email" ? email : phone).trim();
+    if (!contact) {
+      setToast({ message: t(tab === "email" ? "auth.recovery.enterEmail" : "auth.recovery.enterPhone"), type: "error" });
       return;
     }
     const words = mnemonic.trim().split(/\s+/).filter(Boolean);
@@ -47,11 +56,13 @@ export function RecoveryPage() {
     }
     setLoading(true);
     try {
-      // 1. 取 salt
-      const salt = await apiClient.getSalt(email);
+      // 1. 取 salt（email / phone 走不同参数）
+      const salt = tab === "email"
+        ? await apiClient.getSalt(contact)
+        : await apiClient.getSalt(undefined, contact);
 
       // 2. SRP 两步登录（用输入的助记词 + 主密码派生 x；新设备无 device_id -> 建 UserDevice）
-      const { resp, K } = await performSrpLogin("email", email, masterPassword, mnemonic, salt);
+      const { resp, K } = await performSrpLogin(tab, contact, masterPassword, mnemonic, salt);
 
       // 3. 助记词 + 主密码派生 K -> 解 UserKey + 建本地缓存（换设备无 cached_K/mnemonic_encrypted）
       const rec = await keyChain.recoverAndRewrap(
@@ -62,8 +73,10 @@ export function RecoveryPage() {
       }
 
       // 4. 落库 + 登录（device_id + session_K 建，cached_K + mnemonic_encrypted 重建）
+      //    email 字段存「登录标识符」（phone 通道时即手机号），与 LoginPage 语义一致
       await saveSession({
-        email,
+        email: contact,
+        identifier_type: tab,
         accessToken: resp.access_token,
         refreshToken: resp.refresh_token,
         serverUserId: resp.user_id,
@@ -75,7 +88,7 @@ export function RecoveryPage() {
         device_id: resp.device_id,
         session_K: bytesToHex(K),
       });
-      login(resp.access_token, resp.refresh_token, resp.user_id);
+      await login(resp.access_token, resp.refresh_token, resp.user_id);
       navigate("/");
     } catch (e: any) {
       setToast({ message: e.message || t("auth.recovery.recoverFailed"), type: "error" });
@@ -86,7 +99,23 @@ export function RecoveryPage() {
 
   return (
     <AuthLayout title={t("auth.recovery.title")} subtitle={t("auth.recovery.subtitle")}>
-      <div style={{ marginBottom: "0.75rem" }}>
+      {/* email / phone 双 tab —— 与 LoginPage 对齐，手机号注册用户才有恢复入口 */}
+      <div style={{ display: "flex", marginBottom: "1.5rem", borderRadius: 8, overflow: "hidden", border: "1px solid #ddd" }}>
+        {tabs.map((tk) => (
+          <button key={tk.key} onClick={() => setTab(tk.key)}
+            style={{
+              flex: 1, padding: "0.5rem", border: "none",
+              background: tab === tk.key ? "#0f3460" : "#f5f5f5",
+              color: tab === tk.key ? "#fff" : "#333",
+              cursor: "pointer", fontSize: "0.85rem", fontWeight: 500,
+            }}>
+            {tk.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Email tab */}
+      <div style={{ display: tab === "email" ? "block" : "none", marginBottom: "0.75rem" }}>
         <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>
           {t("auth.recovery.emailLabel")}
         </label>
@@ -94,6 +123,17 @@ export function RecoveryPage() {
           placeholder={t("auth.recovery.emailPlaceholder")}
           style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
       </div>
+
+      {/* Phone tab */}
+      <div style={{ display: tab === "phone" ? "block" : "none", marginBottom: "0.75rem" }}>
+        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>
+          {t("auth.recovery.phoneLabel")}
+        </label>
+        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+          placeholder={t("auth.recovery.phonePlaceholder")}
+          style={{ width: "100%", padding: "0.6rem 0.75rem", border: "1px solid #ddd", borderRadius: 8, fontSize: "0.95rem", boxSizing: "border-box" }} />
+      </div>
+
       <div style={{ marginBottom: "0.75rem" }}>
         <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 500, marginBottom: "0.25rem", color: "#333" }}>
           {t("auth.recovery.mnemonicLabel")}

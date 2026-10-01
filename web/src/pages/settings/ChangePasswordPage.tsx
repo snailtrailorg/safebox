@@ -34,7 +34,8 @@ export function ChangePasswordPage() {
     if (!ok) throw new Error("wrong password");
     const contact = session.email || "";
     if (!contact) throw new Error("no contact");
-    await apiClient.sendCode({ target: contact.includes("@") ? "email" : "phone", value: contact });
+    const targetType = session.identifier_type ?? (contact.includes("@") ? "email" : "phone");
+    await apiClient.sendCode({ target: targetType, value: contact });
   };
 
   const handleChangePassword = async () => {
@@ -51,7 +52,8 @@ export function ChangePasswordPage() {
     try {
       const session = await getSession();
       const contact = session.email || "";
-      const targetType = contact.includes("@") ? "email" : "phone";
+      // 优先用显式 identifier_type；旧 session 无该字段时回退到 includes("@") 猜测
+      const targetType = session.identifier_type ?? (contact.includes("@") ? "email" : "phone");
       const identifier = contact;
 
       // 1. 用当前主密码解锁（载入 UserKey 到内存，changeMasterPassword 需要）

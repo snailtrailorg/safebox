@@ -18,6 +18,7 @@ import { generatePassword } from "../../utils/password";
 import { formatFileSize } from "../../utils/format";
 import { buildItemTypeConfigs } from "../../config/itemTypes";
 import type { Item, ItemType } from "../../types/domain";
+import type { ItemKey } from "../../keychain/types";
 
 export function ItemEditPage() {
   const { t } = useTranslation();
@@ -101,7 +102,18 @@ export function ItemEditPage() {
       }
 
       const dataJson = JSON.stringify(dataFields);
-      const itemKey = await keyChain.createItemKey();
+      // Item Key：编辑时复用原条目的 ItemKey（"不变"语义，见 keyChain.createItemKey 注释）；
+      // 新建时生成新 ItemKey。复用可保持同一条目的密钥稳定，避免每次编辑轮换。
+      let itemKey: ItemKey | undefined;
+      if (isEdit && origItem?.name?.encrypted_key) {
+        const reused = await keyChain.decryptItemKey(origItem.name.encrypted_key);
+        if (reused) {
+          itemKey = { key: reused, encrypted: origItem.name.encrypted_key };
+        }
+      }
+      if (!itemKey) {
+        itemKey = await keyChain.createItemKey();
+      }
       const uid = await getCurrentUserId();
       const item: Item = {
         did: isEdit && did ? parseInt(did) : 0,

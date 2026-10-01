@@ -43,7 +43,14 @@ export interface SessionData {
   accessToken: string;
   refreshToken: string;
   serverUserId: string;
+  /** 登录标识符：email 通道时为邮箱，phone 通道时为手机号（历史命名，语义详见 identifier_type） */
   email: string;
+  /**
+   * 登录标识符类型。显式记录通道，避免下游用 `email.includes("@")` 猜类型
+   * （手机号存进 email 字段是既定历史约定，不改字段名以兼容旧 session）。
+   * 缺省视为 "email"（兼容旧数据）。
+   */
+  identifier_type?: "email" | "phone";
   localSalt: string;            // 本地密码派生用盐（替代 passwordSalt）
   cached_K: string;             // AES(K, PBKDF2(本地密码))，本地缓存 K
   encrypted_user_key: string;   // AES(K, User Key)，从服务器获取

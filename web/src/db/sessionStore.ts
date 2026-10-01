@@ -11,6 +11,7 @@ const EMPTY_SESSION: SessionData = {
   refreshToken: "",
   serverUserId: "",
   email: "",
+  identifier_type: "email",
   localSalt: "",
   cached_K: "",
   encrypted_user_key: "",
