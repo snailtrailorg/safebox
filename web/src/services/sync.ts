@@ -20,6 +20,43 @@ export interface SyncResult {
   conflicts: ConflictInfo[];
 }
 
+/** 空加密字段占位（服务端字段缺失时使用） */
+const EMPTY_FIELD: EncryptedField = { encrypted_key: "", ciphertext: "" };
+
+/**
+ * 安全解析服务端返回的加密字段 JSON。
+ *
+ * 服务端字段是 JSON 字符串（EncryptedField 的序列化），但可能因数据损坏/版本不匹配
+ * 返回非法 JSON。早期实现直接 JSON.parse 会让**整轮同步抛异常**（一条坏数据阻断全部条目）。
+ * 这里兜底为 null，由调用方决定跳过该条。
+ */
+function parseField(raw: string | null | undefined): EncryptedField | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && "ciphertext" in parsed) {
+      return parsed as EncryptedField;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 解析服务端 ISO 时间戳为毫秒数；非法输入返回 null。
+ *
+ * 服务端 updated_at 理论上是 ISO 8601，但 null / 空串 / 非日期串都可能出现
+ * （上游字段变更、时区格式异常）。new Date("junk").getTime() === NaN，
+ * 而 NaN 作为 updatedAt 落库后，按 updatedAt 排序/比较的代码会**静默失序** ——
+ * 条目既不会报错也不会消失，只是永远排在错误的位置。宁可跳过该条。
+ */
+function parseServerTime(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 export async function sync(): Promise<SyncResult> {
   let pushed = 0;
   let pulled = 0;
@@ -124,7 +161,26 @@ export async function sync(): Promise<SyncResult> {
           await softDeleteByServerId(remote.server_id);
           pulled++;
         }
-      } else if (remote.server_id && conflictServerIds.has(remote.server_id)) {
+        continue;
+      }
+
+      // 解析加密字段；name 解析失败 -> 该条目损坏，跳过（不让一条坏数据阻断整轮同步）
+      const nameField = parseField(remote.name);
+      if (!nameField) {
+        console.warn(`[sync] 跳过损坏条目 server_id=${remote.server_id}（name 非法 JSON）`);
+        continue;
+      }
+      const descField = parseField(remote.description);
+      const dataField = parseField(remote.data) ?? EMPTY_FIELD;
+
+      // 时间戳非法 -> 该条无法安全落库（NaN 会污染排序），跳过
+      const remoteMs = parseServerTime(remote.updated_at);
+      if (remoteMs === null) {
+        console.warn(`[sync] 跳过损坏条目 server_id=${remote.server_id}（updated_at 非法）`);
+        continue;
+      }
+
+      if (remote.server_id && conflictServerIds.has(remote.server_id)) {
         // 冲突条目的服务端版本：不自动 upsert，捕获供用户选「使用服务端」时应用
         const local = pendingConflicts.find((c) => c.serverId === remote.server_id);
         if (local) {
@@ -132,15 +188,15 @@ export async function sync(): Promise<SyncResult> {
             localDid: local.localDid,
             serverId: remote.server_id,
             localUpdatedAt: local.localUpdatedAt,
-            serverUpdatedAt: new Date(remote.updated_at).getTime(),
+            serverUpdatedAt: remoteMs,
             serverItem: {
               type: remote.type,
               icon: remote.icon,
-              name: JSON.parse(remote.name) as EncryptedField,
-              description: remote.description ? JSON.parse(remote.description) as EncryptedField : null,
-              data: remote.data ? JSON.parse(remote.data) as EncryptedField : ({ encrypted_key: "", ciphertext: "" } as EncryptedField),
+              name: nameField,
+              description: descField,
+              data: dataField,
               version: remote.version,
-              updatedAt: new Date(remote.updated_at).getTime(),
+              updatedAt: remoteMs,
             },
           });
         }
@@ -148,13 +204,13 @@ export async function sync(): Promise<SyncResult> {
         toUpsert.push({
           type: remote.type,
           icon: remote.icon,
-          name: JSON.parse(remote.name) as EncryptedField,
-          description: remote.description ? JSON.parse(remote.description) as EncryptedField : null,
-          data: remote.data ? JSON.parse(remote.data) as EncryptedField : ({ encrypted_key: "", ciphertext: "" } as EncryptedField),
+          name: nameField,
+          description: descField,
+          data: dataField,
           serverId: remote.server_id,
           version: remote.version,
           isDirty: false,
-          updatedAt: new Date(remote.updated_at).getTime(),
+          updatedAt: remoteMs,
         });
       }
     }

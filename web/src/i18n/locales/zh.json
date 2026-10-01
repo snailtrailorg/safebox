@@ -90,7 +90,12 @@
       "enterEmail": "请输入邮箱",
       "enterPassword": "请输入主密码",
       "mnemonicWordCount": "助记词应为 12 个英文单词，用空格分隔",
-      "recoverFailed": "恢复失败，请检查助记词或主密码"
+      "recoverFailed": "恢复失败，请检查助记词或主密码",
+      "emailTab": "📧 邮箱",
+      "phoneTab": "📱 手机",
+      "phoneLabel": "手机号",
+      "phonePlaceholder": "+8613800138000",
+      "enterPhone": "请输入手机号"
     }
   },
   "vault": {

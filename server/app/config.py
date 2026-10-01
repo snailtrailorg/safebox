@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     mnemonic_hmac_key: str = ""  # 32 字节 base64 编码，服务端 HMAC 密钥
     cors_origins: str = "*"
 
+    # 运行环境："development"（默认）| "production"
+    # 决定「外部服务未配置」时的行为：
+    #   development -> 打日志 + 假装成功（便于本地调试走通注册/登录全流程）
+    #   production  -> 返回失败（让 /send-code 抛 503，而不是静默发不出去）
+    # 误判风险：生产若忘了设为 production，会出现"用户收不到验证码但接口 200"的
+    # 静默失败。故 production 部署必须显式设置 SAFEBOX_ENVIRONMENT=production，
+    # 本项已列入 DEPLOY.md 检查单。
+    environment: str = "development"
+
     # 限流
     trusted_proxies: str = ""  # 可信代理 IP（逗号分隔），仅这些直连 IP 的 X-Forwarded-For/X-Real-IP 被采纳
 
@@ -44,6 +53,10 @@ class Settings(BaseSettings):
     sync_batch_limit: int = 100
 
     model_config = {"env_prefix": "SAFEBOX_", "env_file": ".env", "extra": "ignore"}
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in ("production", "prod")
 
 
 settings = Settings()

@@ -46,7 +46,7 @@ from app.services.auth_service import (
     revoke_all_user_tokens,
     verify_and_rotate_refresh_token,
 )
-from app.services.email_service import send_recovery_alert, send_verification_email
+from app.services.email_service import send_password_changed_alert, send_verification_email
 from app.services.sms_service import send_sms
 from app.services.srp_service import (
     G as SRP_G,
@@ -238,7 +238,7 @@ async def send_code(req: SendCodeRequest, request: Request, db: AsyncSession = D
     code = generate_code()
     sent = await send_sms(req.value, code, lang) if req.target == "phone" else await send_verification_email(req.value, code, lang)
     if not sent:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Failed to send verification code")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=_t(request, "send_code_failed"))
 
     await store_code(req.target, req.value, code)
     return SendCodeResponse(expires_in=settings.verification_code_expire_seconds)
@@ -339,9 +339,9 @@ async def login_srp_challenge(req: SRPChallengeRequest, request: Request, db: As
     try:
         A = int(req.A, 16)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid A")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "srp_handshake_invalid"))
     if not is_valid_public(A):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid A")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "srp_handshake_invalid"))
 
     if user and user.srp_verifier and user.srp_salt:
         v = int(user.srp_verifier, 16)
@@ -366,7 +366,7 @@ async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSes
     """SRP 第二步：客户端发 M1，服务端验证后返回 M2 + token（绑 device_id）。"""
     session = await get_srp_session(req.session_id)
     if not session:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SRP session expired")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "srp_session_expired"))
     await delete_srp_session(req.session_id)  # 一次性，防重放
 
     target_type = session["target_type"]
@@ -381,7 +381,7 @@ async def login_srp_verify(req: SRPVerifyRequest, request: Request, db: AsyncSes
     try:
         client_M1 = bytes.fromhex(req.M1)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid M1")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_t(request, "srp_handshake_invalid"))
 
     B = compute_server_public(v, b)
     u = compute_u(A, B)
@@ -421,6 +421,7 @@ async def change_password(
 ):
     """改主密码：主密码参与 K 派生，更新 encrypted_user_key + srp_verifier/srp_salt/local_salt。
     新 token 继承当前 device_id。"""
+    lang = get_lang(request.headers.get("Accept-Language"))
     # M6: 改密要求 fresh token（5min 内），防 XSS 盗旧 access 改密
     if not is_fresh_token(getattr(request.state, "token_iat", None)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_t(request, "invalid_token"))
@@ -452,7 +453,9 @@ async def change_password(
         await delete_session_key(did)
     await db.commit()
 
-    background_tasks.add_task(send_recovery_alert, user, "password_changed")  # 异步发通知，不阻塞响应（SMTP 慢）
+    # 异步发通知，不阻塞响应（SMTP 慢）。按请求的 Accept-Language 决定告警语言
+    # —— 告警是给用户看的，语言不对等于告警失效。
+    background_tasks.add_task(send_password_changed_alert, user, lang)
 
     access_token = create_access_token(user.id, device_id)
     refresh_token = await create_refresh_token(db, user.id, device_id)

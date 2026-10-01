@@ -3,14 +3,25 @@
  *
  * ## 版本升级指南
  *
- * 当前版本 DB_VERSION = 1（调试阶段）。
- * schema 变更时手工清 IndexedDB 即可，不需要改动版本号。
+ * 当前 DB_VERSION = 1。
  *
- * 【投产前必做】将 DB_VERSION 设为当前数据库版本 +1，
- * 在 upgrade() 中用 oldVersion 分支编写迁移逻辑。
- * 例如从 v1 到 v2：
- *   if (oldVersion < 2) { db.createObjectStore("newStore", ...); }
- * 不要删除旧分支——用户可能从任何旧版本升级。
+ * **演化规则**（重要，别被旧注释误导）：
+ *
+ * 1. **新增** object store / index
+ *    upgrade() 里的 objectStoreNames.contains(...) 守卫已经幂等，
+ *    只需把 DB_VERSION 加 1，并在 upgrade 中追加同样写法的守卫式创建即可。
+ *    老用户库会自动补建，**不需要清库**。
+ *
+ * 2. **修改 / 删除** 已有 store 的结构
+ *    （改 keyPath、删 index、改字段语义）—— 这类变更 contains() 守卫覆盖不到，
+ *    必须用 oldVersion 分支显式迁移：在 upgrade(db, oldVersion) 内判断
+ *    oldVersion 小于目标版本时执行对应改造。
+ *    且**不要删除旧分支** —— 用户可能从任何旧版本直接升级。
+ *
+ * 3. 调试期（未投产）若嫌麻烦，手工清 IndexedDB 也可以：
+ *    F12 -> Application -> IndexedDB -> 删 safebox。
+ *
+ * 注：早期注释曾宣称 store 数量变化就必须清库，那是错的 —— 见规则 1。
  */
 import { openDB, DBSchema, IDBPDatabase } from "idb";
 import type { Item, SessionData } from "../types/domain";

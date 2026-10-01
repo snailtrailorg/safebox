@@ -39,7 +39,17 @@ class ApiClient {
   private async getK(): Promise<Uint8Array | null> {
     const session = await getSession();
     if (!session.session_K) return null;
-    return hexToBytes(session.session_K);
+    try {
+      return hexToBytes(session.session_K);
+    } catch {
+      // session_K 损坏（遗留格式 / 存储被改写）时降级为「不加密传输」，
+      // 与登录前请求同路径。K 只是通信加密的增强项，它的损坏不该让
+      // 所有认证请求崩掉——那会把用户锁死在"已登录但什么都干不了"。
+      // 注意：降级是**失去**服务端侧防降级的 X-Safebox-Encrypted 标记，
+      // 故打日志以便定位（不要静默）。
+      console.warn("[api] session_K 非法，本轮请求降级为明文传输");
+      return null;
+    }
   }
 
   private async request<T>(method: string, path: string, body?: unknown, skipAuth = false): Promise<T> {

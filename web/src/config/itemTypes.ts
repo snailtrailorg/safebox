@@ -1,5 +1,6 @@
 /** 条目类型常量 — 集中配置所有类型的字段模板和显示信息 */
 import type { ItemType } from "../types/domain";
+import i18n from "../i18n";
 
 export interface FieldDef {
   key: string;
@@ -18,11 +19,31 @@ export interface ItemTypeConfig {
   fields: FieldDef[];
 }
 
-let _configs: ItemTypeConfig[] | null = null;
+/**
+ * 配置缓存 —— **按语言分桶**。
+ *
+ * 早期实现是单变量 `let _configs = null; if (_configs) return _configs;`，
+ * 即"首次调用后永久固化"。因为 t() 只在首次被求值，**切换语言后
+ * 所有 label/hint 仍是旧语言**，且不会有任何报错 —— 静默失效。
+ *
+ * 现在以语言为 key：语言不变则命中缓存（保留原意），语言变化则重建。
+ * 注：当前语言由 navigator.language 在启动时决定、暂无运行时切换入口，
+ * 故此缺陷当前不可达；但把缓存 key 化是零成本的防雷 —— 将来加语言切换
+ * （settings 页很自然会有）时不会踩到。
+ */
+const _configsByLang: Record<string, ItemTypeConfig[]> = {};
 
 export function buildItemTypeConfigs(t: (key: string) => string): ItemTypeConfig[] {
-  if (_configs) return _configs;
-  _configs = [
+  const lang = i18n.resolvedLanguage ?? i18n.language ?? "en";
+  const cached = _configsByLang[lang];
+  if (cached) return cached;
+  const configs = buildFresh(t);
+  _configsByLang[lang] = configs;
+  return configs;
+}
+
+function buildFresh(t: (key: string) => string): ItemTypeConfig[] {
+  return [
     {
       type: "login",
       icon: "🔑",
@@ -80,7 +101,6 @@ export function buildItemTypeConfigs(t: (key: string) => string): ItemTypeConfig
       ],
     },
   ];
-  return _configs;
 }
 
 /** 获取某个类型的配置 */

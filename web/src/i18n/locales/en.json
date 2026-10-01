@@ -90,7 +90,12 @@
       "enterEmail": "Please enter your email.",
       "enterPassword": "Please enter master password.",
       "mnemonicWordCount": "Recovery phrase must be 12 English words separated by spaces",
-      "recoverFailed": "Recovery failed. Check your recovery phrase or master password."
+      "recoverFailed": "Recovery failed. Check your recovery phrase or master password.",
+      "emailTab": "📧 Email",
+      "phoneTab": "📱 Phone",
+      "phoneLabel": "Phone",
+      "phonePlaceholder": "+8613800138000",
+      "enterPhone": "Please enter your phone number."
     }
   },
   "vault": {

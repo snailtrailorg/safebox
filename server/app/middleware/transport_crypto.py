@@ -16,6 +16,7 @@ import json as _json
 import jwt as jwt_lib
 
 from app.config import settings
+from app.i18n import get_text, get_lang
 from app.services import transport_crypto
 from app.services.verification_service import get_session_key
 
@@ -50,6 +51,7 @@ class TransportCryptoMiddleware:
             return
 
         headers = dict(scope["headers"])
+        lang = get_lang((headers.get(b"accept-language") or b"").decode("latin-1", "ignore"))
         auth = headers.get(b"authorization", b"")
         if not auth.startswith(b"Bearer "):
             await self.app(scope, receive, send)  # 无 token（Depends 401）
@@ -71,7 +73,7 @@ class TransportCryptoMiddleware:
         K_hex = await get_session_key(device_id_str)
         if not K_hex:
             # K 不存在（session 过期/Redis 故障）-> 拒 401，强制重 SRP login 重建 K（防 downgrade）
-            await self._send_json(send, 401, {"detail": "session expired"})
+            await self._send_json(send, 401, {"detail": get_text("transport_session_expired", lang)})
             return
         K = bytes.fromhex(K_hex)
 
@@ -79,14 +81,14 @@ class TransportCryptoMiddleware:
         new_receive = receive
         if scope["method"] in BODY_METHODS:
             if headers.get(b"x-safebox-encrypted") != b"1":
-                await self._send_json(send, 400, {"detail": "encrypted body required"})
+                await self._send_json(send, 400, {"detail": get_text("transport_encrypted_required", lang)})
                 return
             body = await self._read_body(receive)
             if body:
                 try:
                     decrypted = transport_crypto.decrypt(K, body)
                 except Exception:
-                    await self._send_json(send, 400, {"detail": "decrypt failed"})
+                    await self._send_json(send, 400, {"detail": get_text("transport_decrypt_failed", lang)})
                     return
                 new_receive = self._make_receive(decrypted)
 

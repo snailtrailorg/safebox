@@ -27,6 +27,69 @@ interface BackupPayload {
   }>;
 }
 
+/** EncryptedField 形状校验：必须是带 ciphertext 字符串的对象 */
+function isEncryptedField(v: unknown): v is EncryptedField {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof (v as EncryptedField).ciphertext === "string" &&
+    typeof (v as EncryptedField).encrypted_key === "string"
+  );
+}
+
+/**
+ * 备份体结构校验。
+ *
+ * 备份文件来自用户磁盘，可被任意篡改或损坏；早期实现直接 JSON.parse 后
+ * `for (const item of payload.items)`，后果分三类：
+ *   - items 是字符串 -> **逐字符迭代**，"n"、"o" 各成一个"条目"，静默导入垃圾；
+ *   - items 是数字/对象 -> for...of 抛 TypeError，错误信息与"密码错"无法区分；
+ *   - 条目缺 name/data -> `undefined` 直接落库，污染本地库存（后续解密全崩）。
+ * 这里统一拦在写入前，宁可整份拒绝，也不落半份脏数据。
+ */
+function validateBackupPayload(raw: unknown): BackupPayload {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("backup_invalid_payload");
+  }
+  const p = raw as Record<string, unknown>;
+  if (p.version !== 1) {
+    throw new Error(i18n.t("backup.unsupportedVersion", { version: String(p.version) }));
+  }
+  if (!Array.isArray(p.items)) {
+    throw new Error("backup_invalid_items");
+  }
+  for (const [idx, item] of p.items.entries()) {
+    if (!item || typeof item !== "object") {
+      throw new Error(`backup_invalid_item:${idx}`);
+    }
+    const it = item as Record<string, unknown>;
+    if (typeof it.type !== "string") {
+      throw new Error(`backup_invalid_item_type:${idx}`);
+    }
+    if (!isEncryptedField(it.name)) {
+      throw new Error(`backup_invalid_item_name:${idx}`);
+    }
+    if (!isEncryptedField(it.data)) {
+      throw new Error(`backup_invalid_item_data:${idx}`);
+    }
+    if (it.description != null && !isEncryptedField(it.description)) {
+      throw new Error(`backup_invalid_item_description:${idx}`);
+    }
+    if (it.serverId != null && typeof it.serverId !== "string") {
+      throw new Error(`backup_invalid_item_server_id:${idx}`);
+    }
+    // 时间戳缺失时给 0 兜底（备份格式早期版本可能没这两个字段），
+    // 但不能是 NaN —— NaN 会让条目在按 updatedAt 排序时永久失序。
+    if (it.createdAt != null && !Number.isFinite(it.createdAt)) {
+      throw new Error(`backup_invalid_item_created_at:${idx}`);
+    }
+    if (it.updatedAt != null && !Number.isFinite(it.updatedAt)) {
+      throw new Error(`backup_invalid_item_updated_at:${idx}`);
+    }
+  }
+  return raw as BackupPayload;
+}
+
 /** 导出加密备份 */
 export async function exportBackup(password: string): Promise<void> {
   const uid = await getCurrentUserId();
@@ -80,8 +143,15 @@ export async function importBackup(password: string, file: File): Promise<number
   const plainBytes = await aesDecrypt(key, encoded);
   if (!plainBytes) throw new Error(i18n.t("backup.wrongPassword"));
 
-  const payload: BackupPayload = JSON.parse(new TextDecoder().decode(plainBytes));
-  if (payload.version !== 1) throw new Error(i18n.t("backup.unsupportedVersion", { version: payload.version }));
+  // 解密成功不等于文件合法：JSON.parse 与结构校验都必须兜住，
+  // 否则损坏文件会以未捕获异常或脏数据形式漏出去。
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plainBytes));
+  } catch {
+    throw new Error(i18n.t("backup.invalidFile"));
+  }
+  const payload = validateBackupPayload(parsed);
 
   const uid = await getCurrentUserId();
   const db = await getDb();
@@ -103,8 +173,8 @@ export async function importBackup(password: string, file: File): Promise<number
       version: 1,
       isDirty: true,
       isDeleted: false,
-      updatedAt: item.updatedAt,
-      createdAt: item.createdAt,
+      updatedAt: item.updatedAt ?? 0,
+      createdAt: item.createdAt ?? 0,
     });
     count++;
   }

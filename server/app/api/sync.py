@@ -4,12 +4,13 @@ from typing import Optional, List
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.config import settings
+from app.i18n import get_text, get_lang
 from app.middleware import get_current_user_id
 from app.models import Item
 from app.schemas.sync import (
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 
 @router.get("/pull", response_model=SyncPullResponse)
 async def sync_pull(
+    request: Request,
     since: str = Query(..., description="ISO8601 时间戳，拉取此时间之后更新的条目"),
     since_id: Optional[UUID] = Query(None, description="上一页最后一条 id，与 since 组成复合游标防同 updated_at 跨页丢失"),
     limit: int = Query(settings.sync_batch_limit, ge=1, le=500),
@@ -41,7 +43,11 @@ async def sync_pull(
     try:
         since_dt = datetime.fromisoformat(since)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid since format")
+        lang = get_lang(request.headers.get("Accept-Language"))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=get_text("invalid_since_format", lang),
+        )
 
     cond = Item.updated_at > since_dt
     if since_id is not None:

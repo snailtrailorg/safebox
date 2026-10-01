@@ -8,6 +8,24 @@ from unittest.mock import AsyncMock, patch
 # 测试用 HMAC 密钥
 os.environ["SAFEBOX_RECOVERY_HMAC_KEY"] = "dGVzdC1obWFjLWtleS0zMi1ieXRlcy1sb25nISEh"
 
+# ── 测试环境隔离（必须在 import app.config 之前设置）────────────────
+#
+# 为什么必须显式清空：Settings 的 model_config 带 env_file=".env"，而开发者
+# 本机的 server/.env 常配了**真实凭据**（SMTP / Twilio）。一旦真实凭据进入
+# 测试进程，未 mock 的发送路径会真的外呼：
+#   - 最坏情况是挂死 —— smtplib.SMTP() 无超时，在受限网络下 test_change_password
+#     会卡在 TCP/TLS 握手，整个 pytest 永不返回（实测卡死 >5 分钟）。
+#   - 即使连通，也会用生产账号真的发出一封"密码已修改"告警邮件。
+# 测试不该依赖网络，更不该产生外呼副作用（尤其发信）。
+# 置空后 _send_email/send_sms 走"未配置 + development"分支，直接 return True。
+os.environ["SAFEBOX_SMTP_USERNAME"] = ""
+os.environ["SAFEBOX_SMTP_PASSWORD"] = ""
+os.environ["SAFEBOX_TWILIO_ACCOUNT_SID"] = ""
+os.environ["SAFEBOX_TWILIO_AUTH_TOKEN"] = ""
+# 显式声明开发环境：生产语义由 test_config_environment 之类的单测覆盖，
+# 不靠"本机 .env 恰好没设 SAFEBOX_ENVIRONMENT"这种巧合。
+os.environ["SAFEBOX_ENVIRONMENT"] = "development"
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -65,6 +83,11 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         patch("app.api.auth.store_code", new_callable=AsyncMock),
         patch("app.api.auth.send_verification_email", new_callable=AsyncMock),
         patch("app.api.auth.send_sms", new_callable=AsyncMock),
+        # 改密后的安全告警（BackgroundTasks 里发出）。**必须 mock**：
+        # 该函数经 _send_email -> smtplib 真实外呼，未被 mock 的路径会让
+        # 未显式 patch 的用例（如 test_change_password）挂死在 SMTP 握手上。
+        # 需要断言告警行为的用例自行局部 patch（见 test_change_password_sends_security_alert）。
+        patch("app.api.auth.send_password_changed_alert", new_callable=AsyncMock),
         patch("app.middleware.rate_limit.check_rate_key", new_callable=AsyncMock) as mock_rate,
         patch("app.services.verification_service._get_redis", new_callable=AsyncMock) as mock_redis,
         patch("app.middleware.transport_crypto.get_session_key", new_callable=AsyncMock) as mock_session_key,
