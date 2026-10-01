@@ -226,7 +226,7 @@ EncryptedField = { encrypted_key, ciphertext }
   ciphertext = AES-GCM(ItemKey, 明文, AAD="safebox:v2:item:{fieldName}:{itemType}")
   nonce = 12 字节随机, tagLength = 128 位
 ```
-- 每条目一个随机 ItemKey（UserKey 包裹）
+- 每条目一个随机 ItemKey（UserKey 包裹），**条目生命周期内不变**：编辑已有条目时复用原 ItemKey，仅新建时生成（`ItemEditPage.handleSave`）
 - name/description/data 各自独立加密
 - AAD 绑定字段名+类型，防密文替换
 - 文件 blob = AES-GCM(UserKey, 内容)，存 IndexedDB（不同步，仅元数据同步）

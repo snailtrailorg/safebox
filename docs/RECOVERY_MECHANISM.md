@@ -99,15 +99,18 @@
 
 ## 八、换设备 / logout 后重登（RecoveryPage，mnemonic_encrypted 无）
 
-1. `GET /auth/salt`
+**支持 email / phone 双通道**（页面上为 tab 切换，与 LoginPage 对齐）：
+- email tab：`GET /auth/salt?email=...`，`performSrpLogin("email", email, ...)`
+- phone tab：`GET /auth/salt?phone=...`，`performSrpLogin("phone", phone, ...)`
+
+1. `GET /auth/salt`（按 tab 传 email 或 phone）
 2. 用户输助记词 + 主密码
 3. SRP 两步（challenge 传 `device_name` 新设备建 UserDevice + verify 建 K_comm；x 含助记词故同时验主密码+助记词）
 4. `recoverAndRewrap(助记词, 主密码, mnemonic_salt, encrypted_user_key, local_salt)`：
-   - K = PBKDF2(助记词+主密码, mnemonic_salt)
-   - UserKey = AES_Dec(K, encrypted_user_key)
-   - cached_K = AES(localDerivedKey, K)
-   - mnemonic_encrypted = AES(localDerivedKey, 助记词)
-5. saveSession（device_id + session_K + cached_K + mnemonic_encrypted）
+   - 内部：K = PBKDF2(助记词 ‖ 主密码, mnemonic_salt)（**‖ = U+0000 分隔符**，非裸拼接）
+   - UserKey = AES_Dec(K, encrypted_user_key) → **写入内存**（不返回）
+   - 返回 `{ ok, newCachedK, mnemonicEncrypted }` —— **仅 2 个产物**；cached_K = AES(localDerivedKey, K)，mnemonic_encrypted = AES(localDerivedKey, 助记词)
+5. saveSession（device_id + session_K + cached_K + mnemonic_encrypted + `identifier_type`）
 
 **助记词/主密码错**：SRP x 错 -> M1 不匹配 -> 401（与用户不存在一样，fake verifier 防枚举）。
 
@@ -117,11 +120,12 @@
 
 主密码参与 K + x 派生，改密 = K 变 + verifier 变：
 
-1. 输入：当前主密码 + 新主密码 + 助记词 + 验证码
-2. `unlockWithPassword`（载入 UserKey 到内存）
+1. 输入：当前主密码 + 新主密码 + 助记词 + 验证码（登录标识符按 `identifier_type` 走 email 或 phone）
+2. `unlockWithPassword`（载入 UserKey 到内存 + 留存 raw 副本供重包裹）
 3. **前置 SRP 登录**（验旧密码，同设备 device_id）-> fresh token + K_comm
-4. `changeMasterPassword(助记词, email, mnemonic_salt, 新主密码, new_local_salt)`：
+4. `changeMasterPassword(助记词, 标识符, mnemonic_salt, 新主密码, new_local_salt)`：
    - 新 K + new_encrypted_user_key + new_cached_K + new_mnemonic_encrypted + new_srp_verifier + new_srp_salt
+   - **重包裹用内存留存的 UserKey raw 副本，不用 `exportKey`**（userKey 为 non-extractable，exportKey/wrapKey 均抛 InvalidAccessError）
 5. `POST /auth/change-password`（fresh token + 验证码 + 新材料）：
    - revoke_all_user_tokens + **清其他 device session_key**（当前保留）+ 写新材料 + 异步通知邮件
 6. 本地落库新材料 + 新 token（session_K 保留 fresh K，直到重登）

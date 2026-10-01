@@ -266,15 +266,22 @@ async def test_change_password(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_change_password_sends_security_alert(client: AsyncClient):
-    """改密成功后发送安全告警邮件。"""
+    """改密成功后发送安全告警，且语言取自请求 Accept-Language。
+
+    函数在 i18n 改造中由 send_recovery_alert 更名为 send_password_changed_alert
+    （原函数带 initiate/accelerate/freeze 三个死分支，服务于已取消的恢复机制）。
+    """
     from unittest.mock import patch, AsyncMock
 
     email = "cpalert@safebox.example.com"
     resp = await client.post("/api/v1/auth/register/email", json=register_payload(email))
     token = resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept-Language": "zh-CN,zh;q=0.9",   # 断言语言透传
+    }
 
-    with patch("app.api.auth.send_recovery_alert", new_callable=AsyncMock) as mock_alert:
+    with patch("app.api.auth.send_password_changed_alert", new_callable=AsyncMock) as mock_alert:
         resp = await client.post("/api/v1/auth/change-password", json={
             "target": "email", "value": email,
             "verification_code": "123456",
@@ -284,9 +291,9 @@ async def test_change_password_sends_security_alert(client: AsyncClient):
             "new_encrypted_user_key": "new_euk",
         }, headers=headers)
         assert resp.status_code == 200
-        # 告警已发送，event=password_changed
+        # 告警已发送，且带上了收件人语言（告警语言不对 = 告警失效）
         mock_alert.assert_awaited_once()
-        assert mock_alert.call_args[0][1] == "password_changed"
+        assert mock_alert.call_args[0][1] == "zh"
 
 
 @pytest.mark.asyncio

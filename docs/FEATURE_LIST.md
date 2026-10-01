@@ -90,11 +90,12 @@
 
 | 功能 | 描述 |
 |------|------|
-| RateLimitMiddleware | 已认证按 user_id，否则按 IP（X-Real-IP）；滑动窗口 ZSET |
+| RateLimitMiddleware | 已认证（**JWT 验签后**取 sub）按 user_id，否则按 IP；滑动窗口 ZSET |
 | 白名单 | /health, /docs, /openapi.json, /redoc |
 | 严格端点 | /auth/login、/auth/register -> 100/h |
 | 默认 | 500/h |
 | Redis fail-open | 限流故障不锁死 |
+| IP 提取 | 仅可信代理（trusted_proxies）直连时采纳 X-Real-IP；**不采信 X-Forwarded-For**（其最左端可被客户端伪造）；与 `api/auth._client_ip` 策略一致 |
 | 登录限流 | 退避 0,0,1,2,4 秒 -> 第 5 次锁 1h（按目标，第 1 次不限制） |
 | SRP 防枚举 | 不存在用户返 fake verifier，verify 必失败（401 统一） |
 | /salt 防枚举 | 不存在用户返 HMAC 派生确定性 salt |

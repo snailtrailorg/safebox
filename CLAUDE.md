@@ -1,5 +1,14 @@
 # SafeBox 项目约定
 
+## 协作模式
+
+本项目由 **Maeve**（终端内工程搭档）全流程负责：分析、制定方案、编写契约、实施编辑、验证、收尾。
+
+- **重大改动前先给方案**：涉及密码学契约、数据库 schema、密钥派生、API 契约的改动，先出方案待威廉姆确认，再动手
+- **改动必有测试**：任何修复必须配套可复现的测试；修复前先确认测试在旧代码上**变红**，修完再确认**变绿**（防止恒绿废测试）
+- **区分「修一处」与「修一类」**：修单个调用点时，须说明防线挂在哪个「类」上
+- **真相源在文件里**：说"改好了"之前，必须读改动、跑测试、看 diff
+
 ## 部署
 
 ### 服务器部署（脚本，推服务器）
@@ -96,14 +105,28 @@
 - 浏览器清 IndexedDB：F12 -> Application -> IndexedDB -> 删 safebox
 - 服务端清数据库 + 迁移：`./scripts/clear-db.sh`
 - Redis 清理：`redis-cli FLUSHALL` 或 `DEL loginfail:email:xxx`（本地 redis6-cli 不存在用 redis-cli）
-- 前端 IndexedDB `DB_VERSION=1`，schema 变更手动清库；后端 Alembic 迁移链
+- 前端 IndexedDB `DB_VERSION=1`。**版本演化规则**（原文"schema 变更手动清库"过时，已勘误）：
+  - **新增** store/index：`upgrade()` 的 `contains()` 守卫已幂等，只需 `DB_VERSION` +1 并在 upgrade 里
+    追加守卫式创建，老库自动补建，**不需要清库**
+  - **改/删**已有结构（改 keyPath、删 index、改字段语义）：`contains()` 覆盖不到，必须用
+    `oldVersion` 分支显式迁移，且不要删旧分支（用户可能从任何旧版升级）
+  - 调试期嫌麻烦可手工清库：F12 -> Application -> IndexedDB
+  - 后端仍是 Alembic 迁移链
 
 ### 测试
-- 后端（所有）：`cd server && PYTHONPATH=. venv/bin/python -m pytest tests/ -q`（38 tests，1 skipped 需真 Redis）
+- 后端（所有）：`cd server && PYTHONPATH=. venv/bin/python -m pytest tests/ -q`（**53 passed, 1 skipped**，约 13s）
+  - 注：2026-10-01 前此命令会**挂死**（不是慢）。原因是 conftest 未 mock 告警发送函数，
+    而本机 `server/.env` 配了真实 SMTP → 测试真连 `smtp.gmail.com:587`，`smtplib` 无超时故永不返回。
+    已在 conftest 补 mock + 清空外呼凭据。**若再次出现"跑不起来/很久没输出"，
+    先怀疑测试产生了真实外呼，不要当成"冷启动慢"绕过去。**
 - 后端（单文件）：`cd server && PYTHONPATH=. venv/bin/python -m pytest tests/test_auth.py -v`
-- 前端（所有）：`cd web && npx vitest run`（84 tests）
+- 前端（所有）：`cd web && npx vitest run`（**17 files / 139 tests**）
 - 前端（单文件）：`cd web && npx vitest run src/__tests__/kdf-keychain.test.ts`
 - 测试数据库 SQLite，不需 PostgreSQL/Redis（conftest.py mock Redis + identity 加解密透传）
+- **静态检查**：`ruff` 未装（`Makefile` 的 `lint` 目标依赖缺失）。替代：
+  `python -m compileall -q app/ tests/`。要真 lint 先 `venv/bin/pip install ruff`
+- **i18n 双端闸门**：`pytest tests/test_i18n_consistency.py`（改任何 i18n 后必跑；
+  历史上后端曾被整体漏扫，见该文件头注释）
 - tsc 类型检查：`cd web && npx tsc --noEmit`
 
 ### 设备 deauthorize + SRP K 通信加密（Phase 2）
