@@ -48,6 +48,10 @@ from app.services.auth_service import (
 )
 from app.services.email_service import send_password_changed_alert, send_verification_email
 from app.services.sms_service import send_sms
+# 客户端 IP 提取与限流共用同一实现：旧本地副本无条件信任 X-Real-IP，仅因 nginx 的
+# proxy_set_header 覆盖了客户端自带头才安全，属脆弱的隐式依赖。现统一为
+# 「仅可信代理直连才采纳」，详见 app/middleware/rate_limit.get_client_ip 的 docstring。
+from app.middleware.rate_limit import get_client_ip
 from app.services.srp_service import (
     G as SRP_G,
     N as SRP_N,
@@ -122,14 +126,6 @@ def _parse_user_agent(ua: str) -> tuple[str, str]:
     return client_name, os_name
 
 
-def _client_ip(request: Request) -> str:
-    """最后认证 IP。优先 X-Real-IP（反代设，可信），不取 X-Forwarded-For（client 可伪造）。"""
-    xri = request.headers.get("X-Real-IP", "")
-    if xri:
-        return xri
-    return request.client.host if request.client else ""
-
-
 def _device_info(d: UserDevice, current_device_id: Optional[UUID] = None) -> DeviceInfo:
     return DeviceInfo(
         id=str(d.id),
@@ -153,7 +149,7 @@ async def _resolve_device(
     """登录后建/关联 device。同设备（device_id 有）验未 revoked + 更新 last_active_at + client_info；
     新设备建 UserDevice（client_name/os_name/last_auth_ip 从 User-Agent + IP 解析）。"""
     client_name, os_name = _parse_user_agent(request.headers.get("User-Agent", ""))
-    ip = _client_ip(request)
+    ip = get_client_ip(request)
     if device_id_str:
         try:
             device_id = UUID(device_id_str)
@@ -262,7 +258,7 @@ async def register_email(req: RegisterEmailRequest, request: Request, db: AsyncS
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
-        client_name=client_name, os_name=os_name, last_auth_ip=_client_ip(request))
+        client_name=client_name, os_name=os_name, last_auth_ip=get_client_ip(request))
     access_token = create_access_token(user.id, device_id)
     refresh_token = await create_refresh_token(db, user.id, device_id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))
@@ -284,7 +280,7 @@ async def register_phone(req: RegisterPhoneRequest, request: Request, db: AsyncS
         encrypted_user_key=req.encrypted_user_key, mnemonic_salt=req.mnemonic_salt,
         kdf_settings=req.kdf_settings,
         device_name=req.device_name, device_public_key=req.device_public_key, device_wrapped=req.device_wrapped,
-        client_name=client_name, os_name=os_name, last_auth_ip=_client_ip(request))
+        client_name=client_name, os_name=os_name, last_auth_ip=get_client_ip(request))
     access_token = create_access_token(user.id, device_id)
     refresh_token = await create_refresh_token(db, user.id, device_id)
     return RegisterResponse(user_id=str(user.id), access_token=access_token, refresh_token=refresh_token, device_id=str(device_id))

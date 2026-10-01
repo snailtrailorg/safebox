@@ -124,6 +124,15 @@ SAFEBOX_SMTP_PORT=587
 SAFEBOX_SMTP_USERNAME=
 SAFEBOX_SMTP_PASSWORD=
 SAFEBOX_SMTP_FROM=noreply@your-domain.com
+
+# 运行环境：production 下「外部服务未配置」返回失败（503），dev 静默放行
+SAFEBOX_ENVIRONMENT=production
+
+# 可信代理 IP（逗号分隔）。**反代部署（本机 nginx → uvicorn）必须配置为 127.0.0.1**，
+# 否则：1) IP 限流退化为所有用户共用 127.0.0.1 单桶（一人刷爆 → 全站 429）；
+# 2) 设备列表的 last_auth_ip 全部记成 127.0.0.1。
+# 原理见 app/middleware/rate_limit.py 的 get_client_ip（全项目唯一 IP 提取实现）。
+SAFEBOX_TRUSTED_PROXIES=127.0.0.1
 ```
 
 > `.env` 含密码/JWT 密钥，已在 `.gitignore`，不提交。

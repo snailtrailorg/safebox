@@ -53,7 +53,7 @@
 | **P1-9** | ✅ **已修** | `AuthContext.checkSession` 先做 base64url→base64 转换再 `atob` | 新增 3 条测试，含「旧实现必抛错」断言 |
 | **P1-10** | ✅ **已修** | `ItemEditPage.handleSave` 编辑时复用原 ItemKey（`decryptItemKey`），仅新建时 `createItemKey()` | 文档同步（ARCHITECTURE.md §9） |
 | **P1-2** | ⏸ **改注释** | `deriveKey` 的 `extractable=true` 是「缓存 K」需求的必然结果（`wrapKey` 实测不可替代）。**加详细取舍注释，不改行为** | 见 kdf.ts 注释 |
-| **P1-6** | ⚠️ **部分** | 代码侧已统一策略；**`trusted_proxies` 需部署时显式配置**（非代码问题） | 待对照 DEPLOY.md |
+| **P1-6** | ⚠️ **部分** | 代码侧已统一为单一实现 `get_client_ip`（`rate_limit.py`），auth 侧无条件信任 X-Real-IP 的脆弱隐式依赖已消除（10-01 深夜补）；**`trusted_proxies` 需部署时显式配置**，**DEPLOY.md §1.8 已补记载**（此前代码注释引用 DEPLOY.md 但文档根本没写，属文档空头引用） | 需服务器 `.env` 加 `SAFEBOX_TRUSTED_PROXIES=127.0.0.1`（威廉姆暂定改密码时顺手加） |
 | P1-8 | 🔷 **复议不改** | `session_K` 明文存储。**判定为可接受残余风险**，理由见下方「P1-8 复议」 | — |
 | P2-1 | ✅ **已修** | `exportUserKeyRaw` 改为读内存副本（原为死代码 + 同缺陷） | — |
 | P2-5 | ✅ **已修** | `hexToBytes` 加严格校验：奇数长度 / 非 hex 字符抛错（原 `parseInt` 返回 `NaN` 静默变 0） | 新增测试，**修复前 2 条红 → 全绿** |

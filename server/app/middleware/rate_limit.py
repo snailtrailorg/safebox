@@ -28,18 +28,24 @@ STRICT_PREFIXES = ("/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/
 STRICT_MAX = 100
 
 
-def _client_ip(request: Request) -> str:
-    """提取客户端真实 IP。
+def get_client_ip(request: Request) -> str:
+    """提取客户端真实 IP —— **全项目唯一实现**（限流桶 key 与 last_auth_ip 共用）。
 
-    策略与 api/auth._client_ip 保持一致（保守）：
+    策略（保守）：
     - 仅当直连来自可信代理（trusted_proxies）时才采纳 X-Real-IP
     - **不采信 X-Forwarded-For**：其最左端由客户端完全控制（客户端可自带
       `X-Forwarded-For: 1.2.3.4`，反代默认 append 到右侧），取最左等价采信伪造值，
       攻击者可借此让每次请求落在不同限流桶，绕过 IP 限流。
     - 非可信直连一律用 request.client.host
 
-    注：trusted_proxies 为空时（默认），所有请求按直连 IP 处理。反代部署下这会
-    退化为同一 IP 单桶 -> 需在部署时显式配置 trusted_proxies（见 DEPLOY.md）。
+    历史：原先是两份实现 —— 限流这份要求可信代理，auth 那份**无条件信任**
+    X-Real-IP。auth 的做法只有靠 nginx 的 `proxy_set_header X-Real-IP` 覆盖
+    客户端自带头才安全，属于脆弱的隐式依赖（改 nginx / 加 CDN 即破）。
+    现统一为本函数（单一真理源），策略不可能再分裂。
+
+    注：trusted_proxies 为空时（默认），所有请求按直连 IP 处理。反代部署下
+    这会退化为同一 IP 单桶（限流）/ 全部记录 127.0.0.1（last_auth_ip）
+    -> **必须**在部署时显式配置 trusted_proxies（见 DEPLOY.md）。
     """
     direct = request.client.host if request.client else ""
     trusted = [p.strip() for p in settings.trusted_proxies.split(",") if p.strip()]
@@ -91,7 +97,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # 限流 key：已认证用 user_id，否则用 IP
         user_id = _extract_user_id(request)
-        key = f"userrate:{user_id}" if user_id else f"iprate:{_client_ip(request)}"
+        key = f"userrate:{user_id}" if user_id else f"iprate:{get_client_ip(request)}"
 
         _, max_count = _rate_limit_for(path)
         try:

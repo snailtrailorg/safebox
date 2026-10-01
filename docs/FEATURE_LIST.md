@@ -95,7 +95,7 @@
 | 严格端点 | /auth/login、/auth/register -> 100/h |
 | 默认 | 500/h |
 | Redis fail-open | 限流故障不锁死 |
-| IP 提取 | 仅可信代理（trusted_proxies）直连时采纳 X-Real-IP；**不采信 X-Forwarded-For**（其最左端可被客户端伪造）；与 `api/auth._client_ip` 策略一致 |
+| IP 提取 | `get_client_ip`（`rate_limit.py`，**全项目唯一实现**，限流与 `last_auth_ip` 共用）：仅可信代理（trusted_proxies）直连时采纳 X-Real-IP；**不采信 X-Forwarded-For**（其最左端可被客户端伪造）。反代部署**必须**配置 `SAFEBOX_TRUSTED_PROXIES=127.0.0.1`（见 DEPLOY.md §1.8） |
 | 登录限流 | 退避 0,0,1,2,4 秒 -> 第 5 次锁 1h（按目标，第 1 次不限制） |
 | SRP 防枚举 | 不存在用户返 fake verifier，verify 必失败（401 统一） |
 | /salt 防枚举 | 不存在用户返 HMAC 派生确定性 salt |
