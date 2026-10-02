@@ -39,13 +39,20 @@ def get_client_ip(request: Request) -> str:
     - 非可信直连一律用 request.client.host
 
     历史：原先是两份实现 —— 限流这份要求可信代理，auth 那份**无条件信任**
-    X-Real-IP。auth 的做法只有靠 nginx 的 `proxy_set_header X-Real-IP` 覆盖
-    客户端自带头才安全，属于脆弱的隐式依赖（改 nginx / 加 CDN 即破）。
-    现统一为本函数（单一真理源），策略不可能再分裂。
+    X-Real-IP。auth 的做法只有靠反代覆盖客户端自带头才安全，属脆弱的隐式依赖
+    （改反代配置 / 前面加 CDN 即破）。现统一为本函数（单一真理源）。
 
-    注：trusted_proxies 为空时（默认），所有请求按直连 IP 处理。反代部署下
-    这会退化为同一 IP 单桶（限流）/ 全部记录 127.0.0.1（last_auth_ip）
-    -> **必须**在部署时显式配置 trusted_proxies（见 DEPLOY.md）。
+    ⚠️ 配置 trusted_proxies 的**前置条件**：反代必须**覆盖**（而非透传）
+    X-Real-IP。本函数只能判断「直连是否来自可信代理」，**无法分辨**该头是反代
+    写的还是客户端伪造的 —— 采信它的前提就是反代保证它可信：
+      - nginx : `proxy_set_header X-Real-IP $remote_addr;` 覆盖语义 -> 可用
+      - Apache: ProxyPass **不改**未声明的头（客户端自带头原样透传）-> 须显式
+                `RequestHeader set X-Real-IP %{REMOTE_ADDR}s` 之后才能配。
+    未确认反代覆盖该头之前不要配 trusted_proxies：宁可不采信（退化为
+    127.0.0.1），也不要采信一个可被客户端伪造的值。详见 DEPLOY.md §1.8 / §五。
+
+    注：trusted_proxies 为空时（默认），所有请求按直连 IP 处理。反代部署下这会
+    退化为同一 IP 单桶（限流）/ 全部记录 127.0.0.1（last_auth_ip）。
     """
     direct = request.client.host if request.client else ""
     trusted = [p.strip() for p in settings.trusted_proxies.split(",") if p.strip()]

@@ -128,9 +128,22 @@ SAFEBOX_SMTP_FROM=noreply@your-domain.com
 # 运行环境：production 下「外部服务未配置」返回失败（503），dev 静默放行
 SAFEBOX_ENVIRONMENT=production
 
-# 可信代理 IP（逗号分隔）。**反代部署（本机 nginx → uvicorn）必须配置为 127.0.0.1**，
-# 否则：1) IP 限流退化为所有用户共用 127.0.0.1 单桶（一人刷爆 → 全站 429）；
-# 2) 设备列表的 last_auth_ip 全部记成 127.0.0.1。
+# 可信代理 IP（逗号分隔）。反代部署（本机反代 → uvicorn 127.0.0.1）填 127.0.0.1。
+#
+# ⚠️ 前置条件（搞错会引入 IP 伪造漏洞）：
+#   配本项的前提是「反代**覆盖**客户端自带的 X-Real-IP」，而不是原样透传。
+#   应用只能检查「直连是否来自可信代理」，**无法分辨**这个头是反代写的还是
+#   客户端伪造的。所以：
+#     - nginx：`proxy_set_header X-Real-IP $remote_addr;` 是覆盖语义 → 可配
+#     - Apache：ProxyPass **不修改**未声明的请求头（客户端自带头原样透传）→
+#       必须先在 Apache 侧加一行，再配本项：
+#           RequestHeader set X-Real-IP %{REMOTE_ADDR}s
+#       或启用 mod_remoteip（`RemoteIPHeader X-Real-IP`），见 §五。
+#   未确认反代覆盖该头之前 **不要配本项**：宁可不采信（退化为 127.0.0.1），
+#   也不要采信一个可被客户端伪造的值。
+#
+# 不配的代价（可接受，且优于伪造）：1) IP 限流退化为单桶（一人刷爆 → 全站 429）；
+# 2) 设备列表 last_auth_ip 全记成 127.0.0.1。
 # 原理见 app/middleware/rate_limit.py 的 get_client_ip（全项目唯一 IP 提取实现）。
 SAFEBOX_TRUSTED_PROXIES=127.0.0.1
 ```
@@ -347,5 +360,21 @@ sudo systemctl enable --now httpd
 ```
 
 `/etc/httpd/conf.d/safebox.conf`（ProxyPreserveHost + ProxyPass /api/ -> 127.0.0.1:8000 + DocumentRoot web + FallbackResource /index.html + SSL + 安全头），Let's Encrypt 用 `certbot --apache`。
+
+> ⚠️ **Apache 必须显式覆盖 `X-Real-IP`**，否则客户端的来源 IP 可被伪造。
+> 与 nginx 不同：Apache 的 `ProxyPass` **不会**修改未声明的请求头，客户端自带的
+> `X-Real-IP: 8.8.8.8` 会原样透传到后端；而 nginx 的 `proxy_set_header` 是覆盖语义。
+>
+> ```apache
+> # 二选一（放 <VirtualHost> 内的 /api/ 代理段）
+> RequestHeader set X-Real-IP %{REMOTE_ADDR}s   # 简单：直接覆盖
+> # 或启用 mod_remoteip（更完整，会一并修正访问日志里的客户端 IP）：
+> # RemoteIPHeader X-Forwarded-For
+> ```
+>
+> 加了这一行之后，`SAFEBOX_TRUSTED_PROXIES=127.0.0.1` 才是安全的；
+> **没加就不要设 `TRUSTED_PROXIES`**（应用会退化为不采信该头，见 §1.8）。
+> 自查：`grep -rn 'X-Real-IP\|RemoteIP' /etc/httpd/conf.d/`
+> 确认 web server 类型：`systemctl is-active httpd; systemctl is-active nginx`
 
 > Apache 配置含证书路径等敏感信息，不提交 git。
